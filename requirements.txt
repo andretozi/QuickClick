@@ -1,0 +1,2 @@
+# Quick Click — main.py roda so com a biblioteca padrao do Python (>= 3.8).
+# Nao instala nada. Este arquivo existe so como sinalizacao explicita.

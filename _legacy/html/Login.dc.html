@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    body{margin:0}
+    *{box-sizing:border-box}
+    ::selection{background:#FF6A3D;color:#fff}
+    a{color:#FF6A3D;text-decoration:none}
+    a:hover{color:#e8531f}
+    input::placeholder{color:rgba(43,29,21,.4)}
+    @keyframes qcspin{to{transform:rotate(360deg)}}
+  </style>
+</helmet>
+<div ref="{{ rootRef }}" style="font-family:'Nunito',system-ui,sans-serif;color:#2B1D15;background:#DFCBAA;min-height:100vh;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr));overflow-x:hidden;-webkit-font-smoothing:antialiased">
+
+  <!-- LEFT — brand panel -->
+  <sc-if value="{{ brandPanel }}" hint-placeholder-val="{{ true }}">
+  <div style="position:relative;overflow:hidden;background-color:#241813;background-image:radial-gradient(rgba(251,243,231,.05) 1px,transparent 1px),radial-gradient(130% 100% at 18% -8%,rgba(255,106,61,.16),transparent 55%);background-size:24px 24px,100% 100%;color:#FBF3E7;padding:clamp(30px,4vw,52px);display:flex;flex-direction:column;justify-content:space-between;gap:40px;min-height:clamp(360px,50vh,100%)">
+    <div data-blob style="position:absolute;z-index:0;top:-120px;left:-90px;width:460px;height:460px;border-radius:50%;filter:blur(80px);background:radial-gradient(circle,rgba(255,106,61,.34),rgba(255,106,61,0) 66%);pointer-events:none"></div>
+    <div data-blob style="position:absolute;z-index:0;bottom:-140px;right:-110px;width:420px;height:420px;border-radius:50%;filter:blur(84px);background:radial-gradient(circle,rgba(242,169,59,.26),rgba(242,169,59,0) 66%);pointer-events:none"></div>
+
+    <div style="position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:16px">
+      <a href="../Quick%20Click.dc.html" style="display:flex;align-items:center;gap:11px;color:#FBF3E7">
+        <span style="position:relative;width:42px;height:42px;flex:none;display:flex;align-items:center;justify-content:center">
+          <span data-logo-pulse style="position:absolute;width:42px;height:42px;border-radius:13px;border:2px solid rgba(255,106,61,.55);opacity:0;pointer-events:none"></span>
+          <span style="position:relative;width:42px;height:42px;border-radius:13px;background:linear-gradient(145deg,#FF7A4E,#FF6A3D 52%,#F2A93B);display:flex;align-items:center;justify-content:center;box-shadow:0 10px 22px -10px rgba(255,106,61,.9),inset 0 1px 0 rgba(255,255,255,.4)">
+            <span style="position:absolute;width:26px;height:26px;border-radius:50%;border:1.5px solid rgba(255,255,255,.3)"></span>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" style="position:relative;transform:translate(1px,1px)"><path d="M4 3l6.9 16.6 2.45-7.25 7.25-2.45L4 3z" fill="#fff" stroke="#fff" stroke-width="1" stroke-linejoin="round"/></svg>
+          </span>
+        </span>
+        <span style="font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:22px;letter-spacing:-.015em">Quick <span style="color:#FF8A5C;font-weight:700">Click</span></span>
+      </a>
+      <a href="../Quick%20Click.dc.html" style="display:inline-flex;align-items:center;gap:7px;color:rgba(251,243,231,.7);font-weight:700;font-size:14px" style-hover="color:#FBF3E7">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Voltar ao site
+      </a>
+    </div>
+
+    <div style="position:relative;z-index:1;max-width:440px">
+      <p data-in="1" style="color:#F2A93B;font-weight:800;font-size:13px;letter-spacing:.22em;margin:0 0 18px">ÁREA DO VENDEDOR</p>
+      <h1 data-in="2" style="font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:clamp(40px,5.4vw,60px);line-height:1;letter-spacing:-.025em;margin:0">Bem-vindo<br/>de volta.</h1>
+      <p data-in="3" style="color:rgba(251,243,231,.66);font-weight:600;font-size:clamp(16px,1.8vw,18.5px);line-height:1.6;margin:20px 0 0;max-width:400px">Entre e continue transformando estoque parado em dinheiro. É só uma foto — a IA cuida do resto.</p>
+    </div>
+
+    <div style="position:relative;z-index:1">
+      <div data-proof data-in="4" style="display:inline-flex;align-items:center;gap:13px;background:rgba(251,243,231,.07);border:1px solid rgba(251,243,231,.12);backdrop-filter:blur(6px);border-radius:16px;padding:14px 18px">
+        <span style="position:relative;flex:none">
+          <span data-proof-ring style="position:absolute;inset:-8px;border-radius:50%;border:2px solid rgba(55,160,106,.6);opacity:0"></span>
+          <span style="width:40px;height:40px;border-radius:50%;background:#37A06A;display:flex;align-items:center;justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4 4L19 7" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        </span>
+        <div>
+          <div style="font-weight:800;font-size:14px">Nova venda no Bazar da Ana</div>
+          <div style="font-family:'Fraunces',serif;font-weight:700;font-size:18px;color:#5fd39a">+ R$ 189,00</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- RIGHT — form panel -->
+  <div style="position:relative;display:flex;align-items:center;justify-content:center;padding:clamp(30px,5vw,56px) clamp(22px,5vw,56px)">
+    <div data-in="3" style="width:100%;max-width:428px">
+      <div style="margin-bottom:26px">
+        <h2 style="font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:clamp(30px,4vw,38px);line-height:1.05;letter-spacing:-.015em;margin:0">Entrar na sua conta</h2>
+        <p style="color:rgba(43,29,21,.6);font-weight:600;font-size:15.5px;margin:10px 0 0">Escolha como quer entrar — leva alguns segundos.</p>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:11px">
+        <button onClick="{{ onSocial }}" style="display:flex;align-items:center;justify-content:center;gap:11px;width:100%;height:52px;background:#F6EDDB;color:#2B1D15;border:1.5px solid rgba(43,29,21,.16);border-radius:14px;font-family:inherit;font-weight:800;font-size:15.5px;cursor:pointer;transition:transform .25s cubic-bezier(.16,1,.3,1),box-shadow .25s,border-color .25s" style-hover="transform:translateY(-2px);box-shadow:0 14px 28px -18px rgba(43,29,21,.7);border-color:rgba(43,29,21,.28)">
+          <svg width="21" height="21" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.4 29.3 35 24 35c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 18.9 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.5-5.2l-6.2-5.3C29.2 34.9 26.7 36 24 36c-5.3 0-9.7-2.6-11.3-6.9l-6.5 5C9.6 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4 5.5l6.2 5.3C41 38.4 44 32 44 24c0-1.3-.1-2.3-.4-3.5z"/></svg>
+          Continuar com Google
+        </button>
+        <button onClick="{{ onSocial }}" style="display:flex;align-items:center;justify-content:center;gap:10px;width:100%;height:52px;background:#241813;color:#fff;border:none;border-radius:14px;font-family:inherit;font-weight:800;font-size:15.5px;cursor:pointer;transition:transform .25s cubic-bezier(.16,1,.3,1),box-shadow .25s" style-hover="transform:translateY(-2px);box-shadow:0 16px 30px -16px rgba(36,24,19,.9)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M16.4 12.8c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.8.8-3.5.8-.7 0-1.9-.8-3-.8-1.6 0-3 .9-3.8 2.3-1.6 2.8-.4 7 1.2 9.3.8 1.1 1.7 2.4 2.9 2.3 1.2 0 1.6-.7 3-.7s1.8.7 3 .7c1.2 0 2-1.1 2.8-2.2.9-1.3 1.2-2.5 1.3-2.6-.1 0-2.5-1-2.5-3.8zM14.2 5.9c.6-.8 1-1.8.9-2.9-.9 0-2 .6-2.6 1.3-.6.6-1.1 1.7-1 2.7 1 .1 2-.5 2.7-1.1z"/></svg>
+          Continuar com Apple
+        </button>
+        <button onClick="{{ onSocial }}" style="display:flex;align-items:center;justify-content:center;gap:10px;width:100%;height:52px;background:#1877F2;color:#fff;border:none;border-radius:14px;font-family:inherit;font-weight:800;font-size:15.5px;cursor:pointer;transition:transform .25s cubic-bezier(.16,1,.3,1),box-shadow .25s" style-hover="transform:translateY(-2px);box-shadow:0 16px 30px -16px rgba(24,119,242,.9)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M22 12a10 10 0 10-11.6 9.9v-7H7.9V12h2.5V9.8c0-2.5 1.5-3.9 3.8-3.9 1.1 0 2.2.2 2.2.2v2.5h-1.2c-1.2 0-1.6.8-1.6 1.6V12h2.7l-.4 2.9h-2.3v7A10 10 0 0022 12z"/></svg>
+          Continuar com Facebook
+        </button>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:14px;margin:22px 0">
+        <span style="flex:1;height:1px;background:rgba(43,29,21,.16)"></span>
+        <span style="color:rgba(43,29,21,.5);font-weight:700;font-size:12.5px;letter-spacing:.04em">ou entre com e-mail</span>
+        <span style="flex:1;height:1px;background:rgba(43,29,21,.16)"></span>
+      </div>
+
+      <form onSubmit="{{ onSubmit }}" style="display:flex;flex-direction:column;gap:15px">
+        <div>
+          <label style="display:block;font-weight:800;font-size:13px;color:rgba(43,29,21,.7);margin-bottom:7px">E-mail</label>
+          <input type="email" placeholder="voce@sualoja.com.br" style="width:100%;background:#F6EDDB;border:1.5px solid rgba(43,29,21,.16);border-radius:13px;padding:14px 15px;font-family:inherit;font-weight:600;font-size:15.5px;color:#2B1D15;outline:none;transition:border-color .2s,box-shadow .2s" style-focus="border-color:#FF6A3D;box-shadow:0 0 0 4px rgba(255,106,61,.16)" />
+        </div>
+        <div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px">
+            <label style="font-weight:800;font-size:13px;color:rgba(43,29,21,.7)">Senha</label>
+            <a href="#" style="font-weight:800;font-size:13px">Esqueci a senha</a>
+          </div>
+          <div style="position:relative">
+            <input ref="{{ pwRef }}" type="password" placeholder="Sua senha" style="width:100%;background:#F6EDDB;border:1.5px solid rgba(43,29,21,.16);border-radius:13px;padding:14px 46px 14px 15px;font-family:inherit;font-weight:600;font-size:15.5px;color:#2B1D15;outline:none;transition:border-color .2s,box-shadow .2s" style-focus="border-color:#FF6A3D;box-shadow:0 0 0 4px rgba(255,106,61,.16)" />
+            <button type="button" onClick="{{ togglePw }}" aria-label="Mostrar senha" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:none;border:none;color:rgba(43,29,21,.5);cursor:pointer;border-radius:9px" style-hover="color:#2B1D15;background:rgba(43,29,21,.06)">
+              <sc-if value="{{ notShowPw }}" hint-placeholder-val="{{ true }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/></svg></sc-if>
+              <sc-if value="{{ showPw }}" hint-placeholder-val="{{ false }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M3 3l18 18M10.6 10.7a3 3 0 004.2 4.2M9.4 5.2A9.4 9.4 0 0112 5c6.5 0 10 7 10 7a17 17 0 01-3.3 4.1M6.1 6.6A17 17 0 002 12s3.5 7 10 7a9.3 9.3 0 003.4-.6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></sc-if>
+            </button>
+          </div>
+        </div>
+        <button type="submit" style="position:relative;width:100%;height:54px;margin-top:4px;background:#FF6A3D;color:#fff;border:none;border-radius:14px;font-family:inherit;font-weight:800;font-size:16.5px;cursor:pointer;box-shadow:0 18px 34px -16px rgba(255,106,61,1);transition:transform .25s cubic-bezier(.16,1,.3,1),box-shadow .25s,background .25s" style-hover="transform:translateY(-2px);box-shadow:0 24px 44px -16px rgba(255,106,61,1);background:#e8531f">
+          <sc-if value="{{ notLoading }}" hint-placeholder-val="{{ true }}"><span>Entrar</span></sc-if>
+          <sc-if value="{{ loading }}" hint-placeholder-val="{{ false }}"><span style="display:inline-flex;align-items:center;gap:10px"><span style="width:18px;height:18px;border-radius:50%;border:2.6px solid rgba(255,255,255,.4);border-top-color:#fff;display:inline-block;animation:qcspin .7s linear infinite"></span>Entrando…</span></sc-if>
+        </button>
+      </form>
+
+      <p style="text-align:center;color:rgba(43,29,21,.62);font-weight:700;font-size:14.5px;margin:22px 0 0">Novo por aqui? <a href="../Quick%20Click.dc.html" style="font-weight:800">Criar conta grátis</a></p>
+      <p style="text-align:center;color:rgba(43,29,21,.42);font-weight:600;font-size:12px;line-height:1.55;margin:18px auto 0;max-width:330px">Ao continuar, você concorda com os <a href="#" style="color:rgba(43,29,21,.55);font-weight:700">Termos</a> e a <a href="#" style="color:rgba(43,29,21,.55);font-weight:700">Política de Privacidade</a>.</p>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+ &quot;$preview&quot;: { &quot;width&quot;: 1280, &quot;height&quot;: 860 },
+ &quot;brandPanel&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Layout&quot; },
+ &quot;ambient&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Movimento&quot; }
+}">
+class Component extends DCLogic {
+  state = { showPw: false, loading: false };
+  rootRef = (el) => { this.rootEl = el; };
+  pwRef = (el) => { this.pwEl = el; };
+
+  togglePw = () => {
+    const n = !this.state.showPw;
+    this.setState({ showPw: n });
+    if (this.pwEl) this.pwEl.type = n ? 'text' : 'password';
+  };
+  onSubmit = (e) => {
+    e.preventDefault();
+    if (this.state.loading) return;
+    this.setState({ loading: true });
+    this.after(1600, () => this.setState({ loading: false }));
+  };
+  onSocial = (e) => {
+    const el = e.currentTarget;
+    el.animate([{ transform: 'scale(1)' }, { transform: 'scale(.955)' }, { transform: 'scale(1)' }], { duration: 300, easing: 'ease-out' });
+  };
+
+  renderVals() {
+    return {
+      rootRef: this.rootRef, pwRef: this.pwRef,
+      togglePw: this.togglePw, onSubmit: this.onSubmit, onSocial: this.onSocial,
+      showPw: this.state.showPw, notShowPw: !this.state.showPw,
+      loading: this.state.loading, notLoading: !this.state.loading,
+      brandPanel: this.props.brandPanel !== false
+    };
+  }
+
+  componentDidMount() { this.setup(); }
+  componentWillUnmount() { this.teardown(); }
+
+  after(ms, fn) { const t = setTimeout(fn, ms); (this._timers || (this._timers = [])).push(t); return t; }
+  A(el, kf, opts) { if (!el) return null; const a = el.animate(kf, opts); (this._anims || (this._anims = [])).push(a); return a; }
+  teardown() { (this._timers || []).forEach(clearTimeout); (this._anims || []).forEach(a => { try { a.cancel(); } catch (e) {} }); }
+
+  setup() {
+    const root = this.rootEl; if (!root) return;
+    this._timers = []; this._anims = [];
+    this.q = (s, c) => (c || root).querySelector(s);
+    this.qa = (s, c) => Array.from((c || root).querySelectorAll(s));
+    this.reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this.ambientOn = this.props.ambient !== false;
+    if (this.reduced) return;
+    this.revealIn();
+    this.ambient();
+  }
+
+  revealIn() {
+    const els = this.qa('[data-in]').sort((a, b) => (+a.dataset.in) - (+b.dataset.in));
+    els.forEach((el, i) => {
+      el.style.opacity = '0'; el.style.transform = 'translateY(22px)'; el.style.filter = 'blur(7px)';
+      this.A(el, [{ opacity: 0, transform: 'translateY(22px)', filter: 'blur(7px)' }, { opacity: 1, transform: 'translateY(0)', filter: 'blur(0)' }],
+        { duration: 780, delay: 130 + i * 90, easing: 'cubic-bezier(.16,1,.3,1)', fill: 'forwards' });
+    });
+  }
+
+  ambient() {
+    if (this.ambientOn) this.qa('[data-blob]').forEach((el, i) => this.A(el,
+      [{ transform: 'translate(0,0) scale(1)' }, { transform: `translate(${i % 2 ? -24 : 24}px,${-18 - i * 8}px) scale(1.12)` }, { transform: 'translate(0,0) scale(1)' }],
+      { duration: 12000 + i * 2600, iterations: Infinity, easing: 'ease-in-out' }));
+    this.qa('[data-logo-pulse]').forEach(el => this.A(el,
+      [{ transform: 'scale(.7)', opacity: 0, offset: 0 }, { transform: 'scale(.7)', opacity: .5, offset: .05 }, { transform: 'scale(1.55)', opacity: 0, offset: .4 }, { transform: 'scale(1.55)', opacity: 0, offset: 1 }],
+      { duration: 5200, iterations: Infinity, easing: 'ease-out' }));
+    const proof = this.q('[data-proof]');
+    if (proof && this.ambientOn) this.A(proof, [{ transform: 'translateY(0)' }, { transform: 'translateY(-9px)' }, { transform: 'translateY(0)' }], { duration: 4200, iterations: Infinity, easing: 'ease-in-out' });
+    const ring = this.q('[data-proof-ring]');
+    if (ring) this.A(ring, [{ transform: 'scale(.7)', opacity: .55 }, { transform: 'scale(1.5)', opacity: 0 }], { duration: 2600, iterations: Infinity, easing: 'ease-out' });
+  }
+}
+</script>
+</body>
+</html>

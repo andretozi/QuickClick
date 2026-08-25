@@ -1,0 +1,392 @@
+/* ------------------------------------------------------------------
+   Login "Quick Click" — estilos que estavam inline no template
+   original de html/Login.dc.html.
+   ------------------------------------------------------------------ */
+
+.lg-page {
+  font-family: 'Nunito', system-ui, sans-serif;
+  color: #2b1d15;
+  background: #dfcbaa;
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr));
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Estados iniciais (evita flash antes das animações rodarem) */
+.lg-page [data-in] {
+  opacity: 0;
+}
+.lg-page [data-proof-ring] {
+  opacity: 0;
+}
+
+/* ============================ LEFT (brand panel) ============================ */
+.lg-brand-panel {
+  position: relative;
+  overflow: hidden;
+  background-color: #241813;
+  background-image: radial-gradient(rgba(251, 243, 231, 0.05) 1px, transparent 1px),
+    radial-gradient(130% 100% at 18% -8%, rgba(255, 106, 61, 0.16), transparent 55%);
+  background-size: 24px 24px, 100% 100%;
+  color: #fbf3e7;
+  padding: clamp(30px, 4vw, 52px);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 40px;
+  min-height: clamp(360px, 50vh, 100%);
+}
+.lg-brand-panel__blob-a {
+  position: absolute;
+  z-index: 0;
+  top: -120px;
+  left: -90px;
+  width: 460px;
+  height: 460px;
+  border-radius: 50%;
+  filter: blur(80px);
+  background: radial-gradient(circle, rgba(255, 106, 61, 0.34), rgba(255, 106, 61, 0) 66%);
+  pointer-events: none;
+}
+.lg-brand-panel__blob-b {
+  position: absolute;
+  z-index: 0;
+  bottom: -140px;
+  right: -110px;
+  width: 420px;
+  height: 420px;
+  border-radius: 50%;
+  filter: blur(84px);
+  background: radial-gradient(circle, rgba(242, 169, 59, 0.26), rgba(242, 169, 59, 0) 66%);
+  pointer-events: none;
+}
+
+.lg-top {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.lg-top__logo {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  color: #fbf3e7;
+}
+.lg-top__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: rgba(251, 243, 231, 0.7);
+  font-weight: 700;
+  font-size: 14px;
+  transition: color 0.2s;
+}
+.lg-top__back:hover {
+  color: #fbf3e7;
+}
+
+.lg-headline {
+  position: relative;
+  z-index: 1;
+  max-width: 440px;
+}
+.lg-eyebrow {
+  color: #f2a93b;
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.22em;
+  margin: 0 0 18px;
+}
+.lg-h1 {
+  font-family: 'Fraunces', Georgia, serif;
+  font-weight: 600;
+  font-size: clamp(40px, 5.4vw, 60px);
+  line-height: 1;
+  letter-spacing: -0.025em;
+  margin: 0;
+}
+.lg-headline__lead {
+  color: rgba(251, 243, 231, 0.66);
+  font-weight: 600;
+  font-size: clamp(16px, 1.8vw, 18.5px);
+  line-height: 1.6;
+  margin: 20px 0 0;
+  max-width: 400px;
+}
+
+.lg-proof-wrap {
+  position: relative;
+  z-index: 1;
+}
+.lg-proof {
+  display: inline-flex;
+  align-items: center;
+  gap: 13px;
+  background: rgba(251, 243, 231, 0.07);
+  border: 1px solid rgba(251, 243, 231, 0.12);
+  backdrop-filter: blur(6px);
+  border-radius: 16px;
+  padding: 14px 18px;
+}
+.lg-proof__badge-wrap {
+  position: relative;
+  flex: none;
+}
+.lg-proof__ring {
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 2px solid rgba(55, 160, 106, 0.6);
+}
+.lg-proof__badge {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #37a06a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.lg-proof__title {
+  font-weight: 800;
+  font-size: 14px;
+}
+.lg-proof__amount {
+  font-family: 'Fraunces', serif;
+  font-weight: 700;
+  font-size: 18px;
+  color: #5fd39a;
+}
+
+/* ============================ RIGHT (form panel) ============================ */
+.lg-form-panel {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(30px, 5vw, 56px) clamp(22px, 5vw, 56px);
+}
+.lg-form-wrap {
+  width: 100%;
+  max-width: 428px;
+}
+.lg-form-head {
+  margin-bottom: 26px;
+}
+.lg-h2 {
+  font-family: 'Fraunces', Georgia, serif;
+  font-weight: 600;
+  font-size: clamp(30px, 4vw, 38px);
+  line-height: 1.05;
+  letter-spacing: -0.015em;
+  margin: 0;
+}
+.lg-form-head__lead {
+  color: rgba(43, 29, 21, 0.6);
+  font-weight: 600;
+  font-size: 15.5px;
+  margin: 10px 0 0;
+}
+
+.lg-socials {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.lg-btn-social {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  width: 100%;
+  height: 52px;
+  border-radius: 14px;
+  font-family: inherit;
+  font-weight: 800;
+  font-size: 15.5px;
+  cursor: pointer;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s,
+    border-color 0.25s;
+}
+.lg-btn-social--google {
+  background: #f6eddb;
+  color: #2b1d15;
+  border: 1.5px solid rgba(43, 29, 21, 0.16);
+  gap: 11px;
+}
+.lg-btn-social--google:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 28px -18px rgba(43, 29, 21, 0.7);
+  border-color: rgba(43, 29, 21, 0.28);
+}
+.lg-btn-social--apple {
+  background: #241813;
+  color: #fff;
+  border: none;
+  gap: 10px;
+}
+.lg-btn-social--apple:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 30px -16px rgba(36, 24, 19, 0.9);
+}
+.lg-btn-social--facebook {
+  background: #1877f2;
+  color: #fff;
+  border: none;
+  gap: 10px;
+}
+.lg-btn-social--facebook:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 30px -16px rgba(24, 119, 242, 0.9);
+}
+
+.lg-divider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 22px 0;
+}
+.lg-divider__line {
+  flex: 1;
+  height: 1px;
+  background: rgba(43, 29, 21, 0.16);
+}
+.lg-divider__text {
+  color: rgba(43, 29, 21, 0.5);
+  font-weight: 700;
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+}
+
+.lg-form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+.lg-field__label {
+  display: block;
+  font-weight: 800;
+  font-size: 13px;
+  color: rgba(43, 29, 21, 0.7);
+  margin-bottom: 7px;
+}
+.lg-field__label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 7px;
+}
+.lg-field__label-row a {
+  font-weight: 800;
+  font-size: 13px;
+}
+.lg-input {
+  width: 100%;
+  background: #f6eddb;
+  border: 1.5px solid rgba(43, 29, 21, 0.16);
+  border-radius: 13px;
+  padding: 14px 15px;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 15.5px;
+  color: #2b1d15;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.lg-input--pw {
+  padding-right: 46px;
+}
+.lg-input:focus {
+  border-color: #ff6a3d;
+  box-shadow: 0 0 0 4px rgba(255, 106, 61, 0.16);
+}
+.lg-pw-wrap {
+  position: relative;
+}
+.lg-pw-toggle {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: rgba(43, 29, 21, 0.5);
+  cursor: pointer;
+  border-radius: 9px;
+  transition: color 0.2s, background 0.2s;
+}
+.lg-pw-toggle:hover {
+  color: #2b1d15;
+  background: rgba(43, 29, 21, 0.06);
+}
+
+.lg-btn-submit {
+  position: relative;
+  width: 100%;
+  height: 54px;
+  margin-top: 4px;
+  background: #ff6a3d;
+  color: #fff;
+  border: none;
+  border-radius: 14px;
+  font-family: inherit;
+  font-weight: 800;
+  font-size: 16.5px;
+  cursor: pointer;
+  box-shadow: 0 18px 34px -16px rgba(255, 106, 61, 1);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s,
+    background 0.25s;
+}
+.lg-btn-submit:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 24px 44px -16px rgba(255, 106, 61, 1);
+  background: #e8531f;
+}
+.lg-btn-submit__loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.lg-spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2.6px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  display: inline-block;
+  animation: qcspin 0.7s linear infinite;
+}
+
+.lg-signup {
+  text-align: center;
+  color: rgba(43, 29, 21, 0.62);
+  font-weight: 700;
+  font-size: 14.5px;
+  margin: 22px 0 0;
+}
+.lg-signup a {
+  font-weight: 800;
+}
+.lg-terms {
+  text-align: center;
+  color: rgba(43, 29, 21, 0.42);
+  font-weight: 600;
+  font-size: 12px;
+  line-height: 1.55;
+  margin: 18px auto 0;
+  max-width: 330px;
+}
+.lg-terms a {
+  color: rgba(43, 29, 21, 0.55);
+  font-weight: 700;
+}
