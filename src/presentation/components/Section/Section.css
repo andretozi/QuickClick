@@ -1,0 +1,40 @@
+/* ==================================================================
+   Bloco: section
+   Cada seção da página ajusta --section-max, --section-padding-y e o
+   fundo pela própria classe (mix BEM), ex.: class="section benefits".
+   ================================================================== */
+.section {
+  --section-max: 1120px;
+  --section-dots: var(--dots-light);
+  --section-dots-size: 22px;
+
+  position: relative;
+  overflow: hidden;
+  padding: var(--section-padding-y) 0;
+}
+
+.section--light {
+  color: var(--color-ink);
+}
+
+.section--dark {
+  --section-dots: var(--dots-dark);
+  --section-dots-size: 24px;
+  --text-muted: rgb(var(--rgb-cream) / 0.6);
+
+  background-color: var(--color-cocoa);
+  color: var(--color-cream);
+}
+
+.section--dotted {
+  background-image: var(--section-dots);
+  background-size: var(--section-dots-size) var(--section-dots-size);
+}
+
+.section__inner {
+  position: relative;
+  z-index: 1;
+  max-width: var(--section-max);
+  margin: 0 auto;
+  padding: 0 var(--container-padding);
+}

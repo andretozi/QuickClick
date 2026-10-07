@@ -1,0 +1,22 @@
+/* ==================================================================
+   Bloco: site-footer  (mix com .section)
+   ================================================================== */
+.site-footer {
+  --section-padding-y: clamp(44px, 6vw, 64px);
+
+  background-color: var(--color-cocoa-950);
+  color: rgb(var(--rgb-cream) / 0.6);
+}
+
+.site-footer__inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.site-footer__copyright {
+  margin: 0;
+  font-size: 13px;
+}

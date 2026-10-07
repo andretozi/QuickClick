@@ -1,0 +1,69 @@
+/* ==================================================================
+   Bloco: field (usado por TextField e PasswordField)
+   ================================================================== */
+.field__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 7px;
+}
+
+.field__label {
+  color: rgb(var(--rgb-ink) / 0.7);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.field__control {
+  position: relative;
+}
+
+.field__input {
+  width: 100%;
+  padding: 14px 15px;
+  border: 1.5px solid rgb(var(--rgb-ink) / 0.16);
+  border-radius: 13px;
+  outline: none;
+  background: var(--color-sand-50);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: 15.5px;
+  font-weight: 600;
+  transition:
+    border-color var(--duration-fast),
+    box-shadow var(--duration-fast);
+}
+
+.field__input:focus {
+  border-color: var(--color-coral);
+  box-shadow: 0 0 0 4px rgb(var(--rgb-coral) / 0.16);
+}
+
+.field__input--with-action {
+  padding-right: 46px;
+}
+
+.field__action {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 9px;
+  background: none;
+  color: rgb(var(--rgb-ink) / 0.5);
+  cursor: pointer;
+  transform: translateY(-50%);
+  transition:
+    color var(--duration-fast),
+    background var(--duration-fast);
+}
+
+.field__action:hover {
+  background: rgb(var(--rgb-ink) / 0.06);
+  color: var(--color-ink);
+}

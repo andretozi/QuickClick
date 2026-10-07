@@ -1,0 +1,51 @@
+/* ==================================================================
+   Base global: reset mínimo e padrões de elementos HTML.
+   Estilos de componentes ficam junto de cada componente (padrão BEM).
+   ================================================================== */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+::selection {
+  background: var(--color-coral);
+  color: var(--color-white);
+}
+
+a {
+  color: var(--color-coral);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--color-coral-dark);
+}
+
+input::placeholder {
+  color: rgb(var(--rgb-ink) / 0.4);
+}
+
+/* Títulos com a fonte de destaque. Cada bloco define só o tamanho. */
+.heading {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}

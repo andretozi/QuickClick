@@ -1,0 +1,33 @@
+/* ==================================================================
+   Bloco: blob
+   Aparência da mancha. Quem usa define posição/tamanho/intensidade
+   através das variáveis --blob-*.
+   ================================================================== */
+.blob {
+  --blob-size: 440px;
+  --blob-blur: 58px;
+  --blob-alpha: 0.4;
+  --blob-fade: 68%;
+  --blob-center: 50% 50%;
+
+  position: absolute;
+  z-index: 0;
+  width: var(--blob-width, var(--blob-size));
+  height: var(--blob-size);
+  border-radius: 50%;
+  filter: blur(var(--blob-blur));
+  background: radial-gradient(
+    circle at var(--blob-center),
+    rgb(var(--blob-rgb) / var(--blob-alpha)),
+    rgb(var(--blob-rgb) / 0) var(--blob-fade)
+  );
+  pointer-events: none;
+}
+
+.blob--coral {
+  --blob-rgb: var(--rgb-coral);
+}
+
+.blob--honey {
+  --blob-rgb: var(--rgb-honey);
+}

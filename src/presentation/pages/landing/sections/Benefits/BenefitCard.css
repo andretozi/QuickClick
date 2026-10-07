@@ -1,0 +1,57 @@
+/* ==================================================================
+   Bloco: benefit-card
+   ================================================================== */
+.benefit-card {
+  padding: 30px;
+  border: 1px solid rgb(var(--rgb-ink) / 0.08);
+  border-radius: var(--radius-lg);
+  background: var(--color-sand-100);
+  box-shadow: 0 30px 60px -44px rgb(var(--rgb-ink) / 0.55);
+  transition:
+    transform 0.35s var(--ease-out-expo),
+    box-shadow 0.35s;
+}
+
+.benefit-card:hover {
+  box-shadow: 0 40px 70px -40px rgb(var(--rgb-ink) / 0.55);
+  transform: translateY(-6px);
+}
+
+.benefit-card__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  margin-bottom: 20px;
+  border-radius: 15px;
+}
+
+.benefit-card__icon--coral {
+  background: rgb(var(--rgb-coral) / 0.13);
+  color: var(--color-coral);
+}
+
+.benefit-card__icon--honey {
+  background: rgb(var(--rgb-honey) / 0.16);
+  color: var(--color-honey-dark);
+}
+
+.benefit-card__icon--green {
+  background: rgb(var(--rgb-green) / 0.15);
+  color: var(--color-green-dark);
+}
+
+.benefit-card__title {
+  margin-bottom: 10px;
+  font-size: 22px;
+  letter-spacing: normal;
+}
+
+.benefit-card__description {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 15.5px;
+  font-weight: 600;
+  line-height: 1.6;
+}

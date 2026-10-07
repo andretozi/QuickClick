@@ -1,0 +1,58 @@
+/* ==================================================================
+   Bloco: brand
+   ================================================================== */
+.brand {
+  --brand-font-size: 23px;
+
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand__text {
+  display: flex;
+  flex-direction: column;
+}
+
+.brand__name {
+  font-family: var(--font-display);
+  font-size: var(--brand-font-size);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.brand__accent {
+  color: var(--color-coral);
+  font-weight: 700;
+}
+
+.brand__tagline {
+  font-size: 13px;
+  opacity: 0.6;
+}
+
+/* ---------- Tamanhos ---------- */
+.brand--md {
+  --brand-font-size: 22px;
+
+  gap: 11px;
+}
+
+.brand--sm {
+  --brand-font-size: 20px;
+
+  gap: 11px;
+}
+
+/* ---------- Tons ---------- */
+.brand--light {
+  color: var(--color-ink);
+}
+
+.brand--dark {
+  color: var(--color-cream);
+}
+
+.brand--dark .brand__accent {
+  color: var(--color-coral-soft);
+}

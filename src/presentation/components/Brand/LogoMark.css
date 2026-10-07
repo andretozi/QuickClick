@@ -1,0 +1,67 @@
+/* ==================================================================
+   Bloco: logo-mark
+   ================================================================== */
+.logo-mark {
+  --logo-size: 44px;
+  --logo-radius: var(--radius-md);
+  --logo-ring: 27px;
+
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--logo-size);
+  height: var(--logo-size);
+}
+
+.logo-mark--md {
+  --logo-size: 42px;
+  --logo-radius: 13px;
+  --logo-ring: 26px;
+}
+
+.logo-mark--sm {
+  --logo-size: 40px;
+  --logo-radius: 13px;
+  --logo-ring: 24px;
+}
+
+/* Anel animado pelo JS ([data-logo-pulse]) */
+.logo-mark__pulse {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border: 2px solid rgb(var(--rgb-coral) / 0.55);
+  border-radius: var(--logo-radius);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.logo-mark__box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--logo-radius);
+  background: linear-gradient(145deg, var(--color-coral-light), var(--color-coral) 52%, var(--color-honey));
+  box-shadow:
+    0 10px 22px -10px rgb(var(--rgb-coral) / 0.9),
+    inset 0 1px 0 rgb(var(--rgb-white) / 0.4);
+}
+
+.logo-mark__ring {
+  position: absolute;
+  width: var(--logo-ring);
+  height: var(--logo-ring);
+  border: 1.5px solid rgb(var(--rgb-white) / 0.3);
+  border-radius: 50%;
+}
+
+.logo-mark__spark {
+  position: relative;
+  color: var(--color-white);
+  transform: translate(1px, 1px);
+}

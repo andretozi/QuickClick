@@ -1,8 +1,14 @@
-import { createRoot } from 'react-dom/client';
-import App from './App.jsx';
-import './styles/global.css';
+// Estilos globais primeiro: os CSS dos componentes (importados pelo App) vêm depois
+// e podem sobrescrever a base sem precisar de seletores mais fortes.
+import '@/presentation/styles/tokens.css';
+import '@/presentation/styles/base.css';
 
-// StrictMode intentionally omitted: React 18 double-invokes effects in dev,
-// which would fire IntersectionObservers and hero-cursor timers twice and
-// desync the choreography copied verbatim from the DCLogic runtime.
-createRoot(document.getElementById('root')).render(<App />);
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import App from '@/app/App.jsx';
+
+createRoot(document.getElementById('root')).render(
+  <StrictMode>
+    <App />
+  </StrictMode>
+);

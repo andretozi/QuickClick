@@ -1,0 +1,31 @@
+/* ==================================================================
+   Bloco: social-login
+   Reaproveita o .button e só ajusta as variáveis de cada marca.
+   ================================================================== */
+.social-login {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.social-login__button {
+  --button-glow: transparent;
+
+  gap: 11px;
+  height: 52px;
+  font-size: 15.5px;
+}
+
+.social-login__button--apple {
+  --button-fg: var(--color-white);
+  --button-glow-hover: rgb(var(--rgb-cocoa) / 0.9);
+  --button-shadow-hover: 0 16px 30px -16px;
+}
+
+.social-login__button--facebook {
+  --button-bg: var(--color-facebook);
+  --button-bg-hover: var(--color-facebook);
+  --button-fg: var(--color-white);
+  --button-glow-hover: rgb(var(--rgb-facebook) / 0.9);
+  --button-shadow-hover: 0 16px 30px -16px;
+}

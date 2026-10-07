@@ -1,0 +1,37 @@
+/* ==================================================================
+   Bloco: how-it-works  (mix com .section)
+   ================================================================== */
+.how-it-works {
+  --section-padding-y: clamp(80px, 11vw, 150px);
+}
+
+.how-it-works__blob {
+  --blob-fade: 66%;
+}
+
+.how-it-works__blob--a {
+  --blob-size: 480px;
+  --blob-blur: 84px;
+  --blob-alpha: 0.16;
+
+  top: 40px;
+  left: -130px;
+}
+
+.how-it-works__blob--b {
+  --blob-size: 440px;
+  --blob-blur: 88px;
+  --blob-alpha: 0.12;
+
+  right: -130px;
+  bottom: 60px;
+}
+
+.how-it-works__steps {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(56px, 9vw, 120px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}

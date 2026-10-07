@@ -1,5 +1,17 @@
+# Dependências e build
 node_modules/
 dist/
 .vite/
+
+# Python (main.py usa só a biblioteca padrão)
+__pycache__/
+.venv/
+venv/
+
+# Configurações locais de editor e sistema
+.idea/
+.vscode/
+*.iml
 *.log
 .DS_Store
+Thumbs.db

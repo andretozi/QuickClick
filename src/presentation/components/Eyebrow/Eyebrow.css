@@ -1,0 +1,23 @@
+/* ==================================================================
+   Bloco: eyebrow
+   ================================================================== */
+.eyebrow {
+  margin: 0 0 16px;
+  font-size: 13.5px;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.eyebrow--honey {
+  color: var(--color-honey);
+}
+
+.eyebrow--coral {
+  color: var(--color-coral);
+  letter-spacing: 0.2em;
+}
+
+.eyebrow--inherit {
+  color: inherit;
+}

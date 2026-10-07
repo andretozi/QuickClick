@@ -1,0 +1,36 @@
+/* ==================================================================
+   Bloco: comparison  (mix com .section)
+   ================================================================== */
+.comparison {
+  --section-max: 1040px;
+
+  background-color: var(--color-sand-400);
+}
+
+.comparison__blob {
+  --blob-blur: 60px;
+}
+
+.comparison__blob--a {
+  --blob-size: 440px;
+  --blob-width: 500px;
+  --blob-alpha: 0.38;
+
+  top: -120px;
+  right: -100px;
+}
+
+.comparison__blob--b {
+  --blob-size: 400px;
+  --blob-alpha: 0.32;
+
+  bottom: -120px;
+  left: -110px;
+}
+
+.comparison__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: clamp(18px, 2.4vw, 26px);
+  align-items: center;
+}

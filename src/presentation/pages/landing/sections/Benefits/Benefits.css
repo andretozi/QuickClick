@@ -1,0 +1,32 @@
+/* ==================================================================
+   Bloco: benefits  (mix com .section)
+   ================================================================== */
+.benefits {
+  background-color: var(--color-sand-300);
+}
+
+.benefits__blob--a {
+  --blob-size: 460px;
+  --blob-alpha: 0.4;
+
+  top: -120px;
+  right: -120px;
+}
+
+.benefits__blob--b {
+  --blob-size: 420px;
+  --blob-alpha: 0.36;
+
+  bottom: -140px;
+  left: -120px;
+}
+
+.benefits__header {
+  --section-header-max: 760px;
+}
+
+.benefits__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: clamp(18px, 2.4vw, 26px);
+}

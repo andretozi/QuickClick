@@ -1,0 +1,15 @@
+/* ==================================================================
+   Bloco: landing (raiz da página inicial)
+   ================================================================== */
+.landing {
+  position: relative;
+  /* "clip" corta o que vaza para os lados sem quebrar o menu fixo (sticky) */
+  overflow-x: clip;
+  background: var(--color-sand);
+  color: var(--color-ink);
+}
+
+/* Elementos que entram ao rolar começam invisíveis (o JS faz a entrada) */
+.landing [data-reveal] {
+  opacity: 0;
+}

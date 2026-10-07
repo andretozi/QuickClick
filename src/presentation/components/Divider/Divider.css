@@ -1,0 +1,22 @@
+/* ==================================================================
+   Bloco: divider
+   ================================================================== */
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 22px 0;
+}
+
+.divider__line {
+  flex: 1;
+  height: 1px;
+  background: rgb(var(--rgb-ink) / 0.16);
+}
+
+.divider__text {
+  color: rgb(var(--rgb-ink) / 0.5);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}

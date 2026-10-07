@@ -1,0 +1,20 @@
+/* ==================================================================
+   Bloco: scene-card
+   ================================================================== */
+.scene-card {
+  position: relative;
+  overflow: hidden;
+  padding: 24px;
+  border: 1px solid rgb(var(--rgb-cream) / 0.09);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(160deg, var(--color-cocoa-700), var(--color-cocoa));
+  box-shadow: 0 40px 80px -50px rgb(var(--rgb-black));
+}
+
+.scene-card--warm {
+  padding: 20px;
+  background: linear-gradient(160deg, var(--color-cocoa-600), var(--color-cocoa-800));
+  box-shadow:
+    0 40px 80px -50px rgb(var(--rgb-black)),
+    inset 0 1px 0 rgb(var(--rgb-cream) / 0.05);
+}
