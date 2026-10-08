@@ -1,0 +1,27 @@
+/* ==================================================================
+   Bloco: section-header
+   ================================================================== */
+.section-header {
+  max-width: var(--section-header-max, 720px);
+  margin: 0 auto clamp(48px, 7vw, 80px);
+  text-align: center;
+}
+
+.section-header__title {
+  font-size: clamp(38px, 6vw, 64px);
+  line-height: 1.03;
+  text-wrap: balance;
+}
+
+.section-header__title--md {
+  font-size: clamp(32px, 5vw, 56px);
+  line-height: 1.04;
+}
+
+.section-header__lead {
+  margin: 18px 0 0;
+  color: var(--text-muted);
+  font-size: clamp(16px, 2vw, 19px);
+  font-weight: 600;
+  text-wrap: pretty;
+}

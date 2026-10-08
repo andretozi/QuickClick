@@ -1,0 +1,126 @@
+/* ==================================================================
+   Bloco: marketplace-card
+   Estados: --connected, --available, --soon
+   ================================================================== */
+.marketplace-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 22px;
+  border: 1px solid rgb(var(--rgb-ink) / 0.1);
+  border-radius: var(--radius-xl);
+  background: var(--color-sand-100);
+  box-shadow: 0 30px 60px -44px rgb(var(--rgb-ink) / 0.55);
+  transition:
+    transform 0.35s var(--ease-out-expo),
+    box-shadow 0.35s,
+    border-color 0.35s,
+    background-color 0.35s;
+}
+
+.marketplace-card:hover {
+  box-shadow: 0 40px 70px -40px rgb(var(--rgb-ink) / 0.55);
+  transform: translateY(-4px);
+}
+
+.marketplace-card--connected {
+  border-color: rgb(var(--rgb-green) / 0.5);
+  background-color: var(--color-sand-50);
+}
+
+.marketplace-card--soon {
+  background-color: rgb(var(--rgb-sand-100) / 0.5);
+  box-shadow: none;
+}
+
+.marketplace-card--soon:hover {
+  box-shadow: none;
+  transform: none;
+}
+
+/* ---------- Monograma, nome e situação ---------- */
+.marketplace-card__head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.marketplace-card__mark {
+  position: relative;
+  display: inline-flex;
+}
+
+.marketplace-card--soon .marketplace-card__mark {
+  opacity: 0.7;
+  filter: saturate(0.4);
+}
+
+/* Onda que sai do monograma quando a conexão acontece (animada pelo JS) */
+.marketplace-card__wave {
+  position: absolute;
+  inset: -5px;
+  border: 2px solid rgb(var(--rgb-green) / 0.75);
+  border-radius: 19px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.marketplace-card__name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+.marketplace-card__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 5px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.marketplace-card--connected .marketplace-card__status {
+  color: var(--color-green-dark);
+}
+
+.marketplace-card__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgb(var(--rgb-ink) / 0.25);
+}
+
+.marketplace-card--available .marketplace-card__dot {
+  background: var(--color-honey);
+}
+
+.marketplace-card__check {
+  flex: none;
+}
+
+.marketplace-card__check-path {
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+}
+
+/* ---------- Ação ---------- */
+.marketplace-card__error {
+  margin: -8px 0 0;
+  color: var(--color-coral-deep);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.marketplace-card__action {
+  align-self: flex-start;
+  margin-top: auto;
+}

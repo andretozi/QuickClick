@@ -1,0 +1,49 @@
+/* ==================================================================
+   Bloco: plans  (mix com .section)
+   ================================================================== */
+.plans {
+  --section-max: 1180px;
+  --section-padding-y: clamp(80px, 10vw, 130px);
+
+  background-color: var(--color-sand);
+}
+
+.plans__blob--a {
+  --blob-size: 440px;
+  --blob-alpha: 0.4;
+
+  top: -110px;
+  left: -90px;
+}
+
+.plans__blob--b {
+  --blob-size: 400px;
+  --blob-alpha: 0.34;
+
+  right: -90px;
+  bottom: -120px;
+}
+
+.plans__header {
+  --section-header-max: 760px;
+}
+
+/* 1 coluna no celular, 2 no tablet e os 4 planos lado a lado no computador */
+.plans__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: clamp(16px, 2vw, 22px);
+  align-items: stretch;
+}
+
+@media (min-width: 560px) {
+  .plans__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1000px) {
+  .plans__grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}

@@ -1,0 +1,123 @@
+/* ==================================================================
+   Bloco: plan-card
+   ================================================================== */
+.plan-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 30px 26px 26px;
+  border: 1px solid rgb(var(--rgb-ink) / 0.1);
+  border-radius: var(--radius-xl);
+  background: var(--color-sand-100);
+  color: var(--color-ink);
+  box-shadow: 0 30px 60px -44px rgb(var(--rgb-ink) / 0.55);
+}
+
+.plan-card--featured {
+  --text-muted: rgb(var(--rgb-white) / 0.86);
+
+  overflow: hidden;
+  border-color: transparent;
+  background: linear-gradient(150deg, var(--color-coral-light), var(--color-coral) 55%, var(--color-coral-dark));
+  color: var(--color-white);
+  box-shadow: 0 50px 100px -50px rgb(var(--rgb-coral));
+}
+
+/* Faixa de brilho que atravessa o cartão em destaque (animada pelo JS) */
+.plan-card__shine {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgb(var(--rgb-white) / 0.22), transparent);
+  pointer-events: none;
+  transform: translateX(-160%) skewX(-16deg);
+}
+
+.plan-card__ribbon {
+  position: absolute;
+  top: 22px;
+  right: 22px;
+  padding: 5px 11px;
+  border-radius: var(--radius-pill);
+  background: var(--color-cocoa);
+  color: var(--color-cream);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.plan-card__name {
+  font-size: 28px;
+  line-height: 1.1;
+}
+
+.plan-card__tagline {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+/* Com os 4 cartões lado a lado, o subtítulo reserva 2 linhas para os preços ficarem alinhados */
+@media (min-width: 1000px) {
+  .plan-card__tagline {
+    min-height: 2.8em;
+  }
+}
+
+/* ---------- Preço ---------- */
+.plan-card__price {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin: 22px 0 0;
+}
+
+.plan-card__amount {
+  font-family: var(--font-display);
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.plan-card__period {
+  color: var(--text-muted);
+  font-size: 14.5px;
+  font-weight: 700;
+}
+
+/* ---------- Recursos ---------- */
+.plan-card__features {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  margin: 24px 0 28px;
+  padding: 0;
+  list-style: none;
+  font-size: 15.5px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.plan-card__feature {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  text-wrap: pretty;
+}
+
+.plan-card__check {
+  flex: none;
+  margin-top: 2px;
+  color: var(--color-green);
+}
+
+.plan-card--featured .plan-card__check {
+  color: var(--color-white);
+}

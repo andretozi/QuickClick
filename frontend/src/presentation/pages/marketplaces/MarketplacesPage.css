@@ -1,0 +1,143 @@
+/* ==================================================================
+   Bloco: marketplaces-page (raiz da tela #/marketplaces)
+   ================================================================== */
+.marketplaces-page {
+  min-height: 100vh;
+  overflow-x: clip;
+  background: var(--color-sand);
+  color: var(--color-ink);
+}
+
+/* Blocos que entram em sequência começam invisíveis (o JS faz a entrada) */
+.marketplaces-page [data-enter] {
+  opacity: 0;
+}
+
+.marketplaces-page__body {
+  --section-max: 1120px;
+  --section-padding-y: clamp(16px, 3vw, 26px);
+
+  min-height: 100vh;
+  padding-bottom: clamp(64px, 8vw, 104px);
+}
+
+/* ---------- Manchas de luz ---------- */
+.marketplaces-page__blob--a {
+  --blob-size: 540px;
+  --blob-alpha: 0.36;
+
+  top: -180px;
+  right: -150px;
+}
+
+.marketplaces-page__blob--b {
+  --blob-size: 480px;
+  --blob-alpha: 0.34;
+
+  top: 34%;
+  left: -220px;
+}
+
+.marketplaces-page__blob--c {
+  --blob-size: 420px;
+  --blob-alpha: 0.22;
+
+  right: 10%;
+  bottom: -160px;
+}
+
+/* ---------- Topo: marca + voltar ---------- */
+.marketplaces-page__topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.marketplaces-page__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: rgb(var(--rgb-ink) / 0.66);
+  font-size: 14px;
+  font-weight: 700;
+  transition: color var(--duration-fast);
+}
+
+.marketplaces-page__back:hover {
+  color: var(--color-ink);
+}
+
+/* ---------- Título ---------- */
+.marketplaces-page__intro {
+  max-width: 700px;
+  margin: clamp(40px, 7vw, 76px) 0 clamp(28px, 4vw, 40px);
+}
+
+.marketplaces-page__title {
+  font-size: clamp(38px, 6vw, 62px);
+  line-height: 1.02;
+  text-wrap: balance;
+}
+
+.marketplaces-page__lead {
+  margin: 16px 0 0;
+  color: var(--text-muted);
+  font-size: clamp(16px, 2vw, 19px);
+  font-weight: 600;
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+/* ---------- Carregando e erro ---------- */
+.marketplaces-page__status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 26px;
+  border: 1px dashed rgb(var(--rgb-ink) / 0.2);
+  border-radius: var(--radius-xl);
+  color: var(--text-muted);
+  font-size: 15.5px;
+  font-weight: 700;
+}
+
+.marketplaces-page__status--loading {
+  flex-direction: row;
+  align-items: center;
+}
+
+.marketplaces-page__spinner {
+  width: 18px;
+  height: 18px;
+  border: 2.6px solid rgb(var(--rgb-coral) / 0.3);
+  border-top-color: var(--color-coral);
+  border-radius: 50%;
+  animation: marketplaces-page-spin 0.7s linear infinite;
+}
+
+@keyframes marketplaces-page-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.marketplaces-page__status--error {
+  border-style: solid;
+  border-color: rgb(var(--rgb-coral) / 0.4);
+  background: rgb(var(--rgb-sand-100) / 0.6);
+}
+
+.marketplaces-page__status-title {
+  margin: 0;
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.marketplaces-page__status-text {
+  margin: 0 0 6px;
+}
