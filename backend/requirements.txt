@@ -1,0 +1,5 @@
+# Back da Quick Click. O main.py instala o que faltar na primeira execução.
+fastapi>=0.115,<1
+uvicorn>=0.30,<1
+# Cliente HTTP: usado pelos testes da API (TestClient) e, no futuro, nas chamadas OAuth aos marketplaces.
+httpx>=0.27,<1
