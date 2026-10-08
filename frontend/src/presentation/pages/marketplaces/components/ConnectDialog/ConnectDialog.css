@@ -1,0 +1,133 @@
+/* ==================================================================
+   Bloco: connect-dialog
+   ================================================================== */
+.connect-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.connect-dialog__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgb(var(--rgb-cocoa) / 0.55);
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
+}
+
+.connect-dialog__panel {
+  position: relative;
+  width: min(100%, 440px);
+  padding: 38px 30px 28px;
+  border-radius: var(--radius-2xl);
+  background: var(--color-sand-50);
+  color: var(--color-ink);
+  text-align: center;
+  box-shadow: 0 50px 100px -40px rgb(var(--rgb-black) / 0.75);
+}
+
+.connect-dialog__close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  color: rgb(var(--rgb-ink) / 0.5);
+  cursor: pointer;
+  transition:
+    color var(--duration-fast),
+    background var(--duration-fast);
+}
+
+.connect-dialog__close:hover {
+  background: rgb(var(--rgb-ink) / 0.06);
+  color: var(--color-ink);
+}
+
+.connect-dialog__close:disabled {
+  visibility: hidden;
+}
+
+/* ---------- Logo + cadeado (ou pontos) + marketplace ---------- */
+.connect-dialog__handshake {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.connect-dialog__lock {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgb(var(--rgb-green) / 0.14);
+  color: var(--color-green-dark);
+}
+
+.connect-dialog__dots {
+  display: inline-flex;
+  gap: 6px;
+}
+
+/* Pontos do "Autorizando…" (animados pelo JS) */
+.connect-dialog__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-coral);
+  opacity: 0.25;
+}
+
+/* ---------- Texto e ações ---------- */
+.connect-dialog__title {
+  font-size: clamp(26px, 4vw, 30px);
+  line-height: 1.1;
+  text-wrap: balance;
+}
+
+.connect-dialog__text {
+  margin: 12px 0 0;
+  color: var(--text-muted);
+  font-size: 15.5px;
+  font-weight: 600;
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+.connect-dialog__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 26px;
+}
+
+/* ---------- Ícone do erro ---------- */
+.connect-dialog__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 58px;
+  height: 58px;
+  margin-bottom: 18px;
+  border-radius: 18px;
+  background: rgb(var(--rgb-ink) / 0.07);
+  color: rgb(var(--rgb-ink) / 0.6);
+}
+
+.connect-dialog__icon--plan {
+  background: rgb(var(--rgb-coral) / 0.14);
+  color: var(--color-coral);
+}

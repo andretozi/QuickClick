@@ -1,12 +1,23 @@
-# Dependências e build
-node_modules/
-dist/
+# Front: dependências e build (React + Vite)
+frontend/node_modules/
+frontend/dist/
 .vite/
 
-# Python (main.py usa só a biblioteca padrão)
+# Back: Python
 __pycache__/
+*.py[cod]
 .venv/
 venv/
+
+# Banco de dados local (SQLite), criado na execução
+backend/data/
+*.sqlite3
+*.sqlite3-journal
+
+# Segredos: nunca vão para o Git (o modelo é o .env.example)
+.env
+.env.*
+!.env.example
 
 # Configurações locais de editor e sistema
 .idea/

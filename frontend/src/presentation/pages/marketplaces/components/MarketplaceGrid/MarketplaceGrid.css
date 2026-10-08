@@ -1,0 +1,17 @@
+/* ==================================================================
+   Bloco: marketplace-grid
+   ================================================================== */
+.marketplace-grid {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(20px, 3vw, 28px);
+}
+
+.marketplace-grid__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  gap: clamp(14px, 2vw, 20px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}

@@ -1,0 +1,143 @@
+/* ==================================================================
+   Bloco: hero  (mix com .section)
+   ================================================================== */
+.hero {
+  --section-max: 1000px;
+
+  padding: clamp(64px, 10vw, 120px) 0 clamp(72px, 10vw, 120px);
+}
+
+.hero__inner {
+  z-index: 2;
+  text-align: center;
+}
+
+/* ---------- Luzes de fundo com parallax ---------- */
+.hero__parallax {
+  position: absolute;
+  z-index: 0;
+}
+
+.hero__parallax--a {
+  top: -120px;
+  right: -60px;
+}
+
+.hero__parallax--b {
+  top: 120px;
+  left: -140px;
+}
+
+.hero__parallax--c {
+  bottom: -80px;
+  left: 38%;
+}
+
+.hero__blob {
+  position: relative;
+}
+
+.hero__blob--a {
+  --blob-size: 520px;
+  --blob-blur: 46px;
+  --blob-alpha: 0.42;
+  --blob-fade: 66%;
+  --blob-center: 40% 40%;
+}
+
+.hero__blob--b {
+  --blob-size: 460px;
+  --blob-blur: 50px;
+  --blob-alpha: 0.38;
+  --blob-fade: 66%;
+}
+
+.hero__blob--c {
+  --blob-size: 360px;
+  --blob-blur: 48px;
+  --blob-alpha: 0.22;
+}
+
+/* ---------- Título "Clicou… vendeu." ---------- */
+.hero__title {
+  position: relative;
+  font-size: clamp(58px, 12vw, 138px);
+  line-height: 0.94;
+  letter-spacing: -0.025em;
+}
+
+.hero__line {
+  display: block;
+  overflow: hidden;
+  padding-bottom: 0.04em;
+}
+
+.hero__line--accent {
+  padding-bottom: 0.06em;
+  color: var(--color-coral);
+}
+
+/* Começa escondida abaixo da linha; o JS faz a palavra subir */
+.hero__word {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(115%);
+  will-change: transform;
+}
+
+.hero__cursor {
+  position: absolute;
+  top: 38%;
+  left: 52%;
+  z-index: 5;
+  color: var(--color-ink);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.hero__ripple {
+  position: absolute;
+  top: -8px;
+  left: -14px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgb(var(--rgb-coral) / 0.35);
+  opacity: 0;
+}
+
+.hero__cursor-icon {
+  filter: drop-shadow(0 6px 10px rgb(var(--rgb-ink) / 0.35));
+}
+
+/* ---------- Texto, botões e linha fina ---------- */
+.hero__lead {
+  max-width: 620px;
+  margin: clamp(22px, 4vw, 34px) auto 0;
+  color: rgb(var(--rgb-ink) / 0.66);
+  font-size: clamp(17px, 2.2vw, 21px);
+  font-weight: 600;
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+.hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px;
+  margin-top: clamp(30px, 4vw, 44px);
+}
+
+/* Seta do "Ver como funciona" (balança animada pelo JS) */
+.hero__scroll-arrow {
+  display: inline-flex;
+}
+
+.hero__fine-print {
+  margin: 20px 0 0;
+  color: rgb(var(--rgb-ink) / 0.55);
+  font-size: 14px;
+  font-weight: 700;
+  text-wrap: balance;
+}

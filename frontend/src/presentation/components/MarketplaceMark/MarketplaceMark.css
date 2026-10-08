@@ -1,0 +1,76 @@
+/* ==================================================================
+   Bloco: marketplace-mark
+   Cada marketplace troca só as variáveis --mark-bg e --mark-fg.
+   ================================================================== */
+.marketplace-mark {
+  --mark-size: 48px;
+  --mark-bg: var(--color-coral);
+  --mark-fg: var(--color-white);
+
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--mark-size);
+  height: var(--mark-size);
+  border-radius: calc(var(--mark-size) * 0.3);
+  background: var(--mark-bg);
+  color: var(--mark-fg);
+  font-family: var(--font-display);
+  font-size: calc(var(--mark-size) * 0.4);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  box-shadow:
+    inset 0 1px 0 rgb(var(--rgb-white) / 0.22),
+    0 10px 22px -12px rgb(var(--rgb-black) / 0.55);
+}
+
+/* ---------- Tamanhos ---------- */
+.marketplace-mark--sm {
+  --mark-size: 30px;
+}
+
+.marketplace-mark--lg {
+  --mark-size: 64px;
+}
+
+/* ---------- Cores de cada marketplace ---------- */
+.marketplace-mark--mercado-livre {
+  --mark-bg: var(--color-mercado-livre);
+  --mark-fg: var(--color-mercado-livre-ink);
+}
+
+.marketplace-mark--shopee {
+  --mark-bg: var(--color-shopee);
+}
+
+.marketplace-mark--amazon {
+  --mark-bg: var(--color-amazon);
+  --mark-fg: var(--color-amazon-accent);
+}
+
+.marketplace-mark--magalu {
+  --mark-bg: var(--color-magalu);
+}
+
+.marketplace-mark--americanas {
+  --mark-bg: var(--color-americanas);
+}
+
+.marketplace-mark--casas-bahia {
+  --mark-bg: var(--color-casas-bahia);
+}
+
+.marketplace-mark--shein {
+  --mark-bg: var(--color-shein);
+}
+
+.marketplace-mark--tiktok-shop {
+  --mark-bg: var(--color-tiktok-shop);
+  --mark-fg: var(--color-tiktok-shop-accent);
+}
+
+.marketplace-mark--aliexpress {
+  --mark-bg: var(--color-aliexpress);
+}
