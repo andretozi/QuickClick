@@ -1,0 +1,26 @@
+/* ==================================================================
+   Bloco: auth-layout (login e cadastro)
+   ================================================================== */
+.auth-layout {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr));
+  min-height: 100vh;
+  overflow-x: clip;
+  background:
+    radial-gradient(90% 60% at 100% 0%, rgb(var(--rgb-white) / 0.35), transparent 60%),
+    var(--color-sand);
+  color: var(--color-ink);
+}
+
+.auth-layout__main {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(30px, 5vw, 56px) clamp(22px, 5vw, 56px);
+}
+
+/* Blocos que entram em sequência começam invisíveis (o JS faz a entrada) */
+.auth-layout [data-enter] {
+  opacity: 0;
+}

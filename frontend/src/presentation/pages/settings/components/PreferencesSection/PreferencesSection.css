@@ -1,0 +1,19 @@
+/* ==================================================================
+   Bloco: preferences-section (interruptores)
+   ================================================================== */
+.preferences-section__list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  border-radius: var(--radius-lg);
+  background: rgb(var(--rgb-white) / 0.5);
+  list-style: none;
+}
+
+.preferences-section__item {
+  padding: 16px 18px;
+}
+
+.preferences-section__item + .preferences-section__item {
+  border-top: 1px solid rgb(var(--rgb-ink) / 0.07);
+}

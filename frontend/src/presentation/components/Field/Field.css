@@ -1,10 +1,12 @@
 /* ==================================================================
-   Bloco: field (usado por TextField e PasswordField)
+   Bloco: field (TextField, PasswordField, SelectField e TextAreaField)
+   Estado: --invalid (borda e mensagem de erro)
    ================================================================== */
 .field__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   margin-bottom: 7px;
 }
 
@@ -31,7 +33,12 @@
   font-weight: 600;
   transition:
     border-color var(--duration-fast),
-    box-shadow var(--duration-fast);
+    box-shadow var(--duration-fast),
+    background var(--duration-fast);
+}
+
+.field__input:hover {
+  border-color: rgb(var(--rgb-ink) / 0.26);
 }
 
 .field__input:focus {
@@ -43,6 +50,53 @@
   padding-right: 46px;
 }
 
+.field__input--with-leading {
+  padding-left: 44px;
+}
+
+.field__input--compact {
+  padding-top: 11px;
+  padding-bottom: 11px;
+  font-size: 14.5px;
+}
+
+.field__textarea {
+  min-height: 132px;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+/* ---------- Lista de opções ---------- */
+.field__select {
+  padding-right: 44px;
+  appearance: none;
+  cursor: pointer;
+}
+
+.field__chevron {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  color: rgb(var(--rgb-ink) / 0.55);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+/* ---------- Ícone ou prefixo antes do texto ---------- */
+.field__leading {
+  position: absolute;
+  top: 50%;
+  left: 15px;
+  display: flex;
+  align-items: center;
+  color: rgb(var(--rgb-ink) / 0.5);
+  font-size: 15px;
+  font-weight: 800;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+/* ---------- Botão dentro do campo (mostrar senha) ---------- */
 .field__action {
   position: absolute;
   top: 50%;
@@ -66,4 +120,43 @@
 .field__action:hover {
   background: rgb(var(--rgb-ink) / 0.06);
   color: var(--color-ink);
+}
+
+/* ---------- Mensagens ---------- */
+.field__hint,
+.field__error {
+  margin: 7px 0 0;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.field__hint {
+  color: rgb(var(--rgb-ink) / 0.52);
+}
+
+.field__error {
+  display: flex;
+  gap: 6px;
+  color: var(--color-coral-deep);
+}
+
+.field__error::before {
+  content: '';
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* ---------- Estado: com erro ---------- */
+.field--invalid .field__input {
+  border-color: rgb(var(--rgb-coral-deep) / 0.7);
+  background: rgb(var(--rgb-sand-50) / 1);
+}
+
+.field--invalid .field__input:focus {
+  box-shadow: 0 0 0 4px rgb(var(--rgb-coral-deep) / 0.16);
 }

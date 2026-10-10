@@ -39,8 +39,14 @@ Quick Click ("Clicou, vendeu.") é uma automação de vendas multicanal com IA q
 - **Textos só em `frontend/src/domain/content/`**, inclusive aria-labels. Componente não tem texto fixo.
 - **Animações sempre ligadas.** Ficam em `infrastructure/animation` (Web Animations API, elementos achados por `data-*`). Em `core/config.js`, `respectReducedMotion: false` é decisão do projeto: **não mude**.
 - Reaproveite os componentes que existem (`Button`, `Icon`, `Brand`, `Section`, `Blob`, `MarketplaceMark`...) e os efeitos de `infrastructure/animation/core/effects.js` (`driftBlobs`, `pulseLogo`, `ripple`, `drawCheck`, `enterInSequence`...).
-- Identidade visual: fundos areia e cacau, destaque coral, títulos em Fraunces e texto em Nunito. Marketplaces aparecem como monograma (iniciais na cor da marca dele), nunca como logo oficial.
-- Telas: `#/` (landing), `#/login` e `#/marketplaces`. Hashes sem barra (`#planos`) são seções da landing.
+- Identidade visual: fundos areia e cacau, destaque coral, títulos em Fraunces e texto em Nunito.
+- Marketplaces aparecem com o **logo oficial** (`presentation/assets/marketplaces`, fontes em `FONTES.md`; nunca altere os arquivos), sempre pelo `MarketplaceLogo`. O monograma (`MarketplaceMark`) é só a reserva de quem não tem logo livre (TikTok Shop).
+- **Navbar de vidro** (`SiteNav`): sem cor própria, blur de 12 px, todos os textos em coral. Sobre seção escura (`data-surface="dark"`), o "Quick" da marca fica creme.
+- **Fundos das marcas** são gerados em código (`BrandBackdrop`, paletas em `MARKETPLACE_PALETTES`). Imagem opcional em `assets/marketplaces/fundos/<slug>.webp`.
+- Partículas, explosões e palavras: um canvas só, pelo `infrastructure/animation/core/particleField.js` (componente `ParticleBurst`). Laços (spinner, brilho) por `data-spin` e `data-shimmer` (`core/loops.js`); nada de `@keyframes` novo no CSS.
+- Telas: `#/` (landing), `#/login`, `#/cadastro`, `#/painel`, `#/anuncios/novo`, `#/anuncios/:id`, `#/marketplaces`, `#/configuracoes` e a 404. As privadas mandam para `#/login?volta=...`. Hashes sem barra (`#planos`) são seções da landing.
+- **Área logada sem banco:** contas, sessão, anúncios, conexões, preferências e rascunho ficam no localStorage, por repositórios em `infrastructure/storage` (chaves `quickclick:v1:usuario:<id>:...`). Não existe conta pré criada nem conta de demonstração: cada vendedor cria a sua. Detalhes em `docs/area-logada.md`.
+- No front, só o **Mercado Livre** está disponível para conectar e publicar; os outros aparecem "em breve".
 
 ## Regra de escrita (todo texto que aparece na tela)
 
@@ -56,7 +62,7 @@ Quick Click ("Clicou, vendeu.") é uma automação de vendas multicanal com IA q
 
 - Nomes do domínio em português: `Marketplace`, `ContaVinculada`, `Plano`, `Vendedor`. JSON da API também em português (`nome`, `conectado`, `status`).
 - Regras de negócio moram no `domain`: o limite de marketplaces por plano fica em `domain/plano.py` (Grátis e Essencial: 1; Pro e Business: vários) e o catálogo em `domain/marketplace.py`.
-- **Catálogo sincronizado:** a lista de marketplaces da landing (`frontend/src/domain/content/marketplacesContent.js`) acompanha `backend/domain/marketplace.py`. Mudou um, mude o outro.
+- **Catálogo sincronizado:** a lista de marketplaces da landing (`frontend/src/domain/content/marketplacesContent.js`) acompanha `backend/domain/marketplace.py`. Mudou um, mude o outro. **Pendência:** o back ainda marca Shopee e Amazon como disponíveis; o front só libera o Mercado Livre. Alinhar quando a área logada voltar a usar a API.
 - Erros de negócio têm `codigo` estável e `mensagem` amigável (com a regra de escrita), e a API devolve tudo como `{"erro": {...}}`.
 - Integrações com os marketplaces são **simuladas** (`infrastructure/marketplaces/`). O comentário de cada gateway descreve a integração real. Mercado Livre usa REST direto, sem os SDKs oficiais, que foram arquivados em 2022.
 - Sem login ainda: a API atende o vendedor de demonstração, com o plano em `QUICKCLICK_PLANO_DEMO` no `.env`.
@@ -65,5 +71,7 @@ Quick Click ("Clicou, vendeu.") é uma automação de vendas multicanal com IA q
 
 ## Fluxo de trabalho
 
-- Mensagens de commit em português. Não faça push sem perguntar.
+- O Claude Code não faz commit nem push; quem commita é o André.
+- Mensagens de commit em português.
+- O andamento das tarefas longas fica em `docs/progresso.md` (retomada se a sessão cair).
 - Antes de commitar: `npm run build` sem erros e testes do back passando.

@@ -54,9 +54,16 @@ python -m uvicorn backend.app.bootstrap:criar_app --factory --reload --port 8080
 
 | Endereço | Tela |
 |---|---|
-| `#/` | landing |
-| `#/login` | login (simulado: "Entrar" leva para a tela de marketplaces) |
-| `#/marketplaces` | conectar as contas que o vendedor já tem nos marketplaces |
+| `#/` | landing (com a vitrine de marketplaces em tela cheia) |
+| `#/cadastro` | criar conta (no navegador, sem banco) |
+| `#/login` | entrar com o email e a senha criados no cadastro |
+| `#/painel` | painel: números da loja, anúncios e insights |
+| `#/anuncios/novo` | criar anúncio em 5 passos, da foto ao anúncio pronto |
+| `#/anuncios/:id` | ver e editar um anúncio |
+| `#/marketplaces` | conectar o Mercado Livre (os outros vêm em breve) |
+| `#/configuracoes` | perfil, segurança, plano, conexões, preferências e excluir a conta |
+
+As telas a partir de `#/painel` exigem login. A área logada funciona sem o back e sem banco: tudo fica no localStorage do navegador, por conta. Detalhes, chaves e o que é simulado em [`docs/area-logada.md`](docs/area-logada.md).
 
 Hashes sem barra (`#como`, `#marketplaces`, `#planos`) são seções da landing. De outra tela, um link `#planos` abre a landing já na seção de planos.
 
@@ -215,13 +222,15 @@ Com credenciais reais, a conexão vira duas etapas. O POST devolve a URL de auto
 
 ### Tela de marketplaces
 
-Em `#/marketplaces` o vendedor vê o plano (com o uso e o aviso do limite) e todos os marketplaces do catálogo. Ao clicar em **Conectar**:
+Em `#/marketplaces` o vendedor vê o aviso do plano e uma placa por marketplace, com o logo oficial e o fundo nas cores da marca. Por enquanto, só o Mercado Livre conecta. Ao clicar em **Conectar**:
 
-1. uma confirmação explica que ele vai autorizar direto no marketplace e que a gente nunca vê a senha;
-2. uma tela curta de "Autorizando…" aparece enquanto o back faz a conexão simulada;
-3. o card vira **Conectado**, com o check se desenhando e uma onda saindo do monograma.
+1. uma confirmação mostra as permissões e lembra que a gente nunca vê a senha;
+2. "Indo para o Mercado Livre", no amarelo da marca, e depois "Autorizando…";
+3. "Conectado": o cursor da marca clica, o check se desenha e as partículas formam a palavra.
 
-Erros do back, como o limite do plano, aparecem no próprio diálogo, com a mensagem dele e o caminho para os planos. Os monogramas são as iniciais de cada marketplace numa cor que lembra a marca dele; nenhum logo oficial é usado.
+Conectado, a placa mostra o apelido da conta, "conectado desde", **Sincronizar agora** (com progresso) e **Desconectar** (com confirmação). Hoje essa tela usa o localStorage; o `marketplacesService` que fala com a API continua no projeto para quando a área logada voltar a usar o back.
+
+Os logos oficiais ficam em `frontend/src/presentation/assets/marketplaces`, com as fontes em `FONTES.md`. O TikTok Shop não tem logo livre e usa o monograma como reserva.
 
 ## Convenções do front
 

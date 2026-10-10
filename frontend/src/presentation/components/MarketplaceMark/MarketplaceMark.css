@@ -27,12 +27,20 @@
 }
 
 /* ---------- Tamanhos ---------- */
+.marketplace-mark--xs {
+  --mark-size: 22px;
+}
+
 .marketplace-mark--sm {
   --mark-size: 30px;
 }
 
 .marketplace-mark--lg {
   --mark-size: 64px;
+}
+
+.marketplace-mark--xl {
+  --mark-size: clamp(110px, 16vw, 220px);
 }
 
 /* ---------- Cores de cada marketplace ---------- */

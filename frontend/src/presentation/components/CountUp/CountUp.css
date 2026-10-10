@@ -1,0 +1,12 @@
+/* ==================================================================
+   Bloco: count-up
+   Algarismos de mesma largura: o número não "dança" enquanto conta.
+   ================================================================== */
+.count-up {
+  display: inline-block;
+}
+
+.count-up__value {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

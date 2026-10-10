@@ -1,0 +1,111 @@
+/* ==================================================================
+   Bloco: photos-step (passo das fotos)
+   Item: --cover (a foto de capa)
+   ================================================================== */
+.photos-step {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.photos-step__title {
+  margin: 0;
+  font-size: clamp(22px, 2.6vw, 30px);
+}
+
+.photos-step__lead {
+  margin: 6px 0 0;
+  color: rgb(var(--rgb-ink) / 0.65);
+  font-weight: 600;
+}
+
+.photos-step__count {
+  margin: 0;
+  color: rgb(var(--rgb-ink) / 0.6);
+  font-size: 13.5px;
+  font-weight: 800;
+}
+
+.photos-step__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.photos-step__item {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: rgb(var(--rgb-ink) / 0.06);
+  box-shadow: 0 14px 26px -18px rgb(var(--rgb-black) / 0.6);
+  transition: transform var(--duration-slow) var(--ease-spring);
+}
+
+.photos-step__item:hover {
+  transform: translateY(-3px) rotate(-0.6deg);
+}
+
+.photos-step__item--cover {
+  box-shadow:
+    0 0 0 3px var(--color-coral),
+    0 18px 30px -16px rgb(var(--rgb-coral) / 0.8);
+}
+
+.photos-step__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photos-step__badge,
+.photos-step__make-cover {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border: none;
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.photos-step__badge {
+  background: var(--color-coral);
+  color: var(--color-white);
+}
+
+.photos-step__make-cover {
+  background: rgb(var(--rgb-night) / 0.7);
+  color: var(--color-cream);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--duration-fast);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.photos-step__item:hover .photos-step__make-cover,
+.photos-step__make-cover:focus-visible {
+  opacity: 1;
+}
+
+.photos-step__remove {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
+/* Toque: os botões ficam sempre visíveis */
+@media (hover: none) {
+  .photos-step__make-cover {
+    opacity: 1;
+  }
+}

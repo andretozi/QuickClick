@@ -1,0 +1,60 @@
+/* ==================================================================
+   Bloco: auth-form (moldura do login e do cadastro)
+   ================================================================== */
+.auth-form {
+  width: 100%;
+  max-width: 428px;
+}
+
+.auth-form__header {
+  margin-bottom: 26px;
+}
+
+.auth-form__title {
+  font-size: clamp(30px, 4vw, 38px);
+  line-height: 1.05;
+  letter-spacing: -0.015em;
+}
+
+.auth-form__title:focus {
+  outline: none;
+}
+
+.auth-form__lead {
+  margin: 10px 0 0;
+  color: var(--text-muted);
+  font-size: 15.5px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.auth-form__alert {
+  margin-bottom: 18px;
+}
+
+.auth-form__switch {
+  margin: 22px 0 0;
+  color: rgb(var(--rgb-ink) / 0.62);
+  font-size: 14.5px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.auth-form__switch-link {
+  font-weight: 800;
+}
+
+.auth-form__terms {
+  max-width: 330px;
+  margin: 18px auto 0;
+  color: rgb(var(--rgb-ink) / 0.42);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.55;
+  text-align: center;
+}
+
+.auth-form__terms-link {
+  color: rgb(var(--rgb-ink) / 0.55);
+  font-weight: 700;
+}

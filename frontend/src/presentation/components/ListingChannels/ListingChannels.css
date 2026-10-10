@@ -1,0 +1,59 @@
+/* ==================================================================
+   Bloco: listing-channels (canais de um anúncio, sobre fundo claro)
+   Modificador: --compact (empilha no celular)
+   ================================================================== */
+.listing-channels {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.listing-channels__main {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Logo numa pastilha clara, para o azul do Mercado Livre ler bem */
+.listing-channels__logo {
+  display: inline-flex;
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--color-white);
+  box-shadow: 0 6px 14px -10px rgb(var(--rgb-black) / 0.5);
+}
+
+.listing-channels__soon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  overflow: hidden;
+  border: 1px dashed rgb(var(--rgb-ink) / 0.14);
+  border-radius: var(--radius-pill);
+}
+
+/* Brilho passando pelos que ainda vão chegar (animado pelo JS, via data-shimmer) */
+.listing-channels__shine {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgb(var(--rgb-white) / 0.6), transparent 70%);
+  transform: translateX(-120%);
+  pointer-events: none;
+}
+
+.listing-channels__soon-logo {
+  display: inline-flex;
+}
+
+.listing-channels__more {
+  color: rgb(var(--rgb-ink) / 0.5);
+  font-size: 11.5px;
+  font-weight: 800;
+}
+
+.listing-channels--compact .listing-channels__soon {
+  display: none;
+}

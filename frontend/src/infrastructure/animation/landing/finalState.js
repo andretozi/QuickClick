@@ -13,6 +13,7 @@ export function showFinalState(animator) {
     strokeDashoffset: '0'
   });
   show('[data-part="listing"]', { opacity: '1', transform: 'none' });
+  show('[data-part="viewport"]', { opacity: '1' });
   show('[data-part="fill"]', { width: '100%' });
   animator.queryAll('[data-part="bar"]').forEach((bar) => {
     bar.style.height = bar.style.getPropertyValue('--bar-height') || '60%';

@@ -1,0 +1,135 @@
+/* ==================================================================
+   Bloco: details-step (passo dos detalhes)
+   ================================================================== */
+.details-step {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.details-step__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.details-step__title {
+  margin: 0;
+  font-size: clamp(22px, 2.6vw, 30px);
+}
+
+.details-step__lead {
+  margin: 6px 0 0;
+  color: rgb(var(--rgb-ink) / 0.65);
+  font-weight: 600;
+}
+
+/* ---------- "Analisando a foto" ---------- */
+.details-step__scan {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 14px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, var(--color-cocoa-700), var(--color-cocoa));
+  color: var(--color-cream);
+  box-shadow: 0 20px 36px -24px rgb(var(--rgb-black) / 0.8);
+}
+
+.details-step__scan-photo {
+  position: relative;
+  flex: none;
+  width: 84px;
+  height: 84px;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: rgb(var(--rgb-cream) / 0.08);
+}
+
+.details-step__scan-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.details-step__scan-beam {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 25%, rgb(var(--rgb-coral-glow) / 0.75), transparent 75%);
+  mix-blend-mode: screen;
+}
+
+.details-step__scan-steps {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.details-step__scan-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: rgb(var(--rgb-cream) / 0.45);
+  font-size: 14px;
+  font-weight: 700;
+  transition: color var(--duration-base);
+}
+
+.details-step__scan-step--active {
+  color: var(--color-coral-glow);
+}
+
+.details-step__scan-step--done {
+  color: var(--color-green-light);
+}
+
+.details-step__notice {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: rgb(var(--rgb-honey) / 0.16);
+  color: var(--color-ink);
+  font-weight: 700;
+}
+
+/* ---------- Campos ---------- */
+.details-step__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.details-step__wide {
+  grid-column: 1 / -1;
+}
+
+.details-step__label {
+  margin: 0 0 8px;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.details-step__counter {
+  color: rgb(var(--rgb-ink) / 0.5);
+  font-size: 12.5px;
+  font-weight: 800;
+}
+
+.details-step__counter--near {
+  color: var(--color-coral-deep);
+}
+
+@media (max-width: 560px) {
+  .details-step__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .details-step__ai {
+    width: 100%;
+  }
+}

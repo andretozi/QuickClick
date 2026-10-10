@@ -1,0 +1,137 @@
+/* ==================================================================
+   Bloco: site-nav
+   Tons: --light (landing) e --dark (área logada)
+   Estados (aplicados pelo JS ao rolar):
+   --scrolled  vidro desfocado depois de sair do topo
+   --hidden    some ao rolar para baixo, volta ao rolar para cima (só na landing)
+   --over-dark há uma seção escura atrás (o "Quick" da marca fica creme)
+   ================================================================== */
+.site-nav {
+  /* Todos os textos em coral, nos dois tons: legível sobre areia e sobre cacau */
+  --nav-link: var(--color-coral);
+  --nav-link-hover: var(--color-coral-glow);
+  /* Vidro sem cor própria: mostra a seção que está atrás, só um pouco embaçada */
+  --nav-glass: rgb(var(--rgb-cream) / 0.04);
+  --nav-edge: rgb(var(--rgb-cream) / 0.22);
+
+  position: sticky;
+  top: 0;
+  z-index: var(--layer-nav);
+  border-bottom: 1px solid var(--nav-edge);
+  background: var(--nav-glass);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
+  backdrop-filter: blur(12px) saturate(1.2);
+  transition:
+    transform var(--duration-slow) var(--ease-out-expo),
+    background 0.35s,
+    box-shadow 0.35s,
+    border-color 0.35s;
+}
+
+.site-nav--dark {
+  color: var(--color-cream);
+}
+
+/* Fora do topo: só uma sombra quente leve para descolar do conteúdo */
+.site-nav--scrolled {
+  box-shadow: 0 14px 34px -26px rgb(var(--rgb-black) / 0.55);
+}
+
+.site-nav--hidden {
+  transform: translateY(-108%);
+}
+
+/* Sobre uma seção escura (data-surface="dark" atrás da navbar), o "Quick" da marca vira creme */
+.site-nav__brand {
+  transition: color var(--duration-base);
+}
+
+.site-nav--over-dark .site-nav__brand {
+  color: var(--color-cream);
+}
+
+.site-nav__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  max-width: 1180px;
+  min-height: 72px;
+  margin: 0 auto;
+  padding: 14px var(--container-padding);
+}
+
+.site-nav__actions {
+  display: flex;
+  align-items: center;
+  gap: clamp(12px, 2.6vw, 30px);
+}
+
+.site-nav__link {
+  position: relative;
+  color: var(--nav-link);
+  font-size: 15px;
+  font-weight: 700;
+  transition: color var(--duration-fast);
+}
+
+.site-nav__link:hover {
+  color: var(--nav-link-hover);
+}
+
+/* Página atual: um traço de luz embaixo do link */
+.site-nav__link--current {
+  color: var(--nav-link-hover);
+}
+
+/* Entrar e Criar anúncio: texto e borda em coral; no hover, o coral enche o botão */
+.site-nav__outline {
+  --button-fg: var(--color-coral);
+  --button-fg-hover: var(--color-white);
+  --button-border: var(--color-coral);
+  --button-border-hover: var(--color-coral);
+  --button-bg-hover: var(--color-coral);
+}
+
+.site-nav__link--current::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: -8px;
+  left: 0;
+  height: 3px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(90deg, var(--color-coral), var(--color-honey));
+  box-shadow: 0 0 12px rgb(var(--rgb-coral) / 0.7);
+}
+
+/* Botão "+" só no celular (no lugar de "Criar anúncio") */
+.site-nav__cta-icon {
+  display: none;
+}
+
+/* Telas menores: os links da landing saem e ficam a marca, "Entrar" e "Começar grátis" */
+@media (max-width: 960px) {
+  .site-nav__link--section {
+    display: none;
+  }
+}
+
+/* Logado em tela estreita: Painel e Criar anúncio vão para o menu; fica o "+" */
+@media (max-width: 720px) {
+  .site-nav__link--app,
+  .site-nav__cta--wide {
+    display: none;
+  }
+
+  .site-nav__cta-icon {
+    display: inline-flex;
+  }
+}
+
+/* Celular: sobra só a marca e o botão "Entrar" */
+@media (max-width: 520px) {
+  .site-nav__cta {
+    display: none;
+  }
+}

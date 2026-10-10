@@ -1,0 +1,27 @@
+/* ==================================================================
+   Bloco: signup-form (os campos do cadastro)
+   ================================================================== */
+.signup-form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+/* Senha e confirmação lado a lado quando cabem */
+.signup-form__pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
+  gap: 15px;
+}
+
+.signup-form__hint {
+  margin: -6px 0 0;
+  color: rgb(var(--rgb-ink) / 0.52);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.signup-form__submit {
+  margin-top: 4px;
+}

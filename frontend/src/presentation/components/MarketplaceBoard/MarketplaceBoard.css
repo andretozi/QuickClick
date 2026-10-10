@@ -1,0 +1,93 @@
+/* ==================================================================
+   Bloco: marketplace-board (aviso do plano e a grade de placas)
+   Modificador: --compact (dentro das configurações)
+   ================================================================== */
+.marketplace-board {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(16px, 2.4vw, 24px);
+}
+
+.marketplace-board__notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  margin: 0;
+  padding: 14px 18px;
+  border: 1px solid rgb(var(--rgb-honey) / 0.35);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(80% 140% at 0% 0%, rgb(var(--rgb-honey) / 0.18), transparent 70%),
+    rgb(var(--rgb-cream) / 0.04);
+  color: var(--color-cream);
+  font-size: 14.5px;
+  font-weight: 700;
+}
+
+.marketplace-board__notice-icon {
+  flex: none;
+  color: var(--color-honey);
+}
+
+.marketplace-board__notice-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  color: var(--color-coral-glow);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.marketplace-board__notice-link:hover {
+  color: var(--color-coral);
+}
+
+.marketplace-board__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(14px, 2vw, 20px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.marketplace-board--compact .marketplace-board__grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.marketplace-board__status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-height: 200px;
+  color: rgb(var(--rgb-cream) / 0.8);
+  font-weight: 700;
+}
+
+.marketplace-board__spinner {
+  width: 22px;
+  height: 22px;
+  border: 3px solid rgb(var(--rgb-cream) / 0.2);
+  border-top-color: var(--color-coral);
+  border-radius: 50%;
+}
+
+@media (max-width: 960px) {
+  .marketplace-board__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .marketplace-board__grid,
+  .marketplace-board--compact .marketplace-board__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .marketplace-board__notice-link {
+    margin-left: 0;
+  }
+}

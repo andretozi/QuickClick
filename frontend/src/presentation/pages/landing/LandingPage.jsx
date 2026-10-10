@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import useLandingAnimations from '@/application/animation/useLandingAnimations.js';
-import Nav from './sections/Nav/Nav.jsx';
+import SiteNav from '@/presentation/components/SiteNav/SiteNav.jsx';
 import Hero from './sections/Hero/Hero.jsx';
 import HowItWorks from './sections/HowItWorks/HowItWorks.jsx';
 import Marketplaces from './sections/Marketplaces/Marketplaces.jsx';
@@ -18,7 +18,7 @@ export default function LandingPage() {
 
   return (
     <div ref={rootRef} className="landing">
-      <Nav />
+      <SiteNav tone="light" variant="landing" />
       <main>
         <Hero />
         <HowItWorks />

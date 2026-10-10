@@ -3,7 +3,8 @@ import './MarketplaceMark.css';
 
 /**
  * Monograma de um marketplace: as iniciais numa cor que lembra a marca dele.
- * Não usamos logos oficiais. size: 'sm' | 'md' | 'lg'
+ * É a reserva do MarketplaceLogo, para quando o logo oficial não existe (TikTok Shop).
+ * size: 'xs' | 'sm' | 'md' | 'lg' | 'xl'
  */
 export default function MarketplaceMark({ slug, monogram, size = 'md', className }) {
   return (

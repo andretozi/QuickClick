@@ -26,3 +26,6 @@ backend/data/
 *.log
 .DS_Store
 Thumbs.db
+
+# Screenshots e GIFs de verificação (Claude Code)
+.screens/

@@ -1,0 +1,75 @@
+/* ==================================================================
+   Bloco: bar-chart (barras horizontais sobre vidro escuro)
+   Tons: --coral, --honey
+   ================================================================== */
+.bar-chart {
+  --bar-color: var(--color-coral);
+  --bar-glow: rgb(var(--rgb-coral) / 0.45);
+}
+
+.bar-chart--honey {
+  --bar-color: var(--color-honey);
+  --bar-glow: rgb(var(--rgb-honey) / 0.45);
+}
+
+.bar-chart__list {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bar-chart__row {
+  display: grid;
+  grid-template-columns: minmax(96px, 34%) 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.bar-chart__label {
+  overflow: hidden;
+  color: rgb(var(--rgb-cream) / 0.85);
+  font-size: 14px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar-chart__svg {
+  display: block;
+  width: 100%;
+  height: 12px;
+  overflow: visible;
+}
+
+.bar-chart__track {
+  fill: rgb(var(--rgb-cream) / 0.07);
+}
+
+.bar-chart__bar {
+  fill: var(--bar-color);
+  transform-box: fill-box;
+  transform-origin: left;
+  filter: drop-shadow(0 0 6px var(--bar-glow));
+}
+
+.bar-chart__value {
+  min-width: 72px;
+  color: var(--color-cream);
+  font-size: 13px;
+  font-weight: 800;
+  text-align: right;
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  .bar-chart__row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .bar-chart__svg {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}

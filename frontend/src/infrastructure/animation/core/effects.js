@@ -134,3 +134,70 @@ export function press(element, { scale = 0.955, duration = 300 } = {}) {
     { duration, easing: 'ease-out' }
   );
 }
+
+/**
+ * Clique com mola: o elemento amassa, passa um pouco do tamanho e assenta,
+ * como uma mola amortecida. Use num elemento interno (não no que já se move pelo JS).
+ */
+export function springPress(animator, element, { depth = 0.9, overshoot = 1.045, duration = 620 } = {}) {
+  return animator.animate(
+    element,
+    [
+      { transform: 'scale(1)', easing: 'cubic-bezier(.3,.6,.5,1)' },
+      { transform: `scale(${depth})`, offset: 0.2, easing: 'cubic-bezier(.3,0,.3,1)' },
+      { transform: `scale(${overshoot})`, offset: 0.52, easing: 'ease-in-out' },
+      { transform: 'scale(.988)', offset: 0.78, easing: 'ease-in-out' },
+      { transform: 'scale(1)' }
+    ],
+    { duration }
+  );
+}
+
+/**
+ * Número que conta do zero até o valor ao aparecer.
+ * format: 'number' (1.234) ou 'money' (o valor chega em centavos e vira R$).
+ */
+export function countUp(animator, element, { to, from = 0, duration = 1400, delay = 0, format = 'number' } = {}) {
+  if (!element) return;
+  const formatter =
+    format === 'money'
+      ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
+      : new Intl.NumberFormat('pt-BR');
+  const render = (value) => {
+    element.textContent = formatter.format(format === 'money' ? value / 100 : Math.round(value));
+  };
+  const easeOut = (t) => 1 - Math.pow(1 - t, 4);
+
+  render(from);
+  let frame = null;
+  animator.after(delay, () => {
+    const startedAt = performance.now();
+    const tick = (now) => {
+      if (!animator.alive) return;
+      const t = Math.min(1, (now - startedAt) / duration);
+      render(from + (to - from) * easeOut(t));
+      if (t < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+  });
+  animator.onDispose(() => {
+    if (frame !== null) cancelAnimationFrame(frame);
+    render(to);
+  });
+}
+
+/**
+ * Linha que se desenha (gráficos, trilho de progresso). O path usa pathLength="1";
+ * a posição final fica gravada no elemento, então ela continua desenhada depois.
+ */
+export function drawPath(animator, path, { duration = 900, delay = 0, easing = EASE_DRAW } = {}) {
+  if (!path) return null;
+  path.style.strokeDasharray = '1';
+  path.style.strokeDashoffset = '0';
+  return animator.animate(path, [{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], {
+    duration,
+    delay,
+    easing,
+    fill: 'both'
+  });
+}

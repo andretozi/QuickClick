@@ -8,7 +8,6 @@ export const NAV = {
   ariaLabel: 'Principal',
   links: [
     { label: 'Como funciona', href: '#como' },
-    { label: 'Marketplaces', href: '#marketplaces' },
     { label: 'Planos', href: '#planos' }
   ],
   login: { label: 'Entrar', href: '#/login' },
@@ -33,7 +32,7 @@ export const HOW_IT_WORKS = {
       scene: 'register',
       title: 'Conecte as lojas que você já tem.',
       description:
-        'Mercado Livre, Shopee, Amazon e outros. Você autoriza direto no marketplace e a gente nunca vê a sua senha.'
+        'Comece pelo Mercado Livre. Os outros grandes marketplaces estão chegando. Você autoriza direto no marketplace e a gente nunca vê a sua senha.'
     },
     {
       number: '02',
@@ -57,14 +56,16 @@ export const HOW_IT_WORKS = {
   ]
 };
 
-/** Os nomes e monogramas dos marketplaces vêm do catálogo em marketplacesContent.js. */
+/**
+ * Vitrine animada dos marketplaces (seção #marketplaces). É propaganda: não tem botão
+ * nem link para conectar conta. Os nomes vêm do catálogo em marketplacesContent.js.
+ */
 export const MARKETPLACES = {
-  eyebrow: 'MARKETPLACES',
-  title: 'Conecte as lojas que você já tem.',
-  lead: 'Mercado Livre, Shopee e Amazon já funcionam com a Quick Click. Os outros grandes marketplaces estão chegando.',
-  availableLabel: 'DISPONÍVEIS',
-  soonLabel: 'EM BREVE',
-  cta: { label: 'Conectar meus marketplaces', href: '#/marketplaces' }
+  title: 'Integração com os maiores marketplaces do Brasil.',
+  lead: 'Você vende onde o seu cliente já compra. A gente cuida do resto.',
+  listLabel: 'Marketplaces da vitrine',
+  /** O que o leitor de tela ouve em cada item: "Mercado Livre, já integrado". */
+  itemLabel: (name, word) => `${name}, ${word.toLowerCase()}`
 };
 
 export const BENEFITS = {
@@ -131,7 +132,7 @@ export const PLANS = {
       period: 'pra sempre',
       tagline: 'Pra começar a vender',
       features: ['1 marketplace', 'Poucos anúncios'],
-      cta: { label: 'Começar grátis', href: '#/login' }
+      cta: { label: 'Começar grátis', href: '#/cadastro' }
     },
     {
       id: 'essencial',
@@ -140,7 +141,7 @@ export const PLANS = {
       period: 'por mês',
       tagline: 'Pra vender mais rápido',
       features: ['1 marketplace', 'Anúncios com IA', 'Preço sugerido'],
-      cta: { label: 'Escolher Essencial', href: '#/login' }
+      cta: { label: 'Escolher Essencial', href: '#/cadastro' }
     },
     {
       id: 'pro',
@@ -150,7 +151,7 @@ export const PLANS = {
       tagline: 'Pra vender em todos os canais',
       features: ['Vários marketplaces', 'Baixa automática de estoque', 'Monitor de preços'],
       featured: true,
-      cta: { label: 'Escolher Pro', href: '#/login' }
+      cta: { label: 'Escolher Pro', href: '#/cadastro' }
     },
     {
       id: 'business',
@@ -159,7 +160,7 @@ export const PLANS = {
       period: 'por mês',
       tagline: 'Pra quem vende em escala',
       features: ['Automação completa', 'Emissão automática de NF-e'],
-      cta: { label: 'Escolher Business', href: '#/login' }
+      cta: { label: 'Escolher Business', href: '#/cadastro' }
     }
   ]
 };
@@ -167,7 +168,7 @@ export const PLANS = {
 export const FINAL_CTA = {
   title: 'Pronto pra girar seu estoque?',
   lead: 'Crie sua conta, conecte seu primeiro marketplace e transforme a primeira foto em venda.',
-  cta: { label: 'Começar grátis', href: '#/login' },
+  cta: { label: 'Começar grátis', href: '#/cadastro' },
   finePrint: 'Grátis pra sempre · sem cartão · sem comissão sobre as vendas'
 };
 

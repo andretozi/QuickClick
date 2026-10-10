@@ -1,0 +1,53 @@
+/* ==================================================================
+   Bloco: form-alert
+   Tons: --error, --info, --success
+   ================================================================== */
+.form-alert {
+  --alert-rgb: var(--rgb-coral-deep);
+  --alert-fg: var(--color-coral-deep);
+
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgb(var(--alert-rgb) / 0.09);
+  box-shadow: inset 0 0 0 1px rgb(var(--alert-rgb) / 0.22);
+  color: var(--color-ink);
+}
+
+.form-alert--info {
+  --alert-rgb: var(--rgb-honey-dark);
+  --alert-fg: var(--color-honey-dark);
+}
+
+.form-alert--success {
+  --alert-rgb: var(--rgb-green);
+  --alert-fg: var(--color-green-dark);
+}
+
+.form-alert__icon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  background: rgb(var(--alert-rgb) / 0.14);
+  color: var(--alert-fg);
+}
+
+.form-alert__title {
+  margin: 4px 0 0;
+  font-size: 14.5px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.form-alert__text {
+  margin: 3px 0 0;
+  color: rgb(var(--rgb-ink) / 0.66);
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.5;
+}

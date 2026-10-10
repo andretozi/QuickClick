@@ -1,78 +1,72 @@
-import Section from '@/presentation/components/Section/Section.jsx';
-import SectionHeader from '@/presentation/components/Section/SectionHeader.jsx';
-import Blob from '@/presentation/components/Blob/Blob.jsx';
-import Button from '@/presentation/components/Button/Button.jsx';
-import MarketplaceMark from '@/presentation/components/MarketplaceMark/MarketplaceMark.jsx';
+import BrandBackdrop from '@/presentation/components/BrandBackdrop/BrandBackdrop.jsx';
+import Icon from '@/presentation/components/Icon/Icon.jsx';
+import MarketplaceLogo from '@/presentation/components/MarketplaceLogo/MarketplaceLogo.jsx';
+import ParticleBurst from '@/presentation/components/ParticleBurst/ParticleBurst.jsx';
 import { cx } from '@/presentation/utils/cx.js';
 import { MARKETPLACES } from '@/domain/content/landingContent.js';
-import { MARKETPLACE_CATALOG } from '@/domain/content/marketplacesContent.js';
+import {
+  MARKETPLACE_CATALOG,
+  getMarketplacePalette,
+  showcaseWordFor
+} from '@/domain/content/marketplacesContent.js';
 import './Marketplaces.css';
 
-const CHIP_STAGGER_MS = 60;
-const AVAILABLE = MARKETPLACE_CATALOG.filter((marketplace) => marketplace.available);
-const SOON = MARKETPLACE_CATALOG.filter((marketplace) => !marketplace.available);
+const SCENES = MARKETPLACE_CATALOG.map((marketplace) => ({
+  ...marketplace,
+  palette: getMarketplacePalette(marketplace.slug),
+  word: showcaseWordFor(marketplace)
+}));
 
-const backdrop = (
-  <>
-    <Blob tone="honey" className="marketplaces__blob marketplaces__blob--a" />
-    <Blob tone="coral" className="marketplaces__blob marketplaces__blob--b" />
-  </>
-);
-
-/** Nome do marketplace com o monograma. Os disponíveis têm um ponto verde "no ar" (cena "marketplaces"). */
-function Chip({ marketplace, soon = false, delay }) {
-  return (
-    <li data-reveal="up" data-delay={delay} className={cx('marketplaces__chip', soon && 'marketplaces__chip--soon')}>
-      <MarketplaceMark
-        slug={marketplace.slug}
-        monogram={marketplace.monogram}
-        size="sm"
-        className="marketplaces__mark"
-      />
-      {marketplace.name}
-      {!soon && <span data-part="live" className="marketplaces__live" aria-hidden="true" />}
-    </li>
-  );
-}
-
-/** Seção "Marketplaces": onde a Quick Click já funciona e o que está chegando. */
+/**
+ * Vitrine dos marketplaces (seção #marketplaces): uma cena de tela cheia por marketplace,
+ * com o fundo nas cores da marca e o logo enorme no centro. Sem botão de conectar.
+ * A coreografia (troca de cenas, cursor, clique e partículas que viram palavra) mora em
+ * infrastructure/animation/landing/scenes/marketplaces.js (cena "marketplaces").
+ * As cenas são decorativas; o leitor de tela recebe a lista escondida ("Mercado Livre, já integrado").
+ */
 export default function Marketplaces() {
-  const { eyebrow, title, lead, availableLabel, soonLabel, cta } = MARKETPLACES;
+  const { title, lead, listLabel, itemLabel } = MARKETPLACES;
 
   return (
-    <Section id="marketplaces" className="marketplaces" backdrop={backdrop}>
-      <SectionHeader eyebrow={eyebrow} eyebrowTone="coral" title={title} lead={lead} size="md" className="marketplaces__header" />
-
-      <div data-scene="marketplaces" className="marketplaces__catalog">
-        <p data-reveal="up" className="marketplaces__label">
-          {availableLabel}
-        </p>
-        <ul className="marketplaces__list" aria-label={availableLabel}>
-          {AVAILABLE.map((marketplace, index) => (
-            <Chip key={marketplace.slug} marketplace={marketplace} delay={index * CHIP_STAGGER_MS} />
+    <section id="marketplaces" data-surface="dark" className="showcase" aria-labelledby="vitrine-titulo">
+      <div data-scene="marketplaces" className="showcase__stage">
+        <ul className="showcase__scenes" aria-hidden="true">
+          {SCENES.map((scene, i) => (
+            <li
+              key={scene.slug}
+              data-part="slide"
+              data-slug={scene.slug}
+              data-word={scene.word}
+              data-title-tone={scene.palette.titleTone}
+              className={cx('showcase__slide', i === 0 && 'showcase__slide--current')}
+            >
+              <BrandBackdrop slug={scene.slug} palette={scene.palette} className="showcase__backdrop" />
+              <div data-part="logo" className="showcase__logo">
+                <MarketplaceLogo slug={scene.slug} size="hero" decorative />
+              </div>
+            </li>
           ))}
         </ul>
 
-        <p data-reveal="up" className="marketplaces__label">
-          {soonLabel}
-        </p>
-        <ul className="marketplaces__list" aria-label={soonLabel}>
-          {SOON.map((marketplace, index) => (
-            <Chip
-              key={marketplace.slug}
-              marketplace={marketplace}
-              soon
-              delay={(index + AVAILABLE.length) * CHIP_STAGGER_MS}
-            />
+        <header data-part="header" className="showcase__header">
+          <h2 id="vitrine-titulo" className="heading showcase__title">
+            {title}
+          </h2>
+          <p className="showcase__lead">{lead}</p>
+        </header>
+
+        <span data-part="ring" className="showcase__ring" />
+        <ParticleBurst data-part="particles" className="showcase__particles" />
+        <span data-part="cursor" className="showcase__cursor">
+          <Icon name="logo-spark" size={96} className="showcase__cursor-icon" />
+        </span>
+
+        <ul className="visually-hidden" aria-label={listLabel}>
+          {SCENES.map((scene) => (
+            <li key={scene.slug}>{itemLabel(scene.name, scene.word)}</li>
           ))}
         </ul>
       </div>
-
-      <div data-reveal="up" className="marketplaces__action">
-        <Button href={cta.href} size="lg" icon="arrow-right" iconSize={19}>
-          {cta.label}
-        </Button>
-      </div>
-    </Section>
+    </section>
   );
 }

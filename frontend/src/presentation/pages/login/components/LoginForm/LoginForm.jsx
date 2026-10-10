@@ -1,3 +1,4 @@
+import AuthForm from '@/presentation/components/AuthForm/AuthForm.jsx';
 import Button from '@/presentation/components/Button/Button.jsx';
 import Divider from '@/presentation/components/Divider/Divider.jsx';
 import TextField from '@/presentation/components/Field/TextField.jsx';
@@ -5,48 +6,59 @@ import PasswordField from '@/presentation/components/Field/PasswordField.jsx';
 import SocialLogin from '../SocialLogin/SocialLogin.jsx';
 import useLoginForm from '@/application/auth/useLoginForm.js';
 import { LOGIN_FORM, SOCIAL_PROVIDERS } from '@/domain/content/loginContent.js';
+import { FIELD_ERRORS } from '@/domain/content/commonContent.js';
 import './LoginForm.css';
 
-/** Links que ainda não têm página: não saem da tela atual. */
-const preventNavigation = (event) => event.preventDefault();
-
-/** Formulário de login. O estado e o envio ficam no hook useLoginForm (camada de aplicação). */
+/** Formulário de login. O estado, a validação e o envio ficam no hook useLoginForm. */
 export default function LoginForm() {
-  const { credentials, loading, handleChange, handleSubmit } = useLoginForm();
+  const {
+    values,
+    errors,
+    formRef,
+    handleChange,
+    handleSubmit,
+    loading,
+    formError,
+    announceSocialSoon,
+    announceForgotSoon
+  } = useLoginForm();
   const { title, lead, divider, email, password, submit, signup, terms } = LOGIN_FORM;
 
   return (
-    <div data-enter="4" className="login-form">
-      <header className="login-form__header">
-        <h2 className="heading login-form__title">{title}</h2>
-        <p className="login-form__lead">{lead}</p>
-      </header>
-
-      <SocialLogin providers={SOCIAL_PROVIDERS} />
+    <AuthForm
+      title={title}
+      lead={lead}
+      alert={formError ? LOGIN_FORM.errors[formError] : null}
+      switchTo={signup}
+      terms={terms}
+    >
+      <SocialLogin providers={SOCIAL_PROVIDERS} onSelect={announceSocialSoon} />
 
       <Divider>{divider}</Divider>
 
-      <form className="login-form__fields" onSubmit={handleSubmit}>
+      <form ref={formRef} className="login-form" onSubmit={handleSubmit} noValidate>
         <TextField
           id="login-email"
           name="email"
           type="email"
-          value={credentials.email}
+          value={values.email}
           onChange={handleChange}
           label={email.label}
           placeholder={email.placeholder}
           autoComplete="email"
+          error={FIELD_ERRORS[errors.email]}
         />
         <PasswordField
           id="login-password"
           name="password"
-          value={credentials.password}
+          value={values.password}
           onChange={handleChange}
           label={password.label}
           placeholder={password.placeholder}
           autoComplete="current-password"
+          error={FIELD_ERRORS[errors.password]}
           aside={
-            <a href="#" className="login-form__forgot" onClick={preventNavigation}>
+            <a href="#" className="login-form__forgot" onClick={announceForgotSoon}>
               {password.forgot}
             </a>
           }
@@ -56,30 +68,12 @@ export default function LoginForm() {
           size="block"
           loading={loading}
           loadingText={submit.loading}
+          disabled={loading}
           className="login-form__submit"
         >
           {submit.label}
         </Button>
       </form>
-
-      <p className="login-form__signup">
-        {signup.text}{' '}
-        <a href={signup.href} className="login-form__signup-link">
-          {signup.link}
-        </a>
-      </p>
-
-      <p className="login-form__terms">
-        {terms.before}{' '}
-        <a href="#" className="login-form__terms-link" onClick={preventNavigation}>
-          {terms.terms}
-        </a>{' '}
-        {terms.between}{' '}
-        <a href="#" className="login-form__terms-link" onClick={preventNavigation}>
-          {terms.privacy}
-        </a>
-        .
-      </p>
-    </div>
+    </AuthForm>
   );
 }

@@ -1,0 +1,59 @@
+/* ==================================================================
+   Bloco: avatar
+   Cores: --coral, --honey, --green, --cocoa · Tamanhos: --sm, --md, --lg, --xl
+   ================================================================== */
+.avatar {
+  --avatar-size: 40px;
+  --avatar-from: var(--color-coral-light);
+  --avatar-to: var(--color-honey);
+  --avatar-glow: var(--rgb-coral);
+
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--avatar-size);
+  height: var(--avatar-size);
+  border-radius: 50%;
+  background: linear-gradient(140deg, var(--avatar-from), var(--avatar-to));
+  color: var(--color-white);
+  font-family: var(--font-display);
+  font-size: calc(var(--avatar-size) * 0.38);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  box-shadow:
+    inset 0 1px 0 rgb(var(--rgb-white) / 0.4),
+    0 0 0 2px rgb(var(--rgb-white) / 0.14),
+    0 10px 24px -10px rgb(var(--avatar-glow) / 0.9);
+  user-select: none;
+}
+
+.avatar--sm {
+  --avatar-size: 32px;
+}
+
+.avatar--lg {
+  --avatar-size: 56px;
+}
+
+.avatar--xl {
+  --avatar-size: 84px;
+}
+
+.avatar--honey {
+  --avatar-from: var(--color-honey);
+  --avatar-to: var(--color-coral-glow);
+  --avatar-glow: var(--rgb-honey);
+}
+
+.avatar--green {
+  --avatar-from: var(--color-green);
+  --avatar-to: var(--color-green-light);
+  --avatar-glow: var(--rgb-green);
+}
+
+.avatar--cocoa {
+  --avatar-from: var(--color-cocoa-600);
+  --avatar-to: var(--color-coral-deep);
+  --avatar-glow: var(--rgb-cocoa);
+}

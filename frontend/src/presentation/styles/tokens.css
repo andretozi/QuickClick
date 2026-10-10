@@ -38,7 +38,8 @@
   --color-green-light: #5fd39a;
   --color-facebook: #1877f2;
 
-  /* ---------- Cores dos marketplaces (só nos monogramas: nunca usamos logos oficiais) ---------- */
+  /* ---------- Cores dos marketplaces (monogramas de reserva e detalhes; os logos oficiais
+     ficam em presentation/assets/marketplaces) ---------- */
   --color-mercado-livre: #ffe600;
   --color-mercado-livre-ink: #2d3277;
   --color-shopee: #ee4d2d;
@@ -52,6 +53,14 @@
   --color-tiktok-shop-accent: #fe2c55;
   --color-aliexpress: #e62e04;
 
+  /* ---------- Cores das ilustrações dos anúncios de demonstração ---------- */
+  --color-denim: #5a78b0;
+  --color-denim-dark: #3f5a8c;
+  --color-steel: #a9b1b8;
+  --color-steel-dark: #7d868e;
+  --color-leather: #a0623a;
+  --color-leather-dark: #7a4527;
+
   /* ---------- Canais RGB (para usar com transparência) ---------- */
   --rgb-ink: 43 29 21;
   --rgb-sand-100: 234 220 187;
@@ -63,6 +72,17 @@
   --rgb-facebook: 24 119 242;
   --rgb-black: 0 0 0;
   --rgb-white: 255 255 255;
+  --rgb-sand-50: 246 237 219;
+  --rgb-sand: 223 203 170;
+  --rgb-cocoa-600: 58 41 29;
+  --rgb-cocoa-700: 51 35 24;
+  --rgb-cocoa-950: 28 19 14;
+  --rgb-night: 18 16 14;
+  --rgb-coral-glow: 255 178 122;
+  --rgb-coral-deep: 201 72 31;
+  --rgb-honey-dark: 217 140 26;
+  --rgb-green-light: 95 211 154;
+  --rgb-mercado-livre: 255 230 0;
 
   /* ---------- Texto secundário (seções escuras redefinem) ---------- */
   --text-muted: rgb(var(--rgb-ink) / 0.6);
@@ -87,7 +107,19 @@
 
   /* ---------- Movimento ---------- */
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --duration-fast: 0.2s;
   --duration-base: 0.3s;
   --duration-slow: 0.45s;
+
+  /* ---------- Camadas (z-index) ---------- */
+  --layer-nav: 50;
+  --layer-menu: 70;
+  --layer-modal: 100;
+  --layer-toast: 120;
+
+  /* ---------- Sombras quentes (área logada) ---------- */
+  --shadow-panel: 0 40px 80px -48px rgb(var(--rgb-black) / 0.8);
+  --shadow-paper: 0 34px 70px -42px rgb(var(--rgb-black) / 0.75);
+  --shadow-glow-coral: 0 18px 40px -18px rgb(var(--rgb-coral) / 0.75);
 }

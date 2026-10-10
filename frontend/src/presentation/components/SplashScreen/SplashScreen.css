@@ -1,0 +1,18 @@
+/* ==================================================================
+   Bloco: splash
+   ================================================================== */
+.splash {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  min-height: 100svh;
+  overflow: hidden;
+  background: var(--color-cocoa);
+}
+
+.splash__mark {
+  position: relative;
+  z-index: 1;
+  transform: scale(1.4);
+}

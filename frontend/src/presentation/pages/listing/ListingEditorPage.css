@@ -1,0 +1,132 @@
+/* ==================================================================
+   Bloco: listing-editor (criar, ver e editar anúncio)
+   ================================================================== */
+.listing-editor {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(20px, 3vw, 28px);
+}
+
+/* Canal da comemoração: canvas por cima de tudo e o cursor da marca */
+.listing-editor__particles {
+  z-index: 5;
+}
+
+.listing-editor__cursor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 6;
+  color: var(--color-coral);
+  opacity: 0;
+  filter:
+    drop-shadow(0 18px 28px rgb(var(--rgb-coral-deep) / 0.6))
+    drop-shadow(0 6px 10px rgb(var(--rgb-black) / 0.4));
+  pointer-events: none;
+}
+
+.listing-editor__cursor-icon {
+  display: block;
+}
+
+.listing-editor__cursor-icon path {
+  stroke: var(--color-cream);
+  stroke-width: 1.2px;
+  paint-order: stroke;
+}
+
+.listing-editor__saved {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  padding: 7px 13px;
+  border-radius: var(--radius-pill);
+  background: rgb(var(--rgb-green-light) / 0.12);
+  color: var(--color-green-light);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.listing-editor__stepper {
+  padding: 4px 0;
+}
+
+.listing-editor__panel {
+  color: var(--color-ink);
+}
+
+.listing-editor__step {
+  min-height: 300px;
+}
+
+.listing-editor__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 26px;
+  padding-top: 20px;
+  border-top: 1px solid rgb(var(--rgb-ink) / 0.08);
+}
+
+.listing-editor__footer-end {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.listing-editor__hidden {
+  visibility: hidden;
+}
+
+.listing-editor__publish {
+  box-shadow:
+    0 18px 34px -16px rgb(var(--rgb-coral) / 0.9),
+    0 0 0 6px rgb(var(--rgb-coral) / 0.12);
+}
+
+.listing-editor__warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 16px;
+  border: 1px solid rgb(var(--rgb-honey) / 0.5);
+  border-radius: var(--radius-md);
+  background: rgb(var(--rgb-honey) / 0.12);
+  color: var(--color-cream);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.listing-editor__status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-height: 220px;
+  color: rgb(var(--rgb-cream) / 0.8);
+  font-weight: 700;
+}
+
+.listing-editor__spinner {
+  width: 22px;
+  height: 22px;
+  border: 3px solid rgb(var(--rgb-cream) / 0.2);
+  border-top-color: var(--color-coral);
+  border-radius: 50%;
+}
+
+@media (max-width: 560px) {
+  .listing-editor__footer-end {
+    width: 100%;
+  }
+
+  .listing-editor__footer-end > * {
+    flex: 1;
+  }
+}

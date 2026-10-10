@@ -1,0 +1,22 @@
+/* ==================================================================
+   Bloco: danger-section (excluir a conta)
+   ================================================================== */
+.danger-section {
+  border: 1px solid rgb(var(--rgb-coral-deep) / 0.5);
+}
+
+.danger-section__actions {
+  display: flex;
+}
+
+/* Botão de perigo: o coral fundo, sem o brilho do principal */
+.danger-section__button {
+  --button-bg: var(--color-coral-deep);
+  --button-bg-hover: var(--color-coral-dark);
+  --button-glow: transparent;
+}
+
+.danger-section__form {
+  margin-top: 16px;
+  text-align: left;
+}
