@@ -10,7 +10,6 @@ import {
   listConnections,
   syncMarketplace
 } from '@/infrastructure/storage/connectionsRepository.js';
-import { rememberFocus } from '@/infrastructure/browser/focus.js';
 import { canConnectMore } from '@/domain/plans/planRules.js';
 import { DISCONNECT_DIALOG, MARKETPLACE_CARD, MARKETPLACE_CATALOG } from '@/domain/content/marketplacesContent.js';
 
@@ -51,7 +50,6 @@ export default function useMarketplaces() {
   const [disconnecting, setDisconnecting] = useState(false);
   const [sync, setSync] = useState(null); // { slug, progress }
   const mounted = useRef(true);
-  const restoreFocus = useRef(null);
 
   const load = useCallback(async () => {
     if (!accountId) return;
@@ -74,14 +72,6 @@ export default function useMarketplaces() {
     };
   }, [load]);
 
-  // Quando o diálogo fecha, o teclado volta para o botão que o abriu
-  useEffect(() => {
-    if (dialog || pendingDisconnect || !restoreFocus.current) return;
-    const restore = restoreFocus.current;
-    restoreFocus.current = null;
-    restore();
-  }, [dialog, pendingDisconnect]);
-
   const marketplaces = MARKETPLACE_CATALOG.map((marketplace) => ({
     ...marketplace,
     connection: connections.find((connection) => connection.slug === marketplace.slug) ?? null
@@ -94,7 +84,6 @@ export default function useMarketplaces() {
       const marketplace = MARKETPLACE_CATALOG.find((item) => item.slug === slug);
       // em breve ou já conectado: não há o que conectar
       if (!marketplace?.available || connections.some((item) => item.slug === slug)) return;
-      restoreFocus.current = rememberFocus();
       setDialog({ slug, step: canConnect ? CONNECT_STEPS.CONFIRM : CONNECT_STEPS.LIMIT });
     },
     [canConnect, connections]
@@ -114,7 +103,7 @@ export default function useMarketplaces() {
       await wait(REDIRECT_MS);
       if (!mounted.current) return;
       setDialog({ slug, step: CONNECT_STEPS.AUTHORIZING });
-      const connection = await connectMarketplace(accountId, slug);
+      const connection = await connectMarketplace(accountId, slug, { canConnectMore });
       if (!mounted.current) return;
       setConnections((current) => [...current.filter((item) => item.slug !== slug), connection]);
       setDialog({ slug, step: CONNECT_STEPS.CONNECTED, nickname: connection.nickname });
@@ -159,8 +148,8 @@ export default function useMarketplaces() {
   );
 
   // ---------- Desconectar ----------
+  // O Modal (useModal) devolve o foco ao botão que abriu o diálogo quando ele fecha.
   const requestDisconnect = useCallback((slug) => {
-    restoreFocus.current = rememberFocus();
     setPendingDisconnect(slug);
   }, []);
 

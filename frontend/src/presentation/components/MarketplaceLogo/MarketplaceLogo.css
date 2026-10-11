@@ -74,6 +74,15 @@
   --logo-scale: 1.04;
 }
 
+/* ---------- Arte clara (TikTok Shop): a escrita é branca, feita para fundo escuro.
+   Nas cenas (hero) o fundo da marca já é escuro; nos tamanhos pequenos o logo
+   ganha um fundo escuro próprio, sem mexer no arquivo. ---------- */
+.marketplace-logo--light-art:not(.marketplace-logo--hero) {
+  padding: 3px 7px;
+  border-radius: var(--radius-sm);
+  background: var(--color-tiktok-shop);
+}
+
 /* ---------- Em breve: logo apagado ---------- */
 .marketplace-logo--muted {
   opacity: 0.55;

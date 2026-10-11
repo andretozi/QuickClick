@@ -19,9 +19,10 @@ export default function ListingRow({ listing, busy, canPublish, onToggle, onDupl
     status === LISTING_STATUS.PUBLISHED
       ? { icon: 'pause', label: actions.pause }
       : status === LISTING_STATUS.PAUSED
-        ? { icon: 'play', label: actions.resume }
+        ? { icon: 'play', label: canPublish ? actions.resume : actions.resumeBlocked }
         : { icon: 'upload', label: canPublish ? actions.publish : actions.publishBlocked };
-  const blocked = status === LISTING_STATUS.UNPUBLISHED && !canPublish;
+  // Voltar ao ar (publicar ou reativar) só com o Mercado Livre conectado; pausar sempre pode.
+  const blocked = status !== LISTING_STATUS.PUBLISHED && !canPublish;
 
   return (
     <li data-enter="3" className={cx('listing-row', busy && 'listing-row--busy')}>

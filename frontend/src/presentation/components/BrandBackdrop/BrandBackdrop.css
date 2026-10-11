@@ -3,8 +3,11 @@
    Fundo de uma marca. As cores entram por --brand-primary, --brand-secondary,
    --brand-deep e --brand-glow (a paleta do domain/content, aplicada no style).
    Cobre o bloco pai (position relativa ou absoluta).
+   Modificador: --dark-stage (logo de escrita clara: a luz do centro escurece)
    ================================================================== */
 .brand-backdrop {
+  --brand-glow-edge: rgb(var(--rgb-white) / 0.55);
+
   position: absolute;
   inset: 0;
   overflow: hidden;
@@ -113,9 +116,18 @@
   width: min(92vw, 1180px);
   height: min(70vh, 640px);
   border-radius: 50%;
-  background: radial-gradient(closest-side, var(--brand-glow) 0%, rgb(var(--rgb-white) / 0.55) 45%, transparent 100%);
+  background: radial-gradient(closest-side, var(--brand-glow) 0%, var(--brand-glow-edge) 45%, transparent 100%);
   filter: blur(24px);
   transform: translate(-50%, -48%);
+}
+
+/* Palco escuro: a escrita clara do logo lê sobre a sombra, e as cores da marca ficam nas bordas */
+.brand-backdrop--dark-stage {
+  --brand-glow-edge: color-mix(in srgb, var(--brand-glow) 62%, transparent);
+}
+
+.brand-backdrop--dark-stage .brand-backdrop__spot {
+  opacity: 0.9;
 }
 
 /* ---------- Vinheta e grão ---------- */

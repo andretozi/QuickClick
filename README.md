@@ -15,19 +15,35 @@ André Tozi Magalhaes (PO e dev) e Guilherme Diego Sanches (SM e dev).
 Pré-requisitos:
 
 - **Node.js 18 ou mais novo.** Confira com `node -v`.
-- **Python 3.10 ou mais novo.** O projeto usa o 3.14.
+- **Python 3.10 ou mais novo.** O projeto usa o 3.14, numa `.venv` na raiz.
 
 | Jeito | Comando | Endereço |
 |---|---|---|
-| PyCharm | botão **Run ▶ 'main'** | abre sozinho em http://127.0.0.1:8080 |
-| Terminal | `python main.py` (no Windows também `py main.py`) | http://127.0.0.1:8080 |
+| PyCharm | configuração **main** e botão **Run ▶** | abre sozinho em http://127.0.0.1:8080 |
+| Terminal | `.venv\Scripts\python main.py` (ou `py main.py`, que relança com a `.venv`) | http://127.0.0.1:8080 |
+
+### Primeira vez num computador novo
+
+1. **Git:** `winget install Git.Git` (ou https://git-scm.com).
+2. **Python 3.14:** `winget install Python.Python.3.14` (ou https://python.org). Qualquer versão a partir da 3.10 serve.
+3. **Node.js LTS:** `winget install OpenJS.NodeJS.LTS` (ou https://nodejs.org). Precisa ser o 18 ou mais novo.
+4. Feche e reabra o PyCharm e os terminais, para eles enxergarem o que foi instalado.
+5. **Clonar:** `git clone https://github.com/andretozi/QuickClick.git` dentro de `PycharmProjects` e abra a pasta `QuickClick` no PyCharm.
+6. **Branch:** `git switch area-logada` (no terminal do PyCharm ou pelo seletor de branch).
+7. **Criar e escolher a `.venv`:** no terminal, na raiz do projeto, `py -3.14 -m venv .venv`. Depois, no PyCharm: Settings > Project: QuickClick > Python Interpreter > Add Interpreter > Add Local Interpreter > Select existing > `.venv\Scripts\python.exe`.
+8. **Run 'main':** escolha a configuração **main** no topo do PyCharm e clique em Run. Na primeira vez ele instala o que falta (`npm ci`, build do front e pip) e abre http://127.0.0.1:8080.
+
+A configuração **main** vem do próprio projeto, em `.run/main.run.xml`. Ela roda o `main.py` com o Python de `.venv\Scripts\python.exe` e com `PYTHONUNBUFFERED=1`, numa instância só. Por isso funciona mesmo que o interpretador do projeto esteja errado, desde que a `.venv` exista.
 
 O `main.py` faz tudo em ordem:
 
-1. Roda `npm install` e `npm run build` dentro de `frontend/` quando precisa.
-2. Instala com pip o que faltar de `backend/requirements.txt`, no mesmo Python que roda o `main.py`.
-3. Sobe um único servidor em `127.0.0.1:8080`, com a API em `/api` e o front buildado no resto.
-4. Abre o navegador.
+1. Mostra o Python, o Node e o npm em uso. Se ele for aberto com outro Python e a `.venv` existir, relança com o Python da `.venv`.
+2. Se o Quick Click já estiver rodando na porta 8080, avisa e só abre o navegador.
+3. Acha o npm, mesmo quando o PyCharm foi aberto antes de instalar o Node (procura em Arquivos de Programas, em AppData e no link do nvm), e confere se o Node é 18 ou mais novo.
+4. Roda `npm ci` quando falta o `node_modules` ou quando o `package-lock.json` é mais novo que ele, e `npm run build` quando o front mudou.
+5. Instala com pip o que faltar de `backend/requirements.txt`, no mesmo Python que roda o `main.py`.
+6. Sobe um único servidor em `127.0.0.1:8080`, com a API em `/api` e o front buildado no resto.
+7. Abre o navegador.
 
 A documentação automática da API fica em http://127.0.0.1:8080/docs.
 

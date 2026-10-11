@@ -1,10 +1,12 @@
 /* ==================================================================
    Bloco: toasts (a região dos avisos, no canto da tela)
+   Fica à esquerda: as ações da interface (linhas do painel, rodapé do
+   assistente) ficam à direita, e o aviso não pode cobrir o botão seguinte.
    ================================================================== */
 .toasts {
   position: fixed;
-  right: 20px;
   bottom: 20px;
+  left: 20px;
   z-index: var(--layer-toast);
   width: min(380px, calc(100% - 32px));
   pointer-events: none;

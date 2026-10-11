@@ -8,8 +8,6 @@
  */
 import { STORAGE_KEYS, USER_KEYS, nowIso, readJson, simulateLatency, userKey, writeJson } from './localStore.js';
 
-import { canConnectMore } from '@/domain/plans/planRules.js';
-
 const SYNC_MS = 2200; // quanto dura uma sincronização simulada
 
 /** Só o Mercado Livre conecta por enquanto (o mesmo que o catálogo do front marca como disponível). */
@@ -58,9 +56,11 @@ export class ConnectionError extends Error {
 /**
  * Conecta (ou devolve a conexão que já existe: conectar duas vezes não dá erro, como no back).
  * Como o back, confere aqui mesmo se o marketplace já está disponível e o limite do plano
- * (a tela também confere, mas quem decide é o "servidor").
+ * guardado na conta (a tela também confere, mas quem decide é o "servidor").
+ * - canConnectMore(plano, conectados): a regra do plano, que vem do domínio pela aplicação
+ *   (a infraestrutura não importa o domínio). No back, a regra mora no domain/plano.py.
  */
-export async function connectMarketplace(accountId, slug) {
+export async function connectMarketplace(accountId, slug, { canConnectMore }) {
   await simulateLatency(700);
   const conexoes = load(accountId);
   const existing = conexoes.find((conexao) => conexao.marketplace === slug);

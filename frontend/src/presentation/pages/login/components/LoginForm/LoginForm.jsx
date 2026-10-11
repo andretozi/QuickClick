@@ -20,7 +20,8 @@ export default function LoginForm() {
     loading,
     formError,
     announceSocialSoon,
-    announceForgotSoon
+    announceForgotSoon,
+    announceTermsSoon
   } = useLoginForm();
   const { title, lead, divider, email, password, submit, signup, terms } = LOGIN_FORM;
 
@@ -31,6 +32,7 @@ export default function LoginForm() {
       alert={formError ? LOGIN_FORM.errors[formError] : null}
       switchTo={signup}
       terms={terms}
+      onTerms={announceTermsSoon}
     >
       <SocialLogin providers={SOCIAL_PROVIDERS} onSelect={announceSocialSoon} />
 

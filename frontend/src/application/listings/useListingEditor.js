@@ -103,6 +103,7 @@ export default function useListingEditor({ listingId, celebrate }) {
   const mounted = useRef(true);
   const formRef = useRef(null);
   const loaded = useRef(false);
+  const finishing = useRef(false); // publicando: o rascunho não é mais salvo
 
   useEffect(() => {
     mounted.current = true;
@@ -149,6 +150,7 @@ export default function useListingEditor({ listingId, celebrate }) {
   useEffect(() => {
     if (editing || !loaded.current || result || !accountId || isBlankDraft(draft)) return undefined;
     const timer = window.setTimeout(async () => {
+      if (finishing.current) return;
       try {
         await saveDraft(accountId, { step: stepIndex, data: draft });
         if (!mounted.current) return;
@@ -259,6 +261,11 @@ export default function useListingEditor({ listingId, celebrate }) {
       update(suggestion);
       setAi({ status: 'done', step: 2 });
       showToast({ tone: TOAST_TONES.SUCCESS, ...LISTING_WIZARD.details.ai.done });
+    } catch {
+      // a foto não abriu (rascunho corrompido, por exemplo): o botão volta a funcionar
+      if (!mounted.current) return;
+      setAi({ status: 'idle', step: 0 });
+      showToast({ tone: TOAST_TONES.ERROR, ...LISTING_WIZARD.details.ai.error });
     } finally {
       window.clearInterval(ticker);
     }
@@ -319,6 +326,7 @@ export default function useListingEditor({ listingId, celebrate }) {
       }
     }
     setPublishing(true);
+    finishing.current = true;
     const data = toListingData(draft, range.status === 'ready' ? range : null);
     try {
       if (editing) {
@@ -335,25 +343,34 @@ export default function useListingEditor({ listingId, celebrate }) {
           suggestedPriceCents: data.suggestedPriceCents ?? original.suggestedPriceCents,
           channels: { ...original.channels, [PRIMARY_CHANNEL]: nextStatus }
         });
+        finishing.current = false;
         if (!mounted.current) return;
         setOriginal(updated);
         setPublishing(false);
         showToast({ tone: TOAST_TONES.SUCCESS, ...LISTING_EDITOR.saved });
         return;
       }
-      const word = willPublish ? LISTING_WIZARD.publish.word : LISTING_WIZARD.publish.wordSaved;
-      const [created] = await Promise.all([
-        createListing(accountId, {
+      // O rascunho sai antes: as fotos não ocupam o espaço duas vezes na hora de gravar.
+      await clearDraft(accountId);
+      let created;
+      try {
+        created = await createListing(accountId, {
           ...data,
           channels: { [PRIMARY_CHANNEL]: willPublish ? LISTING_STATUS.PUBLISHED : LISTING_STATUS.UNPUBLISHED }
-        }),
-        celebrate ? celebrate(word) : Promise.resolve()
-      ]);
-      await clearDraft(accountId);
+        });
+      } catch (error) {
+        // Não gravou: o rascunho volta, para nada se perder.
+        await saveDraft(accountId, { step: stepIndex, data: draft }).catch(() => {});
+        throw error;
+      }
+      // A comemoração só depois de gravar de verdade.
+      const word = willPublish ? LISTING_WIZARD.publish.word : LISTING_WIZARD.publish.wordSaved;
+      if (celebrate) await celebrate(word).catch(() => {});
       if (!mounted.current) return;
       setPublishing(false);
       setResult({ published: willPublish, id: created.id });
     } catch (error) {
+      finishing.current = false;
       if (!mounted.current) return;
       setPublishing(false);
       const message = error instanceof StorageFullError ? LISTING_WIZARD.errors.storage : LISTING_WIZARD.errors.generic;
@@ -370,6 +387,7 @@ export default function useListingEditor({ listingId, celebrate }) {
     publishing,
     range,
     showErrors,
+    stepIndex,
     validateStep,
     willPublish
   ]);
@@ -378,6 +396,7 @@ export default function useListingEditor({ listingId, celebrate }) {
   const restart = useCallback(async () => {
     if (accountId) await clearDraft(accountId);
     if (!mounted.current) return;
+    finishing.current = false;
     setDraft(EMPTY_DRAFT);
     setErrors({});
     setStepIndex(0);

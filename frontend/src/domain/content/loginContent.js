@@ -50,5 +50,9 @@ export const LOGIN_SOON = {
   forgot: {
     title: 'Recuperar a senha chega em breve.',
     text: 'Enquanto isso, se não lembrar a senha, crie uma conta nova com outro email.'
+  },
+  terms: {
+    title: 'Termos e Política de Privacidade em breve.',
+    text: 'Os dois textos estão sendo escritos. Por enquanto, nada do que você cadastra sai do seu navegador.'
   }
 };

@@ -23,8 +23,8 @@
   inset: 0;
   border-radius: 50%;
   background: conic-gradient(from 0deg, rgb(var(--rgb-coral) / 0.5), rgb(var(--rgb-coral) / 0) 30%);
-  -webkit-mask: radial-gradient(circle, transparent 34%, #000 35%);
-  mask: radial-gradient(circle, transparent 34%, #000 35%);
+  -webkit-mask: radial-gradient(circle, transparent 34%, rgb(var(--rgb-black)) 35%);
+  mask: radial-gradient(circle, transparent 34%, rgb(var(--rgb-black)) 35%);
 }
 
 .ai-scene__ring {

@@ -60,7 +60,15 @@ export const LISTING_WIZARD = {
     },
     current: (index, total) => `Passo ${index} de ${total}`
   },
-  nav: { back: 'Voltar', next: 'Continuar', publish: 'Publicar anúncio', publishing: 'Publicando…', save: 'Salvar alterações', saving: 'Salvando…' },
+  nav: {
+    back: 'Voltar',
+    next: 'Continuar',
+    publish: 'Publicar anúncio',
+    publishing: 'Publicando…',
+    saveNew: 'Salvar anúncio',
+    save: 'Salvar alterações',
+    saving: 'Salvando…'
+  },
   photos: {
     title: 'Comece pelas fotos',
     lead: 'Boa luz e fundo limpo vendem mais. A primeira foto vira a capa, mas você escolhe.',
@@ -90,6 +98,7 @@ export const LISTING_WIZARD = {
       working: 'Analisando a foto…',
       steps: ['Olhando a foto', 'Reconhecendo o produto', 'Escrevendo o anúncio'],
       done: { title: 'A IA preencheu os campos.', text: 'Confira e ajuste o que quiser antes de seguir.' },
+      error: { title: 'A IA não conseguiu ler essa foto.', text: 'Tente de novo ou troque a capa. Você também pode preencher os campos.' },
       needsPhoto: 'Adicione uma foto primeiro: é dela que a IA tira as ideias.'
     },
     fields: {

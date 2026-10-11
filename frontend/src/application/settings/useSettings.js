@@ -73,6 +73,23 @@ export default function useSettings() {
     validateProfile
   );
   const [savingProfile, setSavingProfile] = useState(false);
+  const savedColor = useRef(account?.avatarColor ?? 'coral');
+  const latestAccount = useRef(account);
+
+  useEffect(() => {
+    latestAccount.current = account;
+  }, [account]);
+
+  // Saiu das configurações sem salvar: a navbar volta para a cor que está salva.
+  useEffect(
+    () => () => {
+      const current = latestAccount.current;
+      if (current && current.avatarColor !== savedColor.current) {
+        setSessionAccount({ ...current, avatarColor: savedColor.current });
+      }
+    },
+    []
+  );
 
   const saveProfile = useCallback(
     async (event) => {
@@ -81,6 +98,7 @@ export default function useSettings() {
       setSavingProfile(true);
       try {
         const updated = await updateAccount(accountId, profile.values);
+        savedColor.current = updated.avatarColor;
         if (!mounted.current) return;
         setSessionAccount(updated);
         showToast({ tone: TOAST_TONES.SUCCESS, ...SETTINGS.savedToast });
@@ -96,7 +114,7 @@ export default function useSettings() {
     [accountId, profile, savingProfile]
   );
 
-  /** A cor do avatar já aparece na navbar enquanto o vendedor escolhe. */
+  /** A cor do avatar já aparece na navbar enquanto o vendedor escolhe (só fica se ele salvar). */
   const pickAvatarColor = useCallback(
     (color) => {
       profile.setField('avatarColor', color);

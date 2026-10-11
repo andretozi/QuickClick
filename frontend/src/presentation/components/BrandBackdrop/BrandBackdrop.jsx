@@ -18,10 +18,11 @@ const PHOTOS = Object.fromEntries(
  *   foto     a imagem opcional, por baixo dos efeitos;
  *   far      manchas de luz grandes e desfocadas (camada de trás do parallax);
  *   streaks  faixas de luz atravessando;
- *   spot     a luz clara no centro, onde o logo fica (o logo lê sobre ela);
+ *   spot     a luz no centro, onde o logo fica (o logo lê sobre ela);
  *   vinheta e granulação de filme.
  * As camadas que se mexem têm data-part; quem anima (infrastructure/animation) as acha por ele.
- * - palette: { primary, secondary, deep, glow } (domain/content/marketplacesContent.js)
+ * - palette: { primary, secondary, deep, glow, stage } (domain/content/marketplacesContent.js);
+ *   stage 'dark' é para logo de escrita clara: a luz do centro escurece em vez de clarear
  * - spotlight: false para não ter a luz do centro (topo de página, por exemplo)
  */
 export default function BrandBackdrop({ slug, palette, spotlight = true, className }) {
@@ -34,7 +35,11 @@ export default function BrandBackdrop({ slug, palette, spotlight = true, classNa
   };
 
   return (
-    <div aria-hidden="true" className={cx('brand-backdrop', className)} style={style}>
+    <div
+      aria-hidden="true"
+      className={cx('brand-backdrop', palette.stage === 'dark' && 'brand-backdrop--dark-stage', className)}
+      style={style}
+    >
       <span className="brand-backdrop__base" />
       {photo && <img className="brand-backdrop__photo" src={photo} alt="" decoding="async" />}
       <span data-part="depth-far" className="brand-backdrop__far">

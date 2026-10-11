@@ -44,21 +44,23 @@ const toAccount = (conta) =>
       }
     : null;
 
-async function load() {
-  return readJson(STORAGE_KEYS.ACCOUNTS, []);
-}
+/**
+ * Ler e gravar sempre juntos, sem await no meio (a latência e as contas de senha vêm antes):
+ * assim duas ações seguidas não se atropelam.
+ */
+const load = () => readJson(STORAGE_KEYS.ACCOUNTS, []);
 
 const save = (contas) => writeJson(STORAGE_KEYS.ACCOUNTS, contas);
 
 export async function getAccount(id) {
-  const contas = await load();
   await simulateLatency(90);
-  return toAccount(contas.find((conta) => conta.id === id));
+  return toAccount(load().find((conta) => conta.id === id));
 }
 
 export async function createAccount({ name, email, store, password }) {
-  const contas = await load();
+  const senha = await hashPassword(password);
   await simulateLatency(320);
+  const contas = load();
   const normalized = normalizeEmail(email);
   if (contas.some((conta) => conta.email === normalized)) throw new AccountError(ACCOUNT_ERRORS.EMAIL_TAKEN);
 
@@ -71,7 +73,7 @@ export async function createAccount({ name, email, store, password }) {
     loja: store.trim(),
     plano: 'gratis',
     cor_avatar: 'coral',
-    senha: await hashPassword(password),
+    senha,
     criada_em: now,
     atualizada_em: now
   };
@@ -81,9 +83,8 @@ export async function createAccount({ name, email, store, password }) {
 
 /** Confere email e senha. Erro genérico de propósito: não contamos qual dos dois errou. */
 export async function authenticate(email, password) {
-  const contas = await load();
   await simulateLatency(420);
-  const conta = contas.find((item) => item.email === normalizeEmail(email));
+  const conta = load().find((item) => item.email === normalizeEmail(email));
   const ok = conta ? await verifyPassword(password, conta.senha) : false;
   if (!ok) throw new AccountError(ACCOUNT_ERRORS.INVALID_CREDENTIALS);
   return toAccount(conta);
@@ -91,8 +92,8 @@ export async function authenticate(email, password) {
 
 /** Atualiza o perfil. `patch` usa os nomes do front: name, email, phone, store, avatarColor. */
 export async function updateAccount(id, patch) {
-  const contas = await load();
   await simulateLatency(260);
+  const contas = load();
   const index = contas.findIndex((conta) => conta.id === id);
   if (index < 0) throw new AccountError(ACCOUNT_ERRORS.NOT_FOUND);
 
@@ -117,25 +118,28 @@ export async function updateAccount(id, patch) {
 }
 
 export async function changePassword(id, currentPassword, newPassword) {
-  const contas = await load();
   await simulateLatency(360);
-  const index = contas.findIndex((conta) => conta.id === id);
-  if (index < 0) throw new AccountError(ACCOUNT_ERRORS.NOT_FOUND);
-  if (!(await verifyPassword(currentPassword, contas[index].senha))) {
+  const conta = load().find((item) => item.id === id);
+  if (!conta) throw new AccountError(ACCOUNT_ERRORS.NOT_FOUND);
+  if (!(await verifyPassword(currentPassword, conta.senha))) {
     throw new AccountError(ACCOUNT_ERRORS.WRONG_PASSWORD);
   }
+  const senha = await hashPassword(newPassword);
+  // Relê agora: outra ação pode ter gravado enquanto a senha era conferida.
+  const contas = load();
+  const index = contas.findIndex((item) => item.id === id);
+  if (index < 0) throw new AccountError(ACCOUNT_ERRORS.NOT_FOUND);
   const next = [...contas];
-  next[index] = { ...contas[index], senha: await hashPassword(newPassword), atualizada_em: nowIso() };
+  next[index] = { ...contas[index], senha, atualizada_em: nowIso() };
   save(next);
 }
 
 /** Exclui a conta e tudo o que é dela neste navegador (anúncios, conexões, preferências, rascunho). */
 export async function deleteAccount(id, password) {
-  const contas = await load();
   await simulateLatency(420);
-  const conta = contas.find((item) => item.id === id);
+  const conta = load().find((item) => item.id === id);
   if (!conta) throw new AccountError(ACCOUNT_ERRORS.NOT_FOUND);
   if (!(await verifyPassword(password, conta.senha))) throw new AccountError(ACCOUNT_ERRORS.WRONG_PASSWORD);
-  save(contas.filter((item) => item.id !== id));
+  save(load().filter((item) => item.id !== id));
   clearUser(id);
 }

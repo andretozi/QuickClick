@@ -62,9 +62,11 @@ function toStoreFields(data) {
   return fields;
 }
 
-async function load(accountId) {
-  return readJson(userKey(accountId, USER_KEYS.LISTINGS), []);
-}
+/**
+ * Ler e gravar sempre juntos, sem await no meio (a latência simulada vem antes): assim
+ * duas ações seguidas, como pausar um anúncio e duplicar outro, não se atropelam.
+ */
+const load = (accountId) => readJson(userKey(accountId, USER_KEYS.LISTINGS), []);
 
 /** Lança StorageFullError (localStore) quando as fotos não cabem mais no navegador. */
 const save = (accountId, anuncios) => writeJson(userKey(accountId, USER_KEYS.LISTINGS), anuncios);
@@ -72,22 +74,22 @@ const save = (accountId, anuncios) => writeJson(userKey(accountId, USER_KEYS.LIS
 const byUpdatedDesc = (a, b) => String(b.atualizado_em).localeCompare(String(a.atualizado_em));
 
 export async function listListings(accountId) {
-  const anuncios = await load(accountId);
   await simulateLatency(220);
+  const anuncios = load(accountId);
   return [...anuncios].sort(byUpdatedDesc).map(toListing);
 }
 
 export async function getListing(accountId, id) {
-  const anuncios = await load(accountId);
   await simulateLatency(160);
+  const anuncios = load(accountId);
   const anuncio = anuncios.find((item) => item.id === id);
   if (!anuncio) throw new ListingNotFoundError();
   return toListing(anuncio);
 }
 
 export async function createListing(accountId, data) {
-  const anuncios = await load(accountId);
   await simulateLatency(240);
+  const anuncios = load(accountId);
   const now = nowIso();
   const anuncio = {
     id: newId('a'),
@@ -112,8 +114,8 @@ export async function createListing(accountId, data) {
 }
 
 export async function updateListing(accountId, id, patch) {
-  const anuncios = await load(accountId);
   await simulateLatency(200);
+  const anuncios = load(accountId);
   const index = anuncios.findIndex((item) => item.id === id);
   if (index < 0) throw new ListingNotFoundError();
   const updated = { ...anuncios[index], ...toStoreFields(patch), atualizado_em: nowIso() };
@@ -125,8 +127,8 @@ export async function updateListing(accountId, id, patch) {
 
 /** Copia um anúncio. A cópia nasce fora do ar (não publicada), com o título que a tela mandar. */
 export async function duplicateListing(accountId, id, { title }) {
-  const anuncios = await load(accountId);
   await simulateLatency(220);
+  const anuncios = load(accountId);
   const original = anuncios.find((item) => item.id === id);
   if (!original) throw new ListingNotFoundError();
   const now = nowIso();
@@ -143,8 +145,8 @@ export async function duplicateListing(accountId, id, { title }) {
 }
 
 export async function removeListing(accountId, id) {
-  const anuncios = await load(accountId);
   await simulateLatency(200);
+  const anuncios = load(accountId);
   const next = anuncios.filter((item) => item.id !== id);
   if (next.length === anuncios.length) throw new ListingNotFoundError();
   save(accountId, next);

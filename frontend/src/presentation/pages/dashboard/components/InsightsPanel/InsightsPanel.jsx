@@ -87,7 +87,7 @@ export default function InsightsPanel({ active }) {
             {revenue.change(totals.changePercent)}
           </p>
           <p className="insights-panel__sub">
-            {revenue.orders(totals.orders)} · {revenue.ticket(formatMoney(totals.ticketCents))}
+            {revenue.summary(revenue.orders(totals.orders), revenue.ticket(formatMoney(totals.ticketCents)))}
           </p>
         </div>
         <AreaChart data={revenuePoints} ticks={ticksFor(revenuePoints.length)} label={revenue.chartLabel}>
@@ -187,7 +187,11 @@ export default function InsightsPanel({ active }) {
                 current: item.priceCents,
                 suggested: item.suggestedCents,
                 note,
-                description: `${prices.current}: ${formatMoney(item.priceCents)}. ${prices.suggested}: ${formatMoney(item.suggestedCents)}. ${note}.`
+                description: prices.description({
+                  current: formatMoney(item.priceCents),
+                  suggested: formatMoney(item.suggestedCents),
+                  note
+                })
               };
             })}
           />

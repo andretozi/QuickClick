@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import useForm from '@/application/ui/useForm.js';
+import { showToast, TOAST_TONES } from '@/application/feedback/toastStore.js';
 import { signUp } from '@/application/session/sessionStore.js';
 import { ACCOUNT_ERRORS, describeAuthError } from '@/infrastructure/auth/authService.js';
 import {
@@ -8,6 +9,7 @@ import {
   validateNewPassword,
   validatePasswordConfirmation
 } from '@/domain/validation/validators.js';
+import { LOGIN_SOON } from '@/domain/content/loginContent.js';
 
 const EMPTY = { name: '', email: '', store: '', password: '', confirmation: '' };
 
@@ -58,6 +60,11 @@ export default function useSignupForm() {
     [check, loading, setFieldError, values]
   );
 
+  /** Termos e privacidade ainda não têm página. */
+  const announceTermsSoon = useCallback(() => {
+    showToast({ tone: TOAST_TONES.INFO, ...LOGIN_SOON.terms });
+  }, []);
+
   return {
     values: form.values,
     errors: form.errors,
@@ -65,6 +72,7 @@ export default function useSignupForm() {
     handleChange: form.handleChange,
     handleSubmit,
     loading,
-    formError
+    formError,
+    announceTermsSoon
   };
 }

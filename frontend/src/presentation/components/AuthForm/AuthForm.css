@@ -55,6 +55,14 @@
 }
 
 .auth-form__terms-link {
+  padding: 0;
+  border: 0;
+  background: none;
   color: rgb(var(--rgb-ink) / 0.55);
+  font: inherit;
   font-weight: 700;
+  text-decoration: underline;
+  text-decoration-color: rgb(var(--rgb-ink) / 0.25);
+  text-underline-offset: 2px;
+  cursor: pointer;
 }

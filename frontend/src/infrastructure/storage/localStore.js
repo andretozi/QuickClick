@@ -28,7 +28,8 @@ export const USER_KEYS = {
   LISTINGS: 'anuncios',
   CONNECTIONS: 'conexoes',
   PREFERENCES: 'preferencias',
-  DRAFT: 'rascunho'
+  DRAFT: 'rascunho',
+  DRAFT_PHOTOS: 'rascunho_fotos'
 };
 
 const userPrefix = (accountId) => `usuario:${accountId}:`;

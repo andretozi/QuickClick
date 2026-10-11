@@ -9,10 +9,11 @@ import magalu from '@/presentation/assets/marketplaces/magalu.svg';
 import americanas from '@/presentation/assets/marketplaces/americanas.svg';
 import casasBahia from '@/presentation/assets/marketplaces/casas-bahia.svg';
 import shein from '@/presentation/assets/marketplaces/shein.svg';
+import tiktokShop from '@/presentation/assets/marketplaces/tiktok-shop.svg';
 import aliexpress from '@/presentation/assets/marketplaces/aliexpress.svg';
 import './MarketplaceLogo.css';
 
-/** Logos oficiais (fontes em assets/marketplaces/FONTES.md). TikTok Shop não tem: usa o monograma. */
+/** Logos oficiais (fontes em assets/marketplaces/FONTES.md). */
 const LOGOS = {
   'mercado-livre': mercadoLivre,
   shopee,
@@ -21,14 +22,18 @@ const LOGOS = {
   americanas,
   'casas-bahia': casasBahia,
   shein,
+  'tiktok-shop': tiktokShop,
   aliexpress
 };
+
+/** Logos com a escrita branca, feitos para fundo escuro: fora das cenas ganham um fundo escuro próprio. */
+const LIGHT_ART = new Set(['tiktok-shop']);
 
 const MARK_SIZE = { xs: 'xs', sm: 'xs', md: 'sm', lg: 'md', xl: 'lg', hero: 'xl' };
 
 /**
  * Logo oficial de um marketplace, sem mudar cor nem proporção (cabe numa caixa).
- * Sem logo, mostra o monograma e o nome. Use sobre fundo claro.
+ * Sem logo, o monograma e o nome entram como reserva. Use sobre fundo claro ou na cena da marca.
  * - size: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'hero' (enche a caixa do pai)
  * - muted: logo apagado, para os marketplaces que ainda vão chegar
  * - decorative: quando o nome já está escrito ao lado (o logo some para o leitor de tela)
@@ -41,6 +46,7 @@ export default function MarketplaceLogo({ slug, size = 'md', muted = false, deco
     `marketplace-logo--${size}`,
     `marketplace-logo--${slug}`,
     muted && 'marketplace-logo--muted',
+    LIGHT_ART.has(slug) && 'marketplace-logo--light-art',
     !src && 'marketplace-logo--fallback',
     className
   );

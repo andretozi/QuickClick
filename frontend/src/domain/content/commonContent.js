@@ -1,7 +1,8 @@
 /** Textos dos componentes compartilhados (usados em mais de uma página). */
 
 export const BRAND = {
-  homeLabel: 'Quick Click, página inicial'
+  homeLabel: 'Quick Click, página inicial',
+  name: { first: 'Quick', accent: 'Click' }
 };
 
 export const PASSWORD_FIELD = {

@@ -1,7 +1,102 @@
-# Progresso · prompt v4
+# Progresso · prompt v5
 
 Arquivo de retomada. Se a sessão cair, a próxima começa por aqui. Atualizado ao fim de cada etapa.
 Regra: o Claude Code não faz commit nem push; quem commita é o André.
+
+## Status das etapas (v5)
+
+| Etapa | Status |
+|---|---|
+| Passo 1 · Onde estamos | feito |
+| A · Ambiente | feito |
+| B · Run 'main' com um clique | feito (falta só o clique do André, na Etapa I) |
+| C · Revisar o que foi feito | feito no Chrome headless; falta repetir na aba visível quando a extensão conectar |
+| D · Título da aba | feito (conferir a aba no Chrome na Etapa I) |
+| E · Logo do TikTok Shop | feito |
+| F · Marketplaces no estilo da vitrine | falta |
+| G · Telas no padrão da landing | falta |
+| H · Docs | falta |
+| I · Conferência final | falta |
+
+## Passo 1 · Onde estamos (11/10/2026)
+
+- Pasta `C:\Users\Marcus\PycharmProjects\QuickClick`, branch `area-logada` em `997006a`, em dia com `origin/area-logada`. Remote já era `andretozi/QuickClick`.
+- Identidade só neste repositório: `user.name` "André Tozi Magalhães", `user.email` andretozi95@gmail.com. No `%USERPROFILE%\.claude\settings.json`: `"attribution": { "commit": "", "pr": "" }`.
+- Atenção: existe uma pasta `QuickClick/` dentro do projeto, um segundo clone idêntico (com `.git` próprio, também na `area-logada`). Não está no Git e não foi mexida. Pode confundir o PyCharm (dois `main.py`); o André decide se apaga.
+
+## Ambiente · DESKTOP-OCA9G1O (computador do Marcus)
+
+| Item | Antes | Agora |
+|---|---|---|
+| Git | 2.45.1.windows.1 | igual |
+| Python | 3.14.0 (`AppData\Local\Programs\Python\Python314`) e 3.13 da Microsoft Store; o `python` do PATH é o 3.13 da Store | igual; o projeto usa a `.venv` com o 3.14.0 |
+| Node e npm | não instalados | Node 24.20.0 LTS e npm 11.19.0, pelo winget (`OpenJS.NodeJS.LTS`, MSI oficial do nodejs.org, hash conferido) em `C:\Program Files\nodejs` |
+| Chrome | 154.0.8037.98 | igual |
+| Extensão do Claude no Chrome | não instalada em nenhum perfil | falta o André instalar (claude.ai/chrome) |
+| Plugin frontend-design | não instalado | instalado (`frontend-design@claude-plugins-official`, escopo do usuário) |
+
+- `.venv` na raiz com `py -3.14 -m venv .venv`: pip atualizado, `backend/requirements.txt` instalado (fastapi 0.143.0, uvicorn 0.54.0, httpx 0.28.1), import ok.
+- `npm ci` em `frontend` ok. O npm 11.19 avisa que não rodou o `postinstall` do esbuild (scripts de instalação agora pedem aprovação); o build funciona assim mesmo, porque o binário vem no pacote `@esbuild/win32-x64`.
+- `npm run build`: ok. Testes do back com a `.venv`: 55 ok.
+- O terminal que já estava aberto não enxerga o Node novo no PATH. Nesta sessão uso `C:\Program Files\nodejs` direto. O PyCharm precisa ser reaberto para enxergar o Node.
+
+## Etapa B · Run 'main' com um clique (feito)
+
+Diagnóstico:
+- O PyCharm já tinha um interpretador "Python 3.14 (QuickClick)" (no `jdk.table.xml`) apontando para `QuickClick\.venv\Scripts\python.exe`, mas a `.venv` não existia: era isso que quebrava o Run 'main'. Agora ela existe.
+- Faltavam o `.idea/misc.xml` (interpretador do projeto) e qualquer configuração "main" (o `workspace.xml` não tinha `RunManager`). O `vcs.xml` registra a pasta duplicada `QuickClick/` como segundo repositório.
+- O PyCharm foi aberto antes do Node existir, então o PATH dele não tem o npm.
+
+Feito:
+- `.run/main.run.xml` (para commitar): nome "main", script `$PROJECT_DIR$/main.py`, pasta `$PROJECT_DIR$`, interpretador `$PROJECT_DIR$/.venv/Scripts/python.exe` (não depende do interpretador do projeto), `PYTHONUNBUFFERED=1`, uma instância só.
+- `.idea/misc.xml` criado com o interpretador "Python 3.14 (QuickClick)" e a pasta duplicada `QuickClick/` excluída no `QuickClick.iml` (a `.idea` é local, fora do Git).
+- `main.py`: mostra Python, Node e npm; relança com a `.venv` quando roda com outro Python (com trava contra laço); acha o npm fora do PATH (PATH do processo, link do nvm, Arquivos de Programas, AppData e o PATH atual do registro do Windows); exige Node 18 ou mais novo; `npm ci` quando falta o `node_modules` ou o `package-lock.json` é mais novo (cai para `npm install` se o `ci` falhar); se a 8080 já é do Quick Click (o `/api/health` responde), avisa e só abre o navegador; porta, rotas e o resto continuam iguais. Docstring atualizada.
+- README: seção "Primeira vez num computador novo" e o passo a passo do `main.py`.
+
+Testado pelo terminal (com o Node fora do PATH do shell):
+- `.venv` com `NO_BROWSER=1 REBUILD=1`: achou o npm em `C:\Program Files\nodejs`, buildou e serviu; `/api/health`, a página inicial e `/docs` responderam.
+- Segunda execução com o servidor no ar: "O Quick Click já está rodando", saída 0.
+- `py -3.14` (Python do sistema) e `python` (3.13 da Store): relançaram com a `.venv`.
+- Porta ocupada por outro programa: a mensagem antiga, saída 1.
+- `package-lock.json` mais novo: rodou `npm ci` e voltou a ficar em dia.
+
+Falta: o clique do André no Run 'main' (Etapa I). Se o PyCharm não mostrar a configuração "main", fechar e reabrir o PyCharm.
+
+## Etapa C · Revisão (feito; RETOMAR DAQUI: depois vêm F, G, H e I)
+
+- Auditoria do diário contra o código: tudo o que o diário cita existe, nenhum import quebrado, rotas certas. Diário v4 desatualizado em dois pontos: o `SettingsPage` não é mais stub e o `ConnectDialog` foi reescrito (não removido).
+- `/code-review high` de `main...area-logada` e correções:
+  - corrida no localStorage: os repositórios de anúncios e contas leem e gravam sem `await` no meio (latência e senha antes);
+  - violação de camada: o `connectionsRepository` não importa mais o domínio (a regra `canConnectMore` chega pela aplicação);
+  - criar anúncio: a comemoração só depois de gravar; o rascunho sai antes de gravar (fotos não ocupam o espaço duas vezes) e volta se der erro; autosave cancelado ao publicar; IA com tratamento de erro (texto novo `ai.error`);
+  - rascunho: fotos numa chave própria (`usuario:<id>:rascunho_fotos`), regravadas só quando mudam;
+  - reativar anúncio pausado exige o ML conectado (texto `resumeBlocked`);
+  - cor do avatar escolhida sem salvar volta ao sair das configurações;
+  - foco: tirada a cópia de restauração do `useMarketplaces` (o `useModal` já faz);
+  - mantido de propósito: o título "QuickClick" (pedido do André).
+- Auditoria, extras: textos fixos foram para o content (`BRAND.name`, separadores dos insights), Termos e Privacidade viraram botões com aviso "em breve", `#000` do `AiScene.css` virou token, botão final do criar anúncio diz "Salvar anúncio" quando não vai publicar.
+- Achado no roteiro: os toasts (canto inferior direito) cobriam os botões das linhas do painel. Agora ficam no canto inferior esquerdo.
+- `main.py`: folga de 5 s na comparação do `package-lock.json`. `.git/info/exclude` ganhou `/QuickClick/` (o clone duplicado não entra num `git add .`).
+- Roteiro completo no Chrome headless (scripts no scratchpad, pelo DevTools Protocol), sem erros no console: cadastro, navbar com nome e avatar, menu, sair e entrar; criar anúncio com foto, IA, preço, canais e salvar; conectar, sincronizar, desconectar e conectar de novo o ML; publicar, pausar, reativar, duplicar, excluir e editar; insights com "Simulação"; perfil, cor, senha (errada e certa) e preferências; segunda conta isolada; excluir a segunda (senha errada e certa); a primeira intacta. Vitrine: as 9 cenas com os logos certos (`.screens/etapaC-vitrine-1440-folha.jpg`). Screens em `.screens/etapaC-*`.
+- Build ok, 55 testes ok.
+
+Próximos passos: F (MarketplaceScene e placas), G (telas no padrão da landing), H (docs: CLAUDE.md, README, area-logada.md com a chave `rascunho_fotos`, toasts à esquerda, TikTok Shop) e I (Run 'main' do André, roteiro em 1440 e 390 na aba visível, grep da regra de escrita, /code-review, git status).
+
+## Etapa D · Título da aba (feito)
+
+- `frontend/index.html`: `<title>QuickClick</title>`. Nenhum código troca o `document.title` (procurado em `frontend/src`), então a aba fica "QuickClick" em todas as telas. Build ok; o `dist/index.html` já sai com o título novo.
+- Feita antes do roteiro da Etapa C porque a extensão do Chrome ainda não estava conectada.
+
+## Etapa E · Logo do TikTok Shop (feito)
+
+- Busca: o Commons não tem nenhum arquivo do TikTok Shop (busca por título e a categoria "TikTok logos"). As páginas oficiais (`seller-br.tiktok.com`, `seller-us.tiktok.com`) montam o cabeçalho por JavaScript; o logo estava nos pacotes JS oficiais.
+- Escolhido: `logo.1e4a311e.svg`, o logo do cabeçalho da Central do Vendedor do Brasil, servido pelo CDN da TikTok (`lf16-scmcdn.oecstatic.com/.../TTS/normal/main/static/media/logo.1e4a311e.svg`). SVG 80×32, versão empilhada ("TikTok" sobre "Shop"), escrita branca com o ciano #25F4EE e o vermelho #FE2C55. Byte a byte igual ao `src/assets/images/logo.svg` embutido no JS da Central. Sem script, eventos, `foreignObject` ou links.
+- Alternativa oficial vista (não usada): `tts_logo.316b4170.svg`, versão horizontal do login da Central dos EUA (`lf16-cdn-tos.tiktokcdn-us.com/.../account/static/media/`).
+- Ligado: `assets/marketplaces/tiktok-shop.svg` (cópia idêntica), `LOGOS` do `MarketplaceLogo`, linha nova no `FONTES.md` (origem, data, hash), comentários "TikTok Shop não tem logo" tirados do `MarketplaceLogo`, `MarketplaceMark` e `marketplacesContent.js`.
+- A escrita do logo é branca: na paleta, `deep` e `glow` pretos e `stage: 'dark'`; o `BrandBackdrop` ganhou o modificador `--dark-stage` (a luz do centro escurece; variável `--brand-glow-edge`). Fora das cenas, o `MarketplaceLogo` dá um fundo escuro ao logo (`marketplace-logo--light-art`, usado na lista "em breve" do criar anúncio, que é clara).
+- Conferido (Chrome headless pelo DevTools Protocol, porque a extensão ainda não conectou): cena do TikTok Shop na vitrine em 1440 e 390, logo grande e legível, sem erros no console. `.screens/etapaE-tiktok-vitrine-1440.jpg` e `-390.jpg`.
+
+# Histórico · prompt v4
 
 ## Etapa 0 · Diagnóstico (08/10/2026)
 

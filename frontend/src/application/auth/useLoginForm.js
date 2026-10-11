@@ -76,6 +76,11 @@ export default function useLoginForm() {
     showToast({ tone: TOAST_TONES.INFO, ...LOGIN_SOON.forgot });
   }, []);
 
+  /** Termos e privacidade ainda não têm página. */
+  const announceTermsSoon = useCallback(() => {
+    showToast({ tone: TOAST_TONES.INFO, ...LOGIN_SOON.terms });
+  }, []);
+
   return {
     values: form.values,
     errors: form.errors,
@@ -85,6 +90,7 @@ export default function useLoginForm() {
     loading,
     formError,
     announceSocialSoon,
-    announceForgotSoon
+    announceForgotSoon,
+    announceTermsSoon
   };
 }

@@ -96,7 +96,8 @@ export default function useDashboard() {
           : status === LISTING_STATUS.PAUSED
             ? { status: LISTING_STATUS.PUBLISHED, toast: LISTINGS_PANEL.toasts.resumed }
             : { status: LISTING_STATUS.PUBLISHED, toast: LISTINGS_PANEL.toasts.published };
-      if (status === LISTING_STATUS.UNPUBLISHED && !mercadoLivreConnected) return;
+      // Voltar ao ar (publicar ou reativar) pede o Mercado Livre conectado.
+      if (next.status === LISTING_STATUS.PUBLISHED && !mercadoLivreConnected) return;
       setBusyId(listing.id);
       try {
         const updated = await updateListing(accountId, listing.id, {

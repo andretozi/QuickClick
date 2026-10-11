@@ -84,6 +84,7 @@ export const LISTINGS_PANEL = {
     resume: 'Reativar',
     publish: 'Publicar no Mercado Livre',
     publishBlocked: 'Conecte o Mercado Livre para publicar',
+    resumeBlocked: 'Conecte o Mercado Livre para reativar',
     duplicate: 'Duplicar',
     remove: 'Excluir'
   },

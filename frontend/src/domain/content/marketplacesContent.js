@@ -7,7 +7,7 @@
  */
 
 /**
- * Catálogo: nome, monograma (reserva para quando não há logo oficial, como no TikTok Shop),
+ * Catálogo: nome, monograma (reserva para quando um logo oficial não carrega ou não existe),
  * o artigo usado nas frases ("direto no Mercado Livre", "direto na Shopee") e se já dá para conectar.
  * Os logos oficiais ficam em presentation/assets/marketplaces.
  */
@@ -28,9 +28,11 @@ export const MARKETPLACE_CATALOG = [
  * As cores saíram do próprio SVG do logo (fill e stop-color, em assets/marketplaces):
  * - primary e secondary: as cores do logo;
  * - deep: a primária bem escura, para as bordas e a vinheta;
- * - glow: a luz clara atrás do logo (o logo precisa ler sobre ela).
+ * - glow: a luz atrás do logo (o logo precisa ler sobre ela).
  * Exceções: o logo do Mercado Livre é só a escrita azul, então o amarelo vem da marca
- * (o mesmo de --color-mercado-livre); o TikTok Shop não tem SVG e usa as cores do monograma.
+ * (o mesmo de --color-mercado-livre). O logo do TikTok Shop tem a escrita branca, com o
+ * ciano #25F4EE e o vermelho #FE2C55 do arquivo: o palco é escuro (stage: 'dark'), e a luz
+ * do centro escurece em vez de clarear.
  * titleTone: 'coral' (padrão) ou 'cream', onde o coral some no fundo da marca.
  */
 export const MARKETPLACE_PALETTES = {
@@ -41,7 +43,7 @@ export const MARKETPLACE_PALETTES = {
   americanas: { primary: '#f80032', secondary: '#ff6680', deep: '#40000d', glow: '#fff0f3', titleTone: 'cream' },
   'casas-bahia': { primary: '#0032c5', secondary: '#e71a3b', deep: '#000d36', glow: '#eef2ff', titleTone: 'coral' },
   shein: { primary: '#000000', secondary: '#5c5c5c', deep: '#000000', glow: '#f5f5f5', titleTone: 'coral' },
-  'tiktok-shop': { primary: '#fe2c55', secondary: '#25f4ee', deep: '#050505', glow: '#f7f7f7', titleTone: 'coral' },
+  'tiktok-shop': { primary: '#fe2c55', secondary: '#25f4ee', deep: '#000000', glow: '#000000', stage: 'dark', titleTone: 'coral' },
   aliexpress: { primary: '#fd2751', secondary: '#fcc836', deep: '#3d0610', glow: '#fff6ea', titleTone: 'cream' }
 };
 

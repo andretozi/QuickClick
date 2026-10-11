@@ -163,11 +163,11 @@ export default function ListingEditorPage({ params }) {
                     iconSize={19}
                     onClick={editor.finish}
                     loading={publishing}
-                    loadingText={nav.publishing}
+                    loadingText={editor.willPublish ? nav.publishing : nav.saving}
                     disabled={publishing}
                     className="listing-editor__publish"
                   >
-                    {nav.publish}
+                    {editor.willPublish ? nav.publish : nav.saveNew}
                   </Button>
                 )}
               </div>

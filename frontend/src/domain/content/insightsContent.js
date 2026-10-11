@@ -18,6 +18,7 @@ export const INSIGHTS = {
     chartLabel: 'Gráfico de área com o faturamento de cada dia dos últimos 30 dias',
     orders: (count) => `${count} ${plural(count, 'pedido', 'pedidos')}`,
     ticket: (value) => `Ticket médio de ${value}`,
+    summary: (orders, ticket) => `${orders} · ${ticket}`,
     change: (percent) =>
       percent >= 0
         ? `${percent}% a mais que nos 30 dias anteriores`
@@ -44,6 +45,7 @@ export const INSIGHTS = {
     chartLabel: 'Gráfico que compara o seu preço com o preço sugerido pela IA em cada anúncio',
     current: 'Seu preço',
     suggested: 'Sugerido pela IA',
+    description: ({ current, suggested, note }) => `Seu preço: ${current}. Sugerido pela IA: ${suggested}. ${note}.`,
     above: (value) => `${value} acima do sugerido`,
     below: (value) => `${value} abaixo do sugerido`,
     equal: 'No preço sugerido'

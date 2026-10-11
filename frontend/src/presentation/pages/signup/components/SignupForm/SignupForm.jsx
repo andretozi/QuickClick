@@ -9,7 +9,7 @@ import './SignupForm.css';
 
 /** Formulário de cadastro. Validação, envio e erros ficam no hook useSignupForm. */
 export default function SignupForm() {
-  const { values, errors, formRef, handleChange, handleSubmit, loading, formError } = useSignupForm();
+  const { values, errors, formRef, handleChange, handleSubmit, loading, formError, announceTermsSoon } = useSignupForm();
   const { title, lead, name, email, store, password, confirmation, submit, login, terms } = SIGNUP_FORM;
   const errorOf = (field) => FIELD_ERRORS[errors[field]];
 
@@ -20,6 +20,7 @@ export default function SignupForm() {
       alert={formError ? SIGNUP_FORM.errors[formError] : null}
       switchTo={login}
       terms={terms}
+      onTerms={announceTermsSoon}
     >
       <form ref={formRef} className="signup-form" onSubmit={handleSubmit} noValidate>
         <TextField
