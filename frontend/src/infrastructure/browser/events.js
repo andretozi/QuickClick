@@ -13,7 +13,6 @@ export function onPointerDownOutside(elements, handler) {
   return () => document.removeEventListener('pointerdown', listener);
 }
 
-
 /** Hora atual do relógio do aparelho (0 a 23), para a saudação do painel. */
 export function currentHour() {
   return new Date().getHours();

@@ -115,7 +115,6 @@
   font-weight: 700;
 }
 
-
 @media (max-width: 860px) {
   .insights-panel {
     grid-template-columns: 1fr;

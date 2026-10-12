@@ -4,7 +4,9 @@ import './BrandBackdrop.css';
 
 /**
  * Imagens de fundo opcionais (geradas por nós numa ferramenta de IA), uma por marca:
- * assets/marketplaces/fundos/<slug>.webp. Sem o arquivo, o fundo é 100% código.
+ * assets/marketplaces/fundos/<slug>.webp, com o slug do catálogo (ex.: mercado-livre.webp).
+ * Abstratas, sem logo e sem texto, por volta de 1920x1080 e com menos de 300 KB.
+ * Sem o arquivo (ou sem a pasta), o fundo é 100% código.
  */
 const PHOTOS = Object.fromEntries(
   Object.entries(import.meta.glob('../../assets/marketplaces/fundos/*.webp', { eager: true, import: 'default' })).map(

@@ -21,7 +21,6 @@ export const LISTING_STATUS = {
   UNPUBLISHED: 'unpublished'
 };
 
-
 /** Canal principal do produto hoje. */
 export const PRIMARY_CHANNEL = 'mercado-livre';
 
@@ -102,7 +101,6 @@ export function filterListings(listings, { query = '', status = 'all' } = {}) {
       (status === 'all' || listingStatus(listing) === status) && (!term || normalize(listing.title).includes(term))
   );
 }
-
 
 export function sortListings(listings, sort = 'recent') {
   const sorted = [...listings];

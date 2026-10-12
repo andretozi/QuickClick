@@ -44,7 +44,6 @@
   margin-top: 12px;
 }
 
-
 @media (max-width: 720px) {
   .listings-panel__toolbar {
     grid-template-columns: 1fr 1fr;

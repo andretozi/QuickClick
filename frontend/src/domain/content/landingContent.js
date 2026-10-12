@@ -1,7 +1,8 @@
 /**
  * Todo o texto da landing em um só lugar.
  * Para mudar uma frase, mude aqui: os componentes só desenham.
- * Regra de escrita dos textos de tela: sem traço e sem barra (veja docs/arquitetura.md).
+ * Regra de escrita dos textos de tela: nenhum traço (travessão, meia risca ou hífen) e
+ * nenhuma barra; só a sigla NF-e escapa.
  */
 
 export const NAV = {

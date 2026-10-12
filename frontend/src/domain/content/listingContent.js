@@ -40,7 +40,6 @@ export const LISTING_STATUS_LABELS = {
   unpublished: { label: 'Não publicado', tone: 'muted' }
 };
 
-
 /** Assistente "criar anúncio" (#/anuncios/novo) e a edição (#/anuncios/:id). */
 export const LISTING_WIZARD = {
   eyebrow: 'DA FOTO AO ANÚNCIO PRONTO',

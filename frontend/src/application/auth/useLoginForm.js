@@ -15,7 +15,6 @@ const validateLogin = (values) => ({
   password: required(values.password)
 });
 
-
 /**
  * Aplicação · Caso de uso "entrar na conta".
  * Valida email e senha, confere a conta no repositório (simulado no navegador) e
@@ -66,7 +65,6 @@ export default function useLoginForm() {
     event.preventDefault();
     showToast({ tone: TOAST_TONES.INFO, ...LOGIN_SOON.forgot });
   }, []);
-
 
   return {
     values: form.values,

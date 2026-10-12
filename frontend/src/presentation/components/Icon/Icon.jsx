@@ -243,7 +243,6 @@ const ICONS = {
     )
   },
 
-
   /* ---------- Ícones preenchidos ---------- */
   sparkle: {
     filled: true,

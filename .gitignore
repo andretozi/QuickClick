@@ -27,9 +27,11 @@ backend/data/
 .DS_Store
 Thumbs.db
 
-# Contexto do Claude Code (fica só na máquina de quem usa)
+# Contexto e documentação interna (fica só na máquina de quem usa)
+.claude/
 CLAUDE.md
 CLAUDE.local.md
-.claude/
 .mcp.json
-.screens/
+docs/
+*.md
+!/README.md

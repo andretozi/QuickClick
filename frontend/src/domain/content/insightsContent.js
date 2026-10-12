@@ -2,7 +2,6 @@
 import { plural } from '@/domain/format/format.js';
 
 export const INSIGHTS = {
-
   loading: 'Calculando os insights…',
   loadError: { title: 'Não deu pra calcular os insights.', retry: 'Tentar de novo' },
   empty: 'Crie anúncios para este gráfico ganhar vida.',

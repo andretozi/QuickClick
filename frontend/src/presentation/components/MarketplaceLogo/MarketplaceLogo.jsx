@@ -12,7 +12,12 @@ import tiktokShop from '@/presentation/assets/marketplaces/tiktok-shop.svg';
 import aliexpress from '@/presentation/assets/marketplaces/aliexpress.svg';
 import './MarketplaceLogo.css';
 
-/** Logos oficiais (fontes em assets/marketplaces/FONTES.md). */
+/**
+ * Logos oficiais dos marketplaces, sem nenhuma alteração de cor, forma ou proporção: oito do
+ * Wikimedia Commons (domínio público por serem só texto e formas simples) e o do TikTok Shop do
+ * site oficial da TikTok. Continuam marcas registradas dos donos e só indicam com quais
+ * marketplaces o produto trabalha, sem sugerir parceria.
+ */
 const LOGOS = {
   'mercado-livre': mercadoLivre,
   shopee,

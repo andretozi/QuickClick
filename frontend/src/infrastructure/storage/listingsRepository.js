@@ -53,7 +53,6 @@ function toStoreFields(data) {
   if (data.stock !== undefined) fields.estoque = Number(data.stock);
   if (data.photos !== undefined) fields.fotos = data.photos;
   if (data.coverIndex !== undefined) fields.capa = data.coverIndex;
-
   if (data.attributes !== undefined) {
     fields.atributos = data.attributes.map(({ name, value }) => ({ nome: name, valor: value }));
   }

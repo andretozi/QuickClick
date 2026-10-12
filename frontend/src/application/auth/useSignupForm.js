@@ -53,7 +53,6 @@ export default function useSignupForm() {
     [check, loading, setFieldError, values, mounted]
   );
 
-
   return {
     values: form.values,
     errors: form.errors,

@@ -435,8 +435,8 @@ def serve() -> None:
 
 def main() -> None:
     ensure_venv_python()
-    if sys.version_info < (3, 10):
-        raise SystemExit("[main.py] Use Python 3.10 ou mais novo (o projeto usa o 3.14).")
+    if sys.version_info < (3, 11):
+        raise SystemExit("[main.py] Use Python 3.11 ou mais novo (o projeto usa o 3.14).")
     describe_python()
 
     if _quickclick_is_running():

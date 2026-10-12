@@ -20,7 +20,6 @@ export function formatMoney(cents) {
   return MONEY.format((Number(cents) || 0) / 100);
 }
 
-
 /** 1234 → "1.234" */
 export function formatNumber(value) {
   return NUMBER.format(Number(value) || 0);
@@ -53,7 +52,6 @@ export function formatRelative(iso, now = Date.now()) {
   if (abs < 365 * DAY) return RELATIVE.format(Math.round(diff / (30 * DAY)), 'month');
   return RELATIVE.format(Math.round(diff / (365 * DAY)), 'year');
 }
-
 
 /** "Ana Oliveira" → "AO"; "Ana" → "A" */
 export function initials(name) {

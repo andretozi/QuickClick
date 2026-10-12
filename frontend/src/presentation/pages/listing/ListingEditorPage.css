@@ -103,7 +103,6 @@
   font-weight: 600;
 }
 
-
 @media (max-width: 560px) {
   .listing-editor__footer-end {
     width: 100%;

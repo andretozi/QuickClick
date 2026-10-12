@@ -14,7 +14,6 @@ export function subscribeToHashChange(listener) {
   return () => window.removeEventListener('hashchange', listener);
 }
 
-
 /**
  * Troca o endereço sem criar uma entrada nova no histórico (redirecionamentos).
  * Assim o "voltar" do navegador não cai de novo na página que redirecionou.

@@ -135,7 +135,6 @@ export function press(element, { scale = 0.955, duration = 300 } = {}) {
   );
 }
 
-
 /**
  * Número que conta do zero até o valor ao aparecer.
  * format: 'number' (1.234) ou 'money' (o valor chega em centavos e vira R$).
