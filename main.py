@@ -24,6 +24,9 @@ O que ele faz, em ordem:
        desatualizado ou com REBUILD=1.
     2. Back (backend/): instala com pip o que faltar de backend/requirements.txt
        no mesmo Python que esta rodando este arquivo (a .venv, quando ela existe).
+       Se na hora de subir o servidor ainda faltar alguma peca (uma dependencia de
+       dependencia, ou uma instalacao que ficou pela metade), ele roda o
+       requirements de novo sozinho e tenta mais uma vez, antes de desistir.
     3. Sobe um unico servidor (Uvicorn) em http://127.0.0.1:8080:
        a API em /api (documentacao automatica em /docs) e o front buildado no resto.
     4. Abre o navegador padrao.
@@ -354,6 +357,23 @@ def _is_installed(package: str) -> bool:
     return True
 
 
+ERRO_PIP = (
+    "[main.py] Falhou a instalacao das dependencias do back. Confira a internet e "
+    "rode de novo. Se o pip recusar instalar no Python do sistema, crie uma .venv "
+    "(py -3.14 -m venv .venv), escolha ela como interpretador no PyCharm e rode o "
+    "main.py de novo."
+)
+
+
+def _pip_install_requirements() -> bool:
+    """Roda o `pip install -r` no Python deste processo. True se o pip terminou bem."""
+    cmd = [sys.executable, "-m", "pip", "install", "-r", str(REQUIREMENTS)]
+    print(f"[main.py] $ {' '.join(cmd)}", flush=True)
+    proc = subprocess.run(cmd, cwd=ROOT, shell=False)
+    importlib.invalidate_caches()
+    return proc.returncode == 0
+
+
 def ensure_backend_deps() -> None:
     missing = [name for name in _required_packages() if not _is_installed(name)]
     if not missing:
@@ -361,17 +381,8 @@ def ensure_backend_deps() -> None:
         return
 
     print(f"[main.py] Instalando dependencias do back que faltam: {', '.join(missing)}")
-    cmd = [sys.executable, "-m", "pip", "install", "-r", str(REQUIREMENTS)]
-    print(f"[main.py] $ {' '.join(cmd)}", flush=True)
-    proc = subprocess.run(cmd, cwd=ROOT, shell=False)
-    if proc.returncode != 0:
-        raise SystemExit(
-            "[main.py] Falhou a instalacao das dependencias do back. Confira a internet e "
-            "rode de novo. Se o pip recusar instalar no Python do sistema, crie uma .venv "
-            "(py -3.14 -m venv .venv), escolha ela como interpretador no PyCharm e rode o "
-            "main.py de novo."
-        )
-    importlib.invalidate_caches()
+    if not _pip_install_requirements():
+        raise SystemExit(ERRO_PIP)
 
 
 # ---------------------------------------------------------------------------
@@ -402,6 +413,41 @@ def _open_browser_when_ready(url: str) -> None:
         pass
 
 
+def _import_backend():
+    """Importa o uvicorn e o criar_app do back."""
+    import uvicorn
+
+    from backend.app.bootstrap import criar_app
+
+    return uvicorn, criar_app
+
+
+def import_backend():
+    """O mesmo, mas instalando o requirements e tentando de novo se faltar alguma peca.
+
+    O ensure_backend_deps() confere so os nomes escritos no requirements. Uma
+    dependencia dessas (pydantic, starlette, h11...) que falte, ou uma instalacao
+    que ficou pela metade, aparece aqui, na hora de importar. Em vez de morrer com
+    o ImportError, roda o requirements e tenta mais uma vez.
+    """
+    try:
+        return _import_backend()
+    except ImportError as erro:
+        print(f"[main.py] Falta uma dependencia do back: {erro}")
+        print("[main.py] Instalando o requirements e tentando de novo.", flush=True)
+        if not _pip_install_requirements():
+            raise SystemExit(ERRO_PIP)
+
+    try:
+        return _import_backend()
+    except ImportError as erro:
+        raise SystemExit(
+            f"[main.py] Mesmo depois de instalar o requirements ainda falta algo para "
+            f"subir o servidor: {erro}. Instale a mao e rode de novo:\n"
+            f"    {sys.executable} -m pip install -r {REQUIREMENTS}"
+        )
+
+
 def serve() -> None:
     if not _port_is_free(HOST, PORT):
         if _quickclick_is_running():
@@ -414,9 +460,7 @@ def serve() -> None:
         )
 
     # So importa o back depois de garantir as dependencias
-    import uvicorn
-
-    from backend.app.bootstrap import criar_app
+    uvicorn, criar_app = import_backend()
 
     app = criar_app()
     if os.environ.get("NO_BROWSER") != "1":

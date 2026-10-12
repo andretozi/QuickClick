@@ -1,0 +1,25 @@
+# Quick Click · dependências Python do projeto (ponto único de instalação)
+#
+# Instale tudo de uma vez, na raiz do projeto, com o Python da .venv:
+#
+#     .venv\Scripts\python -m pip install -r requirements.txt     (Windows)
+#     .venv/bin/python -m pip install -r requirements.txt          (Mac e Linux)
+#
+# Não é obrigatório: o main.py instala sozinho o que faltar na primeira execução,
+# tanto daqui quanto do npm no front. Este arquivo serve para quem prefere
+# instalar antes, de uma vez, ou para um "pip install -r" em CI.
+#
+# A lista de verdade fica em backend/requirements.txt, que é o arquivo que o
+# main.py lê. Aqui só apontamos para lá: assim não existe lista duplicada para
+# manter em dia nos dois lugares.
+
+-r backend/requirements.txt
+
+# O que entra com esse comando: as três do backend/requirements.txt (fastapi,
+# uvicorn e httpx) e, trazidas pelo pip automaticamente, as dependências delas
+# (hoje 14 pacotes): annotated-doc, annotated-types, anyio, certifi, click,
+# h11, httpcore, idna, opentelemetry-api, pydantic, pydantic-core, starlette,
+# typing-extensions e typing-inspection.
+#
+# O front não entra aqui (é Node, não Python): as dependências dele estão em
+# frontend/package.json e o main.py as instala com `npm ci`.
