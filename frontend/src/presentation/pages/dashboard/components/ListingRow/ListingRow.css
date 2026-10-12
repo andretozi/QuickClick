@@ -1,0 +1,134 @@
+/* ==================================================================
+   Bloco: listing-row (uma linha da lista, sobre o painel claro)
+   Estado: --busy (salvando)
+   ================================================================== */
+.listing-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2.4fr) 0.8fr 0.8fr 1.6fr auto;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
+  transition:
+    background var(--duration-fast),
+    border-color var(--duration-fast),
+    box-shadow var(--duration-base),
+    transform var(--duration-base) var(--ease-spring),
+    opacity var(--duration-fast);
+}
+
+.listing-row:hover {
+  border-color: rgb(var(--rgb-coral) / 0.18);
+  background: rgb(var(--rgb-white) / 0.55);
+  box-shadow: 0 16px 30px -24px rgb(var(--rgb-coral-deep) / 0.6);
+  transform: translateY(-1px);
+}
+
+.listing-row--busy {
+  opacity: 0.6;
+}
+
+.listing-row__main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.listing-row__text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.listing-row__title {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.listing-row__main:hover .listing-row__title {
+  color: var(--color-coral-dark);
+}
+
+.listing-row__meta {
+  color: rgb(var(--rgb-ink) / 0.55);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.listing-row__price {
+  margin: 0;
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.listing-row__stock {
+  margin: 0;
+  color: rgb(var(--rgb-ink) / 0.7);
+  font-size: 13.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.listing-row__stock--empty {
+  color: var(--color-coral-deep);
+}
+
+.listing-row__actions {
+  display: flex;
+  gap: 6px;
+}
+
+/* Tela média: canais vão para baixo do título */
+@media (max-width: 1080px) {
+  .listing-row {
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
+  }
+
+  .listing-row__channels {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+/* Celular: tudo empilhado */
+@media (max-width: 640px) {
+  .listing-row {
+    grid-template-columns: 1fr auto;
+    gap: 10px 12px;
+  }
+
+  .listing-row__main {
+    grid-column: 1 / -1;
+  }
+
+  .listing-row__price,
+  .listing-row__stock {
+    grid-row: 2;
+  }
+
+  .listing-row__stock {
+    text-align: right;
+  }
+
+  .listing-row__channels {
+    grid-row: 3;
+  }
+
+  .listing-row__actions {
+    grid-column: 1 / -1;
+    grid-row: 4;
+    justify-content: flex-end;
+  }
+}

@@ -5,7 +5,7 @@ import './Section.css';
  * Casca padrão de toda seção: fundo, textura de pontos, decoração e
  * o container central (`section__inner`).
  *
- * - tone: 'light' | 'dark'
+ * - tone: 'light' | 'dark' (vira data-surface: a navbar lê para saber o fundo atrás dela)
  * - dotted: aplica a textura de pontos
  * - backdrop: elementos decorativos atrás do conteúdo (ex.: <Blob />)
  */
@@ -22,6 +22,7 @@ export default function Section({
   return (
     <Tag
       id={id}
+      data-surface={tone}
       className={cx('section', `section--${tone}`, dotted && 'section--dotted', className)}
     >
       {backdrop}

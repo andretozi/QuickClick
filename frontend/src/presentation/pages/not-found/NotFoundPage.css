@@ -1,0 +1,87 @@
+/* ==================================================================
+   Bloco: not-found (página 404)
+   ================================================================== */
+.not-found {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100svh;
+  overflow: hidden;
+  background: var(--color-cocoa);
+  color: var(--color-cream);
+}
+
+.not-found [data-enter] {
+  opacity: 0;
+}
+
+.not-found__top {
+  position: relative;
+  z-index: 1;
+  padding: clamp(20px, 4vw, 34px) var(--container-padding);
+}
+
+.not-found__main {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px var(--container-padding) 80px;
+  text-align: center;
+}
+
+.not-found__code {
+  position: relative;
+  margin: 0 0 8px;
+  background: linear-gradient(160deg, var(--color-coral-glow), var(--color-coral) 45%, var(--color-honey));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-family: var(--font-display);
+  font-size: clamp(120px, 26vw, 240px);
+  font-weight: 700;
+  letter-spacing: -0.05em;
+  line-height: 0.9;
+  filter: drop-shadow(0 30px 60px rgb(var(--rgb-coral) / 0.35));
+}
+
+/* O cursor da marca "clicando" no número */
+.not-found__cursor {
+  position: absolute;
+  right: -0.18em;
+  bottom: 0.02em;
+  color: var(--color-cream);
+  filter: drop-shadow(0 10px 18px rgb(var(--rgb-coral) / 0.7));
+}
+
+.not-found__title {
+  max-width: 640px;
+  font-size: clamp(34px, 5vw, 54px);
+  line-height: 1.05;
+  text-wrap: balance;
+}
+
+.not-found__title:focus {
+  outline: none;
+}
+
+.not-found__lead {
+  max-width: 520px;
+  margin: 18px 0 0;
+  color: rgb(var(--rgb-cream) / 0.66);
+  font-size: clamp(16px, 2vw, 18px);
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.not-found__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 34px;
+}

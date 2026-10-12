@@ -1,0 +1,25 @@
+/* ==================================================================
+   Bloco: listing-thumb
+   ================================================================== */
+.listing-thumb {
+  --thumb-size: 64px;
+
+  position: relative;
+  display: block;
+  flex: none;
+  width: var(--thumb-size);
+  height: var(--thumb-size);
+  overflow: hidden;
+  border-radius: 16px;
+  background: var(--color-sand-100);
+  box-shadow:
+    inset 0 0 0 1px rgb(var(--rgb-ink) / 0.06),
+    0 10px 22px -14px rgb(var(--rgb-black) / 0.55);
+}
+
+.listing-thumb__image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}

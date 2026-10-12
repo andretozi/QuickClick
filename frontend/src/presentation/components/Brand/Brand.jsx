@@ -21,7 +21,7 @@ export default function Brand({ size = 'lg', tone = 'light', href, tagline, clas
       <LogoMark size={size} />
       <span className="brand__text">
         <span className="brand__name">
-          Quick <span className="brand__accent">Click</span>
+          {BRAND.name.first} <span className="brand__accent">{BRAND.name.accent}</span>
         </span>
         {tagline && <span className="brand__tagline">{tagline}</span>}
       </span>

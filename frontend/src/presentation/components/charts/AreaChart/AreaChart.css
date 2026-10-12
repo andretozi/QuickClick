@@ -1,0 +1,104 @@
+/* ==================================================================
+   Bloco: area-chart (faturamento por dia, sobre vidro escuro)
+   ================================================================== */
+.area-chart {
+  position: relative;
+}
+
+.area-chart__plot {
+  position: relative;
+  height: clamp(180px, 24vw, 240px);
+}
+
+.area-chart__svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  border-radius: var(--radius-md);
+  cursor: crosshair;
+}
+
+.area-chart__svg:focus-visible {
+  outline: 2px solid var(--color-coral-glow);
+  outline-offset: 6px;
+}
+
+.area-chart__grid {
+  stroke: rgb(var(--rgb-cream) / 0.08);
+  stroke-dasharray: 3 6;
+  vector-effect: non-scaling-stroke;
+}
+
+.area-chart__stop--top {
+  stop-color: var(--color-coral);
+  stop-opacity: 0.45;
+}
+
+.area-chart__stop--bottom {
+  stop-color: var(--color-coral);
+  stop-opacity: 0;
+}
+
+.area-chart__stop--honey {
+  stop-color: var(--color-honey);
+}
+
+.area-chart__stop--coral {
+  stop-color: var(--color-coral);
+}
+
+.area-chart__area {
+  transform-box: fill-box;
+  transform-origin: bottom;
+}
+
+.area-chart__line {
+  fill: none;
+  stroke-width: 3;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 6px 10px rgb(var(--rgb-coral) / 0.5));
+}
+
+.area-chart__rule {
+  stroke: rgb(var(--rgb-cream) / 0.35);
+  stroke-dasharray: 4 4;
+  vector-effect: non-scaling-stroke;
+}
+
+.area-chart__dot {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border: 3px solid var(--color-cream);
+  border-radius: 50%;
+  background: var(--color-coral);
+  box-shadow: 0 0 0 6px rgb(var(--rgb-coral) / 0.25), 0 0 18px rgb(var(--rgb-coral) / 0.8);
+  pointer-events: none;
+}
+
+.area-chart__axis {
+  position: relative;
+  height: 22px;
+  margin-top: 8px;
+}
+
+.area-chart__tick {
+  position: absolute;
+  top: 0;
+  color: rgb(var(--rgb-cream) / 0.5);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+.area-chart__tick:first-child {
+  transform: none;
+}
+
+.area-chart__tick:last-child {
+  transform: translateX(-100%);
+}

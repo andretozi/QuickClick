@@ -1,0 +1,119 @@
+/* ==================================================================
+   Bloco: plan-section (comparação dos planos)
+   Cartão: --current (o plano da conta), --featured (o recomendado)
+   ================================================================== */
+.plan-section__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.plan-section__card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px;
+  border: 1px solid rgb(var(--rgb-ink) / 0.08);
+  border-radius: var(--radius-lg);
+  background: rgb(var(--rgb-white) / 0.5);
+  transition: transform var(--duration-slow) var(--ease-spring);
+}
+
+.plan-section__card:hover {
+  transform: translateY(-3px);
+}
+
+.plan-section__card--featured {
+  border-color: rgb(var(--rgb-honey) / 0.6);
+}
+
+.plan-section__card--current {
+  border: 2px solid var(--color-coral);
+  background:
+    radial-gradient(100% 80% at 0% 0%, rgb(var(--rgb-coral) / 0.14), transparent 70%),
+    rgb(var(--rgb-white) / 0.75);
+  box-shadow: 0 20px 34px -24px rgb(var(--rgb-coral) / 0.8);
+}
+
+.plan-section__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.plan-section__name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.plan-section__price {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.plan-section__period {
+  color: rgb(var(--rgb-ink) / 0.55);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.plan-section__tagline {
+  margin: 0;
+  color: rgb(var(--rgb-ink) / 0.65);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.plan-section__features {
+  display: grid;
+  gap: 6px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.plan-section__feature {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+.plan-section__check {
+  flex: none;
+  margin-top: 2px;
+  color: var(--color-green);
+}
+
+.plan-section__soon {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: rgb(var(--rgb-ink) / 0.6);
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+@media (max-width: 1080px) {
+  .plan-section__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .plan-section__grid {
+    grid-template-columns: 1fr;
+  }
+}

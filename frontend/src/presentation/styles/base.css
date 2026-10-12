@@ -32,8 +32,29 @@ a:hover {
   color: var(--color-coral-dark);
 }
 
-input::placeholder {
+input::placeholder,
+textarea::placeholder {
   color: rgb(var(--rgb-ink) / 0.4);
+}
+
+/* Foco visível para quem navega pelo teclado. :where() não pesa: o CSS de cada
+   componente pode trocar o anel pelo próprio estilo de foco. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 3px solid rgb(var(--rgb-coral) / 0.5);
+  outline-offset: 3px;
+}
+
+/* Conteúdo só para leitores de tela (some da tela, continua acessível) */
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  border: 0;
+  white-space: nowrap;
 }
 
 /* Títulos com a fonte de destaque. Cada bloco define só o tamanho. */

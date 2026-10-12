@@ -1,18 +1,24 @@
 import { useEffect, useRef, useState } from 'react';
 import { getHash, scrollToAnchor, scrollToTop, subscribeToHashChange } from '@/infrastructure/browser/location.js';
-import { parseHash } from './routes.js';
+import { focusPageStart } from '@/infrastructure/browser/focus.js';
+import { ROUTES, parseHash } from './routes.js';
 
 const TOP = 'topo';
 
+const sameAddress = (a, b) =>
+  a.route === b.route && a.path === b.path && JSON.stringify(a.query) === JSON.stringify(b.query);
+
 /**
- * Aplicação · Hook que devolve a rota atual e reage às mudanças da URL.
- * Ao trocar de página, rola para o topo ou, se o link apontou uma seção da landing
- * ("#planos"), até essa seção, depois que a página nova aparece.
+ * Aplicação · Hook que devolve a página atual ({ route, params, query, path }) e
+ * reage às mudanças da URL.
+ * Ao trocar de página, rola para o topo (ou até a seção da landing que o link
+ * apontou, ex.: "#planos") e leva o foco do teclado para o começo da página nova.
  */
 export default function useHashRoute() {
-  const [route, setRoute] = useState(() => parseHash(getHash()).route);
-  const currentRoute = useRef(route);
+  const [location, setLocation] = useState(() => parseHash(getHash()));
+  const current = useRef(location);
   const pendingScroll = useRef(null);
+  const firstRender = useRef(true);
 
   useEffect(() => {
     // Link direto para uma seção (ex.: o site aberto já em "#planos")
@@ -20,20 +26,28 @@ export default function useHashRoute() {
 
     return subscribeToHashChange(() => {
       const next = parseHash(getHash());
-      if (next.route === currentRoute.current) return; // seção da mesma página: o navegador rola sozinho
-      currentRoute.current = next.route;
+      // Seção da landing estando na landing: o navegador rola sozinho
+      if (next.route === ROUTES.LANDING && current.current.route === ROUTES.LANDING) return;
+      if (sameAddress(next, current.current)) return;
+      current.current = next;
       pendingScroll.current = next.anchor ?? TOP;
-      setRoute(next.route);
+      setLocation(next);
     });
   }, []);
 
   useEffect(() => {
     const target = pendingScroll.current;
+    const isFirst = firstRender.current;
+    firstRender.current = false;
     if (!target) return;
     pendingScroll.current = null;
-    if (target === TOP) scrollToTop();
-    else scrollToAnchor(target);
-  }, [route]);
+    if (target === TOP) {
+      scrollToTop();
+      if (!isFirst) focusPageStart();
+    } else {
+      scrollToAnchor(target);
+    }
+  }, [location]);
 
-  return route;
+  return location;
 }

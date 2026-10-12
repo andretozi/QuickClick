@@ -1,0 +1,132 @@
+/* ==================================================================
+   Bloco: stepper (trilho dos passos, sobre o fundo escuro)
+   Item: --done, --active
+   ================================================================== */
+.stepper {
+  --stepper-dot: 38px;
+
+  position: relative;
+}
+
+/* O trilho corre por trás das bolinhas, do centro da primeira ao da última */
+.stepper__rail {
+  position: absolute;
+  top: calc(var(--stepper-dot) / 2 - 2px);
+  right: 10%;
+  left: 10%;
+  height: 4px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: rgb(var(--rgb-cream) / 0.1);
+}
+
+.stepper__fill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--color-honey), var(--color-coral));
+  box-shadow: 0 0 14px rgb(var(--rgb-coral) / 0.8);
+  transform-origin: left;
+  transition: transform 0.9s var(--ease-spring);
+}
+
+.stepper__list {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stepper__button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  color: rgb(var(--rgb-cream) / 0.55);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+}
+
+.stepper__button:disabled {
+  cursor: default;
+}
+
+.stepper__dot {
+  display: grid;
+  place-items: center;
+  width: var(--stepper-dot);
+  height: var(--stepper-dot);
+  border: 2px solid rgb(var(--rgb-cream) / 0.18);
+  border-radius: 50%;
+  background: var(--color-cocoa-800);
+  color: rgb(var(--rgb-cream) / 0.7);
+  font-weight: 800;
+  transition:
+    background var(--duration-base),
+    border-color var(--duration-base),
+    transform var(--duration-slow) var(--ease-spring),
+    box-shadow var(--duration-base);
+}
+
+.stepper__button:not(:disabled):hover .stepper__dot {
+  border-color: var(--color-coral-glow);
+  transform: translateY(-2px);
+}
+
+.stepper__item--done .stepper__dot {
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--color-honey), var(--color-coral));
+  color: var(--color-white);
+}
+
+.stepper__item--active .stepper__dot {
+  border-color: var(--color-coral);
+  background: var(--color-cocoa);
+  color: var(--color-cream);
+  box-shadow:
+    0 0 0 6px rgb(var(--rgb-coral) / 0.18),
+    0 0 22px rgb(var(--rgb-coral) / 0.6);
+  transform: scale(1.1);
+}
+
+.stepper__text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.stepper__label {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.stepper__item--active .stepper__label,
+.stepper__item--done .stepper__label {
+  color: var(--color-cream);
+}
+
+.stepper__hint {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .stepper {
+    --stepper-dot: 32px;
+  }
+
+  .stepper__hint {
+    display: none;
+  }
+
+  .stepper__label {
+    font-size: 12px;
+  }
+}

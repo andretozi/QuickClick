@@ -3,10 +3,11 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Quick Click — landing animada + login (React + Vite)",
+  "description": "Quick Click: site do MVP (React + Vite)",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "check": "node scripts/check.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

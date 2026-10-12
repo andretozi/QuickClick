@@ -1,0 +1,75 @@
+/* ==================================================================
+   Bloco: backdrop (fundo cinematográfico)
+   Modificadores: --fixed (atrás da página toda) e --contained
+   ================================================================== */
+.backdrop {
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 80% at 50% 0%, var(--color-cocoa-700), transparent 62%),
+    linear-gradient(180deg, var(--color-cocoa) 0%, var(--color-cocoa-950) 58%, var(--color-night) 100%);
+  pointer-events: none;
+}
+
+.backdrop--fixed {
+  position: fixed;
+}
+
+.backdrop--contained {
+  position: absolute;
+}
+
+/* Luz quente que desce do topo */
+.backdrop__glow {
+  position: absolute;
+  top: -30vh;
+  left: 50%;
+  width: min(1100px, 120vw);
+  height: 70vh;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(var(--rgb-coral) / 0.22), transparent);
+  filter: blur(40px);
+  transform: translateX(-50%);
+}
+
+.backdrop__blob--a {
+  --blob-size: 620px;
+  --blob-blur: 90px;
+  --blob-alpha: 0.32;
+
+  top: -160px;
+  left: -180px;
+}
+
+.backdrop__blob--b {
+  --blob-size: 560px;
+  --blob-blur: 96px;
+  --blob-alpha: 0.2;
+
+  top: 34%;
+  right: -200px;
+}
+
+.backdrop__blob--c {
+  --blob-size: 520px;
+  --blob-blur: 100px;
+  --blob-alpha: 0.18;
+
+  bottom: -220px;
+  left: 22%;
+}
+
+.backdrop__dots {
+  position: absolute;
+  inset: 0;
+  background-image: var(--dots-dark);
+  background-size: 24px 24px;
+  mask-image: radial-gradient(120% 90% at 50% 20%, rgb(var(--rgb-black)), transparent 85%);
+}
+
+.backdrop__vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(140% 100% at 50% 30%, transparent 55%, rgb(var(--rgb-night) / 0.75));
+}

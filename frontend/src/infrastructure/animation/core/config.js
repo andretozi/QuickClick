@@ -17,3 +17,12 @@ export const MOTION_CONFIG = {
   loopScenes: true,
   parallax: true
 };
+
+/**
+ * Vitrine de marketplaces da landing: quanto dura a cena de cada marketplace, da entrada
+ * até a saída (5 s: nem rápido, nem devagar). A coreografia inteira escala com esse tempo.
+ */
+export const MARKETPLACE_SHOWCASE_SCENE_MS = 5000;
+
+/** Partículas da explosão do clique na vitrine: desktop e celular. */
+export const SHOWCASE_PARTICLES = { desktop: 80, mobile: 40 };

@@ -14,9 +14,13 @@ export function subscribeToHashChange(listener) {
   return () => window.removeEventListener('hashchange', listener);
 }
 
-/** Vai para outro endereço da aplicação (ex.: "#/marketplaces"). */
-export function navigateTo(hash) {
-  window.location.hash = hash;
+/**
+ * Troca o endereço sem criar uma entrada nova no histórico (redirecionamentos).
+ * Assim o "voltar" do navegador não cai de novo na página que redirecionou.
+ */
+export function replaceHash(hash) {
+  const { pathname, search } = window.location;
+  window.location.replace(`${pathname}${search}${hash}`);
 }
 
 /** Volta para o topo da página. */

@@ -1,0 +1,113 @@
+/* ==================================================================
+   Bloco: channels-step (passo dos canais)
+   ================================================================== */
+.channels-step {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.channels-step__title {
+  margin: 0;
+  font-size: clamp(22px, 2.6vw, 30px);
+}
+
+.channels-step__lead {
+  margin: 6px 0 0;
+  color: rgb(var(--rgb-ink) / 0.65);
+  font-weight: 600;
+}
+
+.channels-step__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(240px, 1fr);
+  align-items: start;
+  gap: clamp(18px, 3vw, 32px);
+}
+
+.channels-step__list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Mercado Livre: placa clara com a borda amarela da marca */
+.channels-step__main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px;
+  border: 2px solid rgb(var(--rgb-mercado-livre) / 0.9);
+  border-radius: var(--radius-xl);
+  background:
+    radial-gradient(90% 120% at 0% 0%, rgb(var(--rgb-mercado-livre) / 0.35), transparent 60%),
+    var(--color-white);
+  box-shadow: 0 22px 36px -26px rgb(var(--rgb-black) / 0.6);
+}
+
+.channels-step__main-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.channels-step__connect {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.channels-step__connect-text {
+  margin: 0;
+  color: var(--color-ink);
+  font-weight: 700;
+}
+
+/* Os que ainda vão chegar: apagados, com brilho passando */
+.channels-step__soon {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.channels-step__soon-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px;
+  overflow: hidden;
+  border: 1px dashed rgb(var(--rgb-ink) / 0.14);
+  border-radius: var(--radius-md);
+  background: rgb(var(--rgb-white) / 0.45);
+}
+
+.channels-step__shine {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgb(var(--rgb-white) / 0.7), transparent 70%);
+  transform: translateX(-120%);
+  pointer-events: none;
+}
+
+.channels-step__soon-label {
+  color: rgb(var(--rgb-ink) / 0.5);
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 820px) {
+  .channels-step__layout {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,93 +1,164 @@
 /* ==================================================================
-   Bloco: marketplaces  (mix com .section)
+   Bloco: showcase (vitrine de marketplaces da landing)
+   Tela cheia: 100% da largura e uma tela de altura. Cada marketplace é uma
+   cena ([data-part="slide"]) com o fundo da marca e o logo enorme no centro.
+   O JS move as cenas (da esquerda para a direita), o cursor, o anel e o
+   canvas de partículas. Estados da cena: --current (a da vez).
    ================================================================== */
-.marketplaces {
-  --section-max: 980px;
-
-  background-color: var(--color-sand);
+.showcase {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  height: 100vh;
+  height: 100svh;
+  min-height: 560px;
+  overflow: hidden;
+  background: var(--color-night);
+  color: var(--color-cream);
 }
 
-.marketplaces__blob--a {
-  --blob-size: 460px;
-  --blob-alpha: 0.36;
-
-  top: -120px;
-  left: -120px;
+.showcase__stage {
+  position: absolute;
+  inset: 0;
 }
 
-.marketplaces__blob--b {
-  --blob-size: 420px;
-  --blob-alpha: 0.3;
-
-  right: -120px;
-  bottom: -140px;
-}
-
-.marketplaces__header {
-  --section-header-max: 760px;
-}
-
-/* ---------- Catálogo ---------- */
-.marketplaces__catalog {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
-}
-
-.marketplaces__label {
-  margin: 12px 0 0;
-  color: rgb(var(--rgb-ink) / 0.5);
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.18em;
-}
-
-.marketplaces__list {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 12px;
+/* ---------- As cenas ---------- */
+.showcase__scenes {
+  position: absolute;
+  inset: 0;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.marketplaces__chip {
-  display: inline-flex;
+.showcase__slide {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  visibility: hidden;
+  will-change: transform;
+}
+
+.showcase__slide--current {
+  visibility: visible;
+}
+
+/* O logo: uns 56% da largura no desktop, centrado na luz do fundo */
+.showcase__logo {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 18px 8px 8px;
-  border: 1px solid rgb(var(--rgb-ink) / 0.1);
-  border-radius: var(--radius-pill);
-  background: var(--color-sand-50);
-  font-size: 16px;
-  font-weight: 800;
-  box-shadow: 0 18px 36px -26px rgb(var(--rgb-ink) / 0.6);
+  justify-content: center;
+  width: min(56vw, 900px);
+  height: min(40vh, 400px);
+  margin: calc(min(40vh, 400px) / -2) 0 0 calc(min(56vw, 900px) / -2);
+  filter: drop-shadow(0 24px 40px rgb(var(--rgb-black) / 0.18));
+  will-change: transform;
 }
 
-.marketplaces__chip--soon {
-  background: rgb(var(--rgb-sand-100) / 0.6);
-  color: rgb(var(--rgb-ink) / 0.62);
-  font-size: 14.5px;
-  font-weight: 700;
-  box-shadow: none;
-}
-
-.marketplaces__chip--soon .marketplaces__mark {
-  opacity: 0.75;
-  filter: saturate(0.4);
-}
-
-/* Ponto verde "no ar" nos disponíveis (pulsa pelo JS) */
-.marketplaces__live {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--color-green);
-}
-
-.marketplaces__action {
-  margin-top: clamp(36px, 5vw, 52px);
+/* ---------- Título por cima de todas as cenas ---------- */
+.showcase__header {
+  position: absolute;
+  top: clamp(84px, 12vh, 128px);
+  right: var(--container-padding);
+  left: var(--container-padding);
+  z-index: 2;
+  max-width: 900px;
+  margin: 0 auto;
   text-align: center;
+  pointer-events: none;
+}
+
+.showcase__title {
+  margin: 0;
+  color: var(--color-coral);
+  font-size: clamp(30px, 4.6vw, 62px);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  /* sombra escura bem difusa: lê sobre qualquer fundo de marca */
+  text-shadow:
+    0 2px 14px rgb(var(--rgb-black) / 0.55),
+    0 0 48px rgb(var(--rgb-black) / 0.45);
+  transition: color var(--duration-slow);
+}
+
+/* Onde o coral não tem contraste com a marca (Shopee, Amazon...), o título vira creme */
+.showcase__header--cream .showcase__title {
+  color: var(--color-cream);
+}
+
+.showcase__lead {
+  margin: 14px auto 0;
+  max-width: 560px;
+  color: var(--color-cream);
+  font-size: clamp(15px, 1.4vw, 19px);
+  font-weight: 600;
+  text-shadow: 0 1px 12px rgb(var(--rgb-black) / 0.6);
+}
+
+/* ---------- Cursor, anel e partículas ---------- */
+.showcase__particles {
+  z-index: 3;
+}
+
+.showcase__ring {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  width: 260px;
+  height: 260px;
+  margin: -130px 0 0 -130px;
+  border: 4px solid rgb(var(--rgb-coral) / 0.95);
+  border-radius: 50%;
+  box-shadow:
+    0 0 40px rgb(var(--rgb-coral) / 0.6),
+    inset 0 0 30px rgb(var(--rgb-coral-glow) / 0.5);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* O cursor da marca: a seta do LogoMark em coral, 2,5 vezes maior, com sombra quente */
+.showcase__cursor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 4;
+  color: var(--color-coral);
+  opacity: 0;
+  filter:
+    drop-shadow(0 22px 34px rgb(var(--rgb-coral-deep) / 0.6))
+    drop-shadow(0 8px 14px rgb(var(--rgb-black) / 0.45));
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.showcase__cursor-icon {
+  display: block;
+  width: clamp(110px, 13vw, 210px);
+  height: clamp(110px, 13vw, 210px);
+}
+
+.showcase__cursor-icon path {
+  stroke: var(--color-cream);
+  stroke-width: 1.2px;
+  paint-order: stroke;
+}
+
+/* ---------- Celular: mesma coreografia, logo menor ---------- */
+@media (max-width: 720px) {
+  .showcase__logo {
+    width: 78vw;
+    height: 26vh;
+    margin: -13vh 0 0 -39vw;
+  }
+
+  .showcase__ring {
+    width: 160px;
+    height: 160px;
+    margin: -80px 0 0 -80px;
+    border-width: 3px;
+  }
 }

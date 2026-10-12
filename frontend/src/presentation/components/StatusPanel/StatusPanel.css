@@ -1,0 +1,33 @@
+/* ==================================================================
+   Bloco: status-panel (carregando e erro, sobre o vidro escuro)
+   Tamanhos: --sm, --md, --lg (altura mínima)
+   ================================================================== */
+.status-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-height: 220px;
+  color: rgb(var(--rgb-cream) / 0.8);
+  font-weight: 700;
+}
+
+.status-panel--sm {
+  min-height: 180px;
+}
+
+.status-panel--md {
+  min-height: 200px;
+}
+
+.status-panel__title {
+  margin: 0;
+}
+
+.status-panel__spinner {
+  width: 22px;
+  height: 22px;
+  border: 3px solid rgb(var(--rgb-cream) / 0.2);
+  border-top-color: var(--color-coral);
+  border-radius: 50%;
+}

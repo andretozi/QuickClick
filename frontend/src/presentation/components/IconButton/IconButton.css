@@ -1,0 +1,63 @@
+/* ==================================================================
+   Bloco: icon-button
+   Tons: --paper, --glass, --danger · Tamanhos: --sm, --md
+   ================================================================== */
+.icon-button {
+  --icon-button-size: 40px;
+  --icon-button-bg: rgb(var(--rgb-ink) / 0.05);
+  --icon-button-bg-hover: rgb(var(--rgb-ink) / 0.1);
+  --icon-button-fg: rgb(var(--rgb-ink) / 0.72);
+  --icon-button-fg-hover: var(--color-ink);
+
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--icon-button-size);
+  height: var(--icon-button-size);
+  border: none;
+  border-radius: 12px;
+  background: var(--icon-button-bg);
+  color: var(--icon-button-fg);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast),
+    color var(--duration-fast),
+    transform var(--duration-base) var(--ease-spring);
+}
+
+.icon-button:hover {
+  background: var(--icon-button-bg-hover);
+  color: var(--icon-button-fg-hover);
+  transform: translateY(-1px) scale(1.06);
+}
+
+.icon-button:active {
+  transform: scale(0.92);
+}
+
+.icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  transform: none;
+}
+
+.icon-button--sm {
+  --icon-button-size: 34px;
+
+  border-radius: 10px;
+}
+
+.icon-button--glass {
+  --icon-button-bg: rgb(var(--rgb-cream) / 0.08);
+  --icon-button-bg-hover: rgb(var(--rgb-cream) / 0.16);
+  --icon-button-fg: rgb(var(--rgb-cream) / 0.78);
+  --icon-button-fg-hover: var(--color-cream);
+}
+
+.icon-button--danger {
+  --icon-button-bg: rgb(var(--rgb-coral-deep) / 0.08);
+  --icon-button-bg-hover: rgb(var(--rgb-coral-deep) / 0.16);
+  --icon-button-fg: var(--color-coral-deep);
+  --icon-button-fg-hover: var(--color-coral-deep);
+}

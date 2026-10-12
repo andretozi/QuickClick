@@ -1,0 +1,66 @@
+/* ==================================================================
+   Bloco: chart-legend
+   Tons da amostra: --1 a --6 (séries) e --coral, --honey
+   ================================================================== */
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chart-legend__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: rgb(var(--rgb-cream) / 0.78);
+  font-size: 13px;
+  font-weight: 700;
+  transition: color var(--duration-fast);
+}
+
+.chart-legend__item--active {
+  color: var(--color-cream);
+}
+
+.chart-legend__swatch {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-coral);
+  box-shadow: 0 0 10px currentColor;
+}
+
+.chart-legend__swatch--coral,
+.chart-legend__swatch--1 {
+  background: var(--color-coral);
+}
+
+.chart-legend__swatch--honey,
+.chart-legend__swatch--2 {
+  background: var(--color-honey);
+}
+
+.chart-legend__swatch--3 {
+  background: var(--color-green-light);
+}
+
+.chart-legend__swatch--4 {
+  background: var(--color-cream);
+}
+
+.chart-legend__swatch--5 {
+  background: var(--color-coral-deep);
+}
+
+.chart-legend__swatch--6 {
+  background: var(--color-honey-dark);
+}
+
+.chart-legend__value {
+  color: rgb(var(--rgb-cream) / 0.55);
+  font-weight: 600;
+}

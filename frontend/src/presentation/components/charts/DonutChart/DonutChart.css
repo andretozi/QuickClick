@@ -1,0 +1,109 @@
+/* ==================================================================
+   Bloco: donut-chart (estoque por categoria)
+   Fatias: --1 a --6 (as mesmas cores da legenda) · Estados: --active, --dim
+   ================================================================== */
+.donut-chart {
+  display: grid;
+  grid-template-columns: minmax(150px, 200px) 1fr;
+  align-items: center;
+  gap: clamp(16px, 3vw, 32px);
+}
+
+.donut-chart__figure {
+  position: relative;
+}
+
+.donut-chart__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.donut-chart__track {
+  fill: none;
+  stroke: rgb(var(--rgb-cream) / 0.06);
+  stroke-width: 22;
+}
+
+.donut-chart__segment {
+  --segment-color: var(--color-coral);
+
+  fill: none;
+  stroke: var(--segment-color);
+  stroke-width: 22;
+  cursor: pointer;
+  filter: drop-shadow(0 0 6px rgb(var(--rgb-black) / 0.35));
+  transition:
+    stroke-width var(--duration-base) var(--ease-spring),
+    opacity var(--duration-fast);
+}
+
+.donut-chart__segment--2 {
+  --segment-color: var(--color-honey);
+}
+
+.donut-chart__segment--3 {
+  --segment-color: var(--color-green-light);
+}
+
+.donut-chart__segment--4 {
+  --segment-color: var(--color-cream);
+}
+
+.donut-chart__segment--5 {
+  --segment-color: var(--color-coral-deep);
+}
+
+.donut-chart__segment--6 {
+  --segment-color: var(--color-honey-dark);
+}
+
+.donut-chart__segment--active {
+  stroke-width: 28;
+}
+
+.donut-chart__segment--dim {
+  opacity: 0.4;
+}
+
+.donut-chart__center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  pointer-events: none;
+}
+
+.donut-chart__total {
+  color: var(--color-cream);
+  font-family: var(--font-display);
+  font-size: clamp(26px, 3vw, 34px);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.donut-chart__caption {
+  margin-top: 4px;
+  color: rgb(var(--rgb-cream) / 0.55);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.donut-chart__legend {
+  flex-direction: column;
+}
+
+@media (max-width: 520px) {
+  .donut-chart {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+
+  .donut-chart__figure {
+    width: 180px;
+  }
+}

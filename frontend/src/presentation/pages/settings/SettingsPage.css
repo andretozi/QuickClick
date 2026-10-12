@@ -1,0 +1,39 @@
+/* ==================================================================
+   Bloco: settings-page (#/configuracoes)
+   ================================================================== */
+.settings-page {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(20px, 3vw, 30px);
+}
+
+.settings-page__layout {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr);
+  align-items: start;
+  gap: clamp(18px, 3vw, 30px);
+}
+
+.settings-page__nav {
+  position: sticky;
+  top: 96px;
+}
+
+.settings-page__panel {
+  min-width: 0;
+}
+
+/* Celular e tablet: a navegação vira uma fileira de abas que rola de lado */
+@media (max-width: 860px) {
+  .settings-page__layout {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-page .settings-page__nav {
+    position: static;
+    flex-direction: row;
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+}

@@ -1,0 +1,54 @@
+/* ==================================================================
+   Bloco: app-shell (casca das páginas logadas)
+   ================================================================== */
+.app-shell {
+  --text-muted: rgb(var(--rgb-cream) / 0.64);
+
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  overflow-x: clip;
+  background: var(--color-cocoa);
+  color: var(--color-cream);
+}
+
+/* Blocos que entram em sequência começam invisíveis (o JS faz a entrada) */
+.app-shell [data-enter] {
+  opacity: 0;
+}
+
+.app-shell__main {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: clamp(18px, 3vw, 34px) var(--container-padding) clamp(72px, 9vw, 120px);
+}
+
+.app-shell__main:focus {
+  outline: none;
+}
+
+/* Aparece só quando recebe o foco pelo teclado */
+.app-shell__skip {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: calc(var(--layer-nav) + 1);
+  padding: 10px 16px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--color-coral);
+  color: var(--color-white);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  transform: translateY(-180%);
+  transition: transform var(--duration-base) var(--ease-out-expo);
+}
+
+.app-shell__skip:focus {
+  transform: translateY(0);
+}

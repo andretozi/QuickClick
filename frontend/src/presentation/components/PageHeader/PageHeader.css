@@ -1,0 +1,55 @@
+/* ==================================================================
+   Bloco: page-header (topo das páginas logadas)
+   ================================================================== */
+.page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 22px 30px;
+  margin: clamp(18px, 4vw, 40px) 0 clamp(26px, 4vw, 40px);
+}
+
+.page-header__text {
+  flex: 1 1 420px;
+  min-width: 0;
+}
+
+.page-header__eyebrow {
+  margin-bottom: 12px;
+}
+
+.page-header__title {
+  font-size: clamp(36px, 5.4vw, 62px);
+  line-height: 1.02;
+  letter-spacing: -0.028em;
+  text-wrap: balance;
+}
+
+.page-header__title:focus {
+  outline: none;
+}
+
+.page-header__lead {
+  max-width: 640px;
+  margin: 14px 0 0;
+  color: var(--text-muted);
+  font-size: clamp(16px, 1.9vw, 18.5px);
+  font-weight: 600;
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+.page-header__extra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.page-header__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}

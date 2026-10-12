@@ -1,0 +1,71 @@
+/* ==================================================================
+   Bloco: panel
+   Modificadores: --paper (claro) e --glass (vidro escuro)
+   A borda iluminada é um ::before com degradê, recortado por máscara.
+   ================================================================== */
+.panel {
+  --panel-padding: clamp(20px, 3vw, 30px);
+  --panel-edge: linear-gradient(
+    160deg,
+    rgb(var(--rgb-white) / 0.6),
+    rgb(var(--rgb-white) / 0.04) 38%,
+    rgb(var(--rgb-coral) / 0.22)
+  );
+
+  position: relative;
+  isolation: isolate;
+  padding: var(--panel-padding);
+  border-radius: var(--radius-2xl);
+}
+
+.panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  padding: 1px;
+  border-radius: inherit;
+  background: var(--panel-edge);
+  -webkit-mask:
+    linear-gradient(rgb(var(--rgb-black)) 0 0) content-box,
+    linear-gradient(rgb(var(--rgb-black)) 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(rgb(var(--rgb-black)) 0 0) content-box exclude,
+    linear-gradient(rgb(var(--rgb-black)) 0 0);
+  pointer-events: none;
+}
+
+/* ---------- Papel: areia clara em camadas ---------- */
+.panel--paper {
+  --text-muted: rgb(var(--rgb-ink) / 0.6);
+
+  background:
+    radial-gradient(120% 70% at 0% 0%, rgb(var(--rgb-white) / 0.55), transparent 55%),
+    linear-gradient(160deg, var(--color-sand-50), var(--color-sand-100));
+  color: var(--color-ink);
+  box-shadow:
+    inset 0 1px 0 rgb(var(--rgb-white) / 0.8),
+    var(--shadow-paper);
+}
+
+/* ---------- Vidro: escuro e fosco sobre o fundo cinematográfico ---------- */
+.panel--glass {
+  --text-muted: rgb(var(--rgb-cream) / 0.62);
+  --panel-edge: linear-gradient(
+    160deg,
+    rgb(var(--rgb-cream) / 0.22),
+    rgb(var(--rgb-cream) / 0.03) 42%,
+    rgb(var(--rgb-coral) / 0.3)
+  );
+
+  background:
+    radial-gradient(110% 80% at 100% 0%, rgb(var(--rgb-coral) / 0.1), transparent 55%),
+    linear-gradient(160deg, rgb(var(--rgb-cocoa-600) / 0.78), rgb(var(--rgb-cocoa) / 0.66));
+  color: var(--color-cream);
+  box-shadow:
+    inset 0 1px 0 rgb(var(--rgb-cream) / 0.08),
+    var(--shadow-panel);
+  -webkit-backdrop-filter: blur(18px) saturate(1.15);
+  backdrop-filter: blur(18px) saturate(1.15);
+}

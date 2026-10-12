@@ -1,20 +1,13 @@
-import { useRef } from 'react';
-import useLoginAnimations from '@/application/animation/useLoginAnimations.js';
-import BrandPanel from './components/BrandPanel/BrandPanel.jsx';
+import AuthLayout from '@/presentation/components/AuthLayout/AuthLayout.jsx';
+import BrandPanel from '@/presentation/components/BrandPanel/BrandPanel.jsx';
 import LoginForm from './components/LoginForm/LoginForm.jsx';
-import './LoginPage.css';
+import { BRAND_PANEL } from '@/domain/content/loginContent.js';
 
-/** Tela de login: painel da marca à esquerda e formulário à direita. */
+/** Tela de login: painel da marca de um lado e o formulário do outro. */
 export default function LoginPage() {
-  const rootRef = useRef(null);
-  useLoginAnimations(rootRef);
-
   return (
-    <div ref={rootRef} className="login">
-      <BrandPanel />
-      <main className="login__main">
-        <LoginForm />
-      </main>
-    </div>
+    <AuthLayout panel={<BrandPanel content={BRAND_PANEL} />}>
+      <LoginForm />
+    </AuthLayout>
   );
 }

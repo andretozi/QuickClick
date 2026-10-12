@@ -1,0 +1,67 @@
+/* ==================================================================
+   Bloco: status-pill
+   Tons: --green, --honey, --muted, --coral, --cream · Tamanhos: --sm, --md
+   ================================================================== */
+.status-pill {
+  --pill-rgb: var(--rgb-ink);
+  --pill-dot: rgb(var(--rgb-ink) / 0.35);
+  --pill-fg: rgb(var(--rgb-ink) / 0.7);
+
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px 5px 9px;
+  border-radius: var(--radius-pill);
+  background: rgb(var(--pill-rgb) / 0.1);
+  box-shadow: inset 0 0 0 1px rgb(var(--pill-rgb) / 0.16);
+  color: var(--pill-fg);
+  font-size: 12.5px;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.status-pill--sm {
+  gap: 6px;
+  padding: 3px 9px 3px 7px;
+  font-size: 11.5px;
+}
+
+.status-pill__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--pill-dot);
+  box-shadow: 0 0 0 3px rgb(var(--pill-rgb) / 0.14);
+}
+
+.status-pill--green {
+  --pill-rgb: var(--rgb-green);
+  --pill-dot: var(--color-green);
+  --pill-fg: var(--color-green-dark);
+}
+
+.status-pill--honey {
+  --pill-rgb: var(--rgb-honey);
+  --pill-dot: var(--color-honey);
+  --pill-fg: var(--color-honey-dark);
+}
+
+.status-pill--coral {
+  --pill-rgb: var(--rgb-coral);
+  --pill-dot: var(--color-coral);
+  --pill-fg: var(--color-coral-deep);
+}
+
+/* Sobre fundo escuro */
+.status-pill--cream {
+  --pill-rgb: var(--rgb-cream);
+  --pill-dot: var(--color-honey);
+  --pill-fg: var(--color-cream);
+}
+
+.status-pill--mint {
+  --pill-rgb: var(--rgb-green-light);
+  --pill-dot: var(--color-green-light);
+  --pill-fg: var(--color-green-light);
+}

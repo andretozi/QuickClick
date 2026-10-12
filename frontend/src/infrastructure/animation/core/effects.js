@@ -134,3 +134,37 @@ export function press(element, { scale = 0.955, duration = 300 } = {}) {
     { duration, easing: 'ease-out' }
   );
 }
+
+/**
+ * Número que conta do zero até o valor ao aparecer.
+ * format: 'number' (1.234) ou 'money' (o valor chega em centavos e vira R$).
+ */
+export function countUp(animator, element, { to, from = 0, duration = 1400, delay = 0, format = 'number' } = {}) {
+  if (!element) return;
+  const formatter =
+    format === 'money'
+      ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
+      : new Intl.NumberFormat('pt-BR');
+  const render = (value) => {
+    element.textContent = formatter.format(format === 'money' ? value / 100 : Math.round(value));
+  };
+  const easeOut = (t) => 1 - Math.pow(1 - t, 4);
+
+  render(from);
+  let frame = null;
+  animator.after(delay, () => {
+    const startedAt = performance.now();
+    const tick = (now) => {
+      if (!animator.alive) return;
+      const t = Math.min(1, (now - startedAt) / duration);
+      render(from + (to - from) * easeOut(t));
+      if (t < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+  });
+  animator.onDispose(() => {
+    if (frame !== null) cancelAnimationFrame(frame);
+    render(to);
+  });
+}
+

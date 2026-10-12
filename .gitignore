@@ -26,3 +26,12 @@ backend/data/
 *.log
 .DS_Store
 Thumbs.db
+
+# Contexto e documentação interna (fica só na máquina de quem usa)
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+.mcp.json
+docs/
+*.md
+!/README.md
