@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import useMountedRef from '@/application/ui/useMountedRef.js';
 import useSession from '@/application/session/useSession.js';
 import { dismissWelcome } from '@/application/session/sessionStore.js';
 import { showToast, TOAST_TONES } from '@/application/feedback/toastStore.js';
@@ -42,7 +43,7 @@ export default function useDashboard() {
   const [pendingRemoval, setPendingRemoval] = useState(null);
   const [removing, setRemoving] = useState(false);
   const [hour] = useState(currentHour);
-  const mounted = useRef(true);
+  const mounted = useMountedRef();
 
   const load = useCallback(async () => {
     if (!accountId) return;
@@ -53,14 +54,10 @@ export default function useDashboard() {
     } catch {
       if (mounted.current) setData((current) => ({ ...current, status: 'error' }));
     }
-  }, [accountId]);
+  }, [accountId, mounted]);
 
   useEffect(() => {
-    mounted.current = true;
     load();
-    return () => {
-      mounted.current = false;
-    };
   }, [load]);
 
   const summary = useMemo(() => summarizeListings(data.listings), [data.listings]);
@@ -112,7 +109,7 @@ export default function useDashboard() {
         if (mounted.current) setBusyId(null);
       }
     },
-    [accountId, mercadoLivreConnected, replaceListing]
+    [accountId, mercadoLivreConnected, replaceListing, mounted]
   );
 
   const duplicate = useCallback(
@@ -131,7 +128,7 @@ export default function useDashboard() {
         if (mounted.current) setBusyId(null);
       }
     },
-    [accountId]
+    [accountId, mounted]
   );
 
   const requestRemoval = useCallback((listing) => setPendingRemoval(listing), []);
@@ -156,7 +153,7 @@ export default function useDashboard() {
     } finally {
       if (mounted.current) setRemoving(false);
     }
-  }, [accountId, pendingRemoval]);
+  }, [accountId, pendingRemoval, mounted]);
 
   return {
     account,

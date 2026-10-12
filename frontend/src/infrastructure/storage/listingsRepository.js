@@ -7,7 +7,7 @@
  */
 import { USER_KEYS, newId, nowIso, readJson, simulateLatency, userKey, writeJson } from './localStore.js';
 
-export class ListingNotFoundError extends Error {
+class ListingNotFoundError extends Error {
   constructor() {
     super('anuncio_nao_encontrado');
     this.name = 'ListingNotFoundError';
@@ -35,7 +35,6 @@ const toListing = (anuncio) => ({
   stock: anuncio.estoque,
   photos: anuncio.fotos ?? [],
   coverIndex: anuncio.capa ?? 0,
-  illustration: anuncio.ilustracao ?? null,
   attributes: (anuncio.atributos ?? []).map(({ nome, valor }) => ({ name: nome, value: valor })),
   channels: mapChannels(anuncio.canais, STATUS_TO_FRONT),
   createdAt: anuncio.criado_em,
@@ -54,7 +53,7 @@ function toStoreFields(data) {
   if (data.stock !== undefined) fields.estoque = Number(data.stock);
   if (data.photos !== undefined) fields.fotos = data.photos;
   if (data.coverIndex !== undefined) fields.capa = data.coverIndex;
-  if (data.illustration !== undefined) fields.ilustracao = data.illustration;
+
   if (data.attributes !== undefined) {
     fields.atributos = data.attributes.map(({ name, value }) => ({ nome: name, valor: value }));
   }
@@ -102,7 +101,6 @@ export async function createListing(accountId, data) {
     estoque: 0,
     fotos: [],
     capa: 0,
-    ilustracao: null,
     atributos: [],
     canais: {},
     ...toStoreFields(data),

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import useMountedRef from '@/application/ui/useMountedRef.js';
 import useSession from '@/application/session/useSession.js';
 import { getInsights } from '@/infrastructure/insights/insightsService.js';
 
@@ -10,7 +11,7 @@ export default function useInsights(active) {
   const { account } = useSession();
   const accountId = account?.id;
   const [state, setState] = useState({ status: 'idle', data: null });
-  const mounted = useRef(true);
+  const mounted = useMountedRef();
 
   const load = useCallback(async () => {
     if (!accountId) return;
@@ -21,14 +22,10 @@ export default function useInsights(active) {
     } catch {
       if (mounted.current) setState({ status: 'error', data: null });
     }
-  }, [accountId]);
+  }, [accountId, mounted]);
 
   useEffect(() => {
-    mounted.current = true;
     if (active) load();
-    return () => {
-      mounted.current = false;
-    };
   }, [active, load]);
 
   return { ...state, retry: load };

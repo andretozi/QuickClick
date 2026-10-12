@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
+import useMountedRef from '@/application/ui/useMountedRef.js';
 import { signOut } from './sessionStore.js';
 import { showToast, TOAST_TONES } from '@/application/feedback/toastStore.js';
 import { SESSION_TOASTS } from '@/domain/content/appContent.js';
@@ -10,14 +11,7 @@ import { SESSION_TOASTS } from '@/domain/content/appContent.js';
  */
 export default function useSignOut() {
   const [signingOut, setSigningOut] = useState(false);
-  const mounted = useRef(true);
-
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
+  const mounted = useMountedRef();
 
   const signOutNow = useCallback(async () => {
     setSigningOut(true);
@@ -27,7 +21,7 @@ export default function useSignOut() {
     } finally {
       if (mounted.current) setSigningOut(false);
     }
-  }, []);
+  }, [mounted]);
 
   return { signOut: signOutNow, signingOut };
 }

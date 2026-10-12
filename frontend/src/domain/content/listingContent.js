@@ -2,6 +2,7 @@
  * Textos dos anúncios: categorias, condição e situação.
  * Os textos do assistente "criar anúncio" e da edição ficam em LISTING_WIZARD e LISTING_EDITOR.
  */
+import { plural } from '@/domain/format/format.js';
 
 /** Categorias (o id é o que fica guardado no anúncio). */
 export const LISTING_CATEGORIES = [
@@ -39,7 +40,6 @@ export const LISTING_STATUS_LABELS = {
   unpublished: { label: 'Não publicado', tone: 'muted' }
 };
 
-const plural = (count, one, many) => (count === 1 ? one : many);
 
 /** Assistente "criar anúncio" (#/anuncios/novo) e a edição (#/anuncios/:id). */
 export const LISTING_WIZARD = {
@@ -48,7 +48,7 @@ export const LISTING_WIZARD = {
   lead: 'Cinco passos curtos. A gente salva o rascunho sozinho enquanto você preenche.',
   draftSaved: (time) => `Rascunho salvo às ${time}`,
   draftRestored: { title: 'Seu rascunho voltou.', text: 'Continuamos de onde você parou.' },
-  discardDraft: 'Começar do zero',
+
   steps: {
     label: 'Passos do anúncio',
     items: {
@@ -83,7 +83,7 @@ export const LISTING_WIZARD = {
     cover: 'Capa',
     makeCover: 'Usar como capa',
     makeCoverLabel: (index) => `Usar a foto ${index} como capa`,
-    remove: 'Remover',
+
     removeLabel: (index) => `Remover a foto ${index}`,
     photoAlt: (index) => `Foto ${index} do produto`,
     count: (count, max) => `${count} de ${max} ${plural(max, 'foto', 'fotos')}`,

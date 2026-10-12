@@ -5,7 +5,7 @@
  * Os nomes, preços e recursos de cada plano ficam em domain/content/landingContent.js (PLANS).
  */
 
-export const PLAN_IDS = { FREE: 'gratis', ESSENTIAL: 'essencial', PRO: 'pro', BUSINESS: 'business' };
+const PLAN_IDS = { FREE: 'gratis', ESSENTIAL: 'essencial', PRO: 'pro', BUSINESS: 'business' };
 
 /** null = vários marketplaces */
 const MARKETPLACE_LIMIT = {
@@ -15,10 +15,7 @@ const MARKETPLACE_LIMIT = {
   [PLAN_IDS.BUSINESS]: null
 };
 
-/** Plano indicado para quem quer conectar mais de um marketplace. */
-export const MULTICHANNEL_PLAN = PLAN_IDS.PRO;
-
-export function marketplaceLimit(planId) {
+function marketplaceLimit(planId) {
   return planId in MARKETPLACE_LIMIT ? MARKETPLACE_LIMIT[planId] : 1;
 }
 

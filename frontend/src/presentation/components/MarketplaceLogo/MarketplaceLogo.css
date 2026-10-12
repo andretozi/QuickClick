@@ -97,6 +97,45 @@
   min-width: var(--logo-h);
 }
 
+.marketplace-logo__monogram {
+  --mark-size: 48px;
+
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--mark-size);
+  height: var(--mark-size);
+  border-radius: calc(var(--mark-size) * 0.3);
+  background: var(--color-coral);
+  color: var(--color-white);
+  font-family: var(--font-display);
+  font-size: calc(var(--mark-size) * 0.4);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  box-shadow:
+    inset 0 1px 0 rgb(var(--rgb-white) / 0.22),
+    0 10px 22px -12px rgb(var(--rgb-black) / 0.55);
+}
+
+.marketplace-logo--xs .marketplace-logo__monogram,
+.marketplace-logo--sm .marketplace-logo__monogram {
+  --mark-size: 22px;
+}
+
+.marketplace-logo--md .marketplace-logo__monogram {
+  --mark-size: 30px;
+}
+
+.marketplace-logo--xl .marketplace-logo__monogram {
+  --mark-size: 64px;
+}
+
+.marketplace-logo--hero .marketplace-logo__monogram {
+  --mark-size: clamp(110px, 16vw, 220px);
+}
+
 .marketplace-logo__name {
   color: var(--color-ink);
   font-family: var(--font-body);

@@ -46,12 +46,12 @@ export default function App() {
     const Page = APP_PAGES[location.route];
     content = (
       <AppShell current={location.route}>
-        <Page key={location.path} params={location.params} query={location.query} />
+        <Page key={location.path} params={location.params} />
       </AppShell>
     );
   } else if (access === ACCESS.ALLOWED) {
     const Page = PAGES[location.route] ?? NotFoundPage;
-    content = <Page key={location.path} params={location.params} query={location.query} />;
+    content = <Page key={location.path} params={location.params} />;
   }
 
   return (

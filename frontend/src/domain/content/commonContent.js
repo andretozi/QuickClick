@@ -57,9 +57,5 @@ export const STORAGE_ERRORS = {
   full: {
     title: 'O espaço do navegador acabou',
     text: 'As fotos ocupam bastante espaço. Remova uma foto ou apague anúncios antigos e tente de novo.'
-  },
-  generic: {
-    title: 'Não deu pra salvar agora',
-    text: 'Tente de novo em instantes.'
   }
 };

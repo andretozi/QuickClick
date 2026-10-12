@@ -21,7 +21,6 @@ export const LISTING_STATUS = {
   UNPUBLISHED: 'unpublished'
 };
 
-export const LISTING_CONDITION = { NEW: 'new', USED: 'used' };
 
 /** Canal principal do produto hoje. */
 export const PRIMARY_CHANNEL = 'mercado-livre';
@@ -31,8 +30,14 @@ export function listingStatus(listing) {
   return listing?.channels?.[PRIMARY_CHANNEL] ?? LISTING_STATUS.UNPUBLISHED;
 }
 
-export function isActive(listing) {
+function isActive(listing) {
   return listingStatus(listing) === LISTING_STATUS.PUBLISHED;
+}
+
+/** Foto de capa de um anúncio ou rascunho (a primeira, se a capa escolhida não existir mais). */
+export function coverPhoto(item) {
+  const photos = item?.photos ?? [];
+  return photos[item?.coverIndex ?? 0] ?? photos[0];
 }
 
 /** Etapas do assistente "criar anúncio", na ordem. */
@@ -69,7 +74,7 @@ export function validateListingStep(step, draft) {
 }
 
 /** Valor parado no estoque de um anúncio, em centavos. */
-export function stockValueCents(listing) {
+function stockValueCents(listing) {
   return (Number(listing.priceCents) || 0) * (Number(listing.stock) || 0);
 }
 
@@ -98,7 +103,6 @@ export function filterListings(listings, { query = '', status = 'all' } = {}) {
   );
 }
 
-export const LISTING_SORTS = ['recent', 'price-desc', 'price-asc', 'stock-desc', 'title'];
 
 export function sortListings(listings, sort = 'recent') {
   const sorted = [...listings];

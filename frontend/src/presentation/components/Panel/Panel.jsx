@@ -8,10 +8,10 @@ import './Panel.css';
  * - tone 'glass': vidro escuro fosco sobre o fundo cinematográfico (números e gráficos)
  * Props extras (data-enter, aria-labelledby...) vão para o elemento.
  */
-export default function Panel({ as: Tag = 'section', tone = 'paper', className, children, ...rest }) {
+export default function Panel({ tone = 'paper', className, children, ...rest }) {
   return (
-    <Tag className={cx('panel', `panel--${tone}`, className)} {...rest}>
+    <section className={cx('panel', `panel--${tone}`, className)} {...rest}>
       {children}
-    </Tag>
+    </section>
   );
 }

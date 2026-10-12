@@ -16,9 +16,9 @@ const EXIT_MS = 260;
  * - Esc, o X e o clique no fundo fecham (menos quando `dismissible` é false).
  * - O foco entra no [data-autofocus] (ou no primeiro botão), fica preso e volta ao fechar.
  *
- * Props: open, onClose, title, description, icon, iconTone ('coral' | 'green' | 'honey' | 'danger'),
+ * Props: open, onClose, title, description, icon, iconTone ('coral' | 'honey' | 'danger'),
  * media (algo acima do título, no lugar do ícone: um logo, uma ilustração),
- * size ('sm' | 'md' | 'lg'), dismissible, actions (botões no rodapé), className, children.
+ * size ('sm' | 'md'), dismissible, actions (botões no rodapé), className, children.
  */
 export default function Modal({ open, ...props }) {
   const { mounted, closing } = usePresence(open, EXIT_MS);

@@ -4,6 +4,7 @@ import MarketplaceLogo from '@/presentation/components/MarketplaceLogo/Marketpla
 import StatusPill from '@/presentation/components/StatusPill/StatusPill.jsx';
 import Toggle from '@/presentation/components/Toggle/Toggle.jsx';
 import { formatMoney } from '@/domain/format/format.js';
+import { coverPhoto } from '@/domain/listings/listingRules.js';
 import { MARKETPLACE_CATALOG } from '@/domain/content/marketplacesContent.js';
 import { LISTING_WIZARD } from '@/domain/content/listingContent.js';
 import './ChannelsStep.css';
@@ -67,7 +68,7 @@ export default function ChannelsStep({ editor }) {
 
         <ListingPreview
           className="channels-step__preview"
-          photo={draft.photos[draft.coverIndex]}
+          photo={coverPhoto(draft)}
           title={draft.title}
           price={priceCents !== null ? formatMoney(priceCents) : ''}
           condition={draft.condition === 'used' ? texts.previewUsed : texts.previewNew}

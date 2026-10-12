@@ -25,7 +25,7 @@ export function rememberFocus() {
 }
 
 /** Elementos que recebem foco pelo Tab, na ordem da página. */
-export function focusableIn(container) {
+function focusableIn(container) {
   if (!container) return [];
   return Array.from(container.querySelectorAll(FOCUSABLE)).filter(
     (element) => !element.hasAttribute('inert') && element.getClientRects().length > 0
@@ -71,7 +71,7 @@ export function makeAppInert() {
 }
 
 /** Itens de um menu ([data-menu-item]), na ordem da tela. */
-export function menuItems(container) {
+function menuItems(container) {
   if (!container) return [];
   return Array.from(container.querySelectorAll('[data-menu-item]')).filter(
     (element) => element.getClientRects().length > 0

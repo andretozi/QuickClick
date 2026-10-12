@@ -48,10 +48,6 @@
   width: min(100%, 400px);
 }
 
-.modal__panel--lg {
-  width: min(100%, 560px);
-  text-align: left;
-}
 
 .modal__close {
   position: absolute;
@@ -94,10 +90,6 @@
   color: var(--color-coral);
 }
 
-.modal__icon--green {
-  background: rgb(var(--rgb-green) / 0.14);
-  color: var(--color-green-dark);
-}
 
 .modal__icon--honey {
   background: rgb(var(--rgb-honey) / 0.18);

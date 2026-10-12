@@ -15,12 +15,12 @@ const SOON_SHOWN = 3;
  * não publicado) e, apagados, os marketplaces que ainda vão chegar.
  * - status: situação no canal principal ('published' | 'paused' | 'unpublished')
  */
-export default function ListingChannels({ status, compact = false, className }) {
+export default function ListingChannels({ status, className }) {
   const statusInfo = LISTING_STATUS_LABELS[status] ?? LISTING_STATUS_LABELS.unpublished;
   const hidden = SOON.slice(SOON_SHOWN);
 
   return (
-    <div className={cx('listing-channels', compact && 'listing-channels--compact', className)}>
+    <div className={cx('listing-channels', className)}>
       {AVAILABLE.map((marketplace) => (
         <span key={marketplace.slug} className="listing-channels__main">
           <span className="listing-channels__logo">

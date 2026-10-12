@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import useMountedRef from '@/application/ui/useMountedRef.js';
 import useForm from '@/application/ui/useForm.js';
 import useSession from '@/application/session/useSession.js';
 import { forgetSession, setSessionAccount } from '@/application/session/sessionStore.js';
@@ -50,14 +51,7 @@ export default function useSettings() {
   const { account } = useSession();
   const accountId = account?.id;
   const [section, setSection] = useState(SETTINGS_SECTIONS[0]);
-  const mounted = useRef(true);
-
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
+  const mounted = useMountedRef();
 
   const failed = () => showToast({ tone: TOAST_TONES.ERROR, ...SETTINGS.errorToast });
 
@@ -111,7 +105,7 @@ export default function useSettings() {
         if (mounted.current) setSavingProfile(false);
       }
     },
-    [accountId, profile, savingProfile]
+    [accountId, profile, savingProfile, mounted]
   );
 
   /** A cor do avatar já aparece na navbar enquanto o vendedor escolhe (só fica se ele salvar). */
@@ -146,7 +140,7 @@ export default function useSettings() {
         if (mounted.current) setSavingPassword(false);
       }
     },
-    [accountId, savingPassword, security]
+    [accountId, savingPassword, security, mounted]
   );
 
   // ---------- Preferências ----------
@@ -157,7 +151,7 @@ export default function useSettings() {
     getPreferences(accountId).then((value) => {
       if (mounted.current) setPreferences(value);
     });
-  }, [accountId]);
+  }, [accountId, mounted]);
 
   const togglePreference = useCallback(
     async (name, checked) => {
@@ -170,7 +164,7 @@ export default function useSettings() {
         if (mounted.current) failed();
       }
     },
-    [accountId, preferences]
+    [accountId, preferences, mounted]
   );
 
   // ---------- Zona de risco ----------
@@ -205,7 +199,7 @@ export default function useSettings() {
         } else failed();
       }
     },
-    [accountId, danger, deleting]
+    [accountId, danger, deleting, mounted]
   );
 
   return {

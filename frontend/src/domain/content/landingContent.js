@@ -1,7 +1,7 @@
 /**
  * Todo o texto da landing em um só lugar.
  * Para mudar uma frase, mude aqui: os componentes só desenham.
- * Regra de escrita dos textos de tela: sem traço e sem barra (veja o CLAUDE.md).
+ * Regra de escrita dos textos de tela: sem traço e sem barra (veja docs/arquitetura.md).
  */
 
 export const NAV = {
@@ -174,7 +174,7 @@ export const FINAL_CTA = {
 
 export const FOOTER = {
   tagline: 'Clicou, vendeu. Automação de vendas multicanal com IA pra pequenos e grandes vendedores.',
-  copyright: '© 2026 Quick Click · Protótipo'
+  copyright: '© 2026 Quick Click · MVP'
 };
 
 /* ---------- Dados fictícios das cenas animadas ---------- */

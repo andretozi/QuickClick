@@ -1,6 +1,6 @@
 /* ==================================================================
    Bloco: toggle (interruptor)
-   Tons: --paper, --glass · Estado: --disabled · Interruptor: --on
+   Estado: --disabled · Interruptor: --on
    ================================================================== */
 .toggle {
   --toggle-text: var(--color-ink);
@@ -13,11 +13,6 @@
   gap: 16px;
 }
 
-.toggle--glass {
-  --toggle-text: var(--color-cream);
-  --toggle-muted: rgb(var(--rgb-cream) / 0.6);
-  --toggle-off: rgb(var(--rgb-cream) / 0.18);
-}
 
 .toggle--disabled {
   opacity: 0.55;

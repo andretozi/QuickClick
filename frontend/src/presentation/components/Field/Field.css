@@ -54,11 +54,6 @@
   padding-left: 44px;
 }
 
-.field__input--compact {
-  padding-top: 11px;
-  padding-bottom: 11px;
-  font-size: 14.5px;
-}
 
 .field__textarea {
   min-height: 132px;

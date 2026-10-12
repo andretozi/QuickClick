@@ -5,7 +5,7 @@ import SelectField from '@/presentation/components/Field/SelectField.jsx';
 import TextAreaField from '@/presentation/components/Field/TextAreaField.jsx';
 import TextField from '@/presentation/components/Field/TextField.jsx';
 import { cx } from '@/presentation/utils/cx.js';
-import { LISTING_LIMITS } from '@/domain/listings/listingRules.js';
+import { LISTING_LIMITS, coverPhoto } from '@/domain/listings/listingRules.js';
 import { LISTING_CATEGORIES, LISTING_CONDITIONS, LISTING_WIZARD } from '@/domain/content/listingContent.js';
 import { FIELD_ERRORS } from '@/domain/content/commonContent.js';
 import './DetailsStep.css';
@@ -43,7 +43,7 @@ export default function DetailsStep({ editor }) {
       {working && (
         <div className="details-step__scan" role="status" aria-live="polite">
           <span className="details-step__scan-photo" aria-hidden="true">
-            {draft.photos[draft.coverIndex] && <img src={draft.photos[draft.coverIndex]} alt="" />}
+            {coverPhoto(draft) && <img src={coverPhoto(draft)} alt="" />}
             <span data-shimmer className="details-step__scan-beam" />
           </span>
           <ol className="details-step__scan-steps">

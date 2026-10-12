@@ -6,12 +6,11 @@ import './Toggle.css';
  * Interruptor (role="switch") com o botão andando com mola.
  * - checked, onChange(next)
  * - label: o que ele liga; description: uma linha explicando (ligada pelo aria-describedby)
- * - tone: 'paper' (fundo claro) | 'glass' (fundo escuro)
  */
-export default function Toggle({ checked, onChange, label, description, disabled = false, tone = 'paper', name, className }) {
+export default function Toggle({ checked, onChange, label, description, disabled = false, name, className }) {
   const id = useId();
   return (
-    <div className={cx('toggle', `toggle--${tone}`, disabled && 'toggle--disabled', className)}>
+    <div className={cx('toggle', disabled && 'toggle--disabled', className)}>
       <span className="toggle__text">
         <label htmlFor={id} className="toggle__label">
           {label}

@@ -5,7 +5,6 @@
 import { PLANS } from './landingContent.js';
 
 export const APP_NAV = {
-  ariaLabel: 'Principal',
   brandHref: '#/painel',
   dashboard: { label: 'Painel', href: '#/painel' },
   newListing: { label: 'Criar anúncio', href: '#/anuncios/novo' },

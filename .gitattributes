@@ -1,0 +1,14 @@
+# Quebras de linha: o repositório e a cópia de trabalho usam LF, em qualquer sistema.
+* text=auto eol=lf
+
+# Binários: nunca convertidos
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.sqlite3 binary

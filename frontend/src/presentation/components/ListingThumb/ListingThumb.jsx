@@ -1,23 +1,17 @@
-import ListingArt from '@/presentation/components/ListingArt/ListingArt.jsx';
 import { cx } from '@/presentation/utils/cx.js';
+import { coverPhoto } from '@/domain/listings/listingRules.js';
 import './ListingThumb.css';
 
 /**
- * Miniatura de um anúncio: a foto de capa ou, nos anúncios de demonstração,
- * o desenho em SVG. Decorativa (o título do anúncio fica ao lado).
- * size: 'sm' | 'md' | 'lg' | 'fill'
+ * Miniatura de um anúncio: a foto de capa (todo anúncio tem foto; sem ela, fica só o fundo).
+ * Decorativa: o título do anúncio fica ao lado.
  */
-export default function ListingThumb({ listing, size = 'md', className }) {
-  const photos = listing.photos ?? [];
-  const photo = photos[listing.coverIndex ?? 0] ?? photos[0];
+export default function ListingThumb({ listing, className }) {
+  const photo = coverPhoto(listing);
 
   return (
-    <span className={cx('listing-thumb', `listing-thumb--${size}`, className)}>
-      {photo ? (
-        <img className="listing-thumb__image" src={photo} alt="" />
-      ) : (
-        <ListingArt kind={listing.illustration} />
-      )}
+    <span className={cx('listing-thumb', className)}>
+      {photo && <img className="listing-thumb__image" src={photo} alt="" />}
     </span>
   );
 }

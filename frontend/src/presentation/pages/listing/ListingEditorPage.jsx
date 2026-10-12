@@ -6,6 +6,7 @@ import PageHeader from '@/presentation/components/PageHeader/PageHeader.jsx';
 import Panel from '@/presentation/components/Panel/Panel.jsx';
 import ParticleBurst from '@/presentation/components/ParticleBurst/ParticleBurst.jsx';
 import Stepper from '@/presentation/components/Stepper/Stepper.jsx';
+import StatusPanel from '@/presentation/components/StatusPanel/StatusPanel.jsx';
 import PhotosStep from './components/PhotosStep/PhotosStep.jsx';
 import DetailsStep from './components/DetailsStep/DetailsStep.jsx';
 import PriceStep from './components/PriceStep/PriceStep.jsx';
@@ -17,6 +18,7 @@ import useCelebration from '@/application/animation/useCelebration.js';
 import { cx } from '@/presentation/utils/cx.js';
 import { LISTING_EDITOR, LISTING_WIZARD } from '@/domain/content/listingContent.js';
 import { STORAGE_ERRORS } from '@/domain/content/commonContent.js';
+import { coverPhoto } from '@/domain/listings/listingRules.js';
 import './ListingEditorPage.css';
 
 const STEP_VIEWS = {
@@ -69,12 +71,7 @@ export default function ListingEditorPage({ params }) {
         }
       />
 
-      {status === 'loading' && (
-        <Panel tone="glass" className="listing-editor__status" role="status">
-          <span data-spin className="listing-editor__spinner" aria-hidden="true" />
-          {LISTING_EDITOR.loading}
-        </Panel>
-      )}
+      {status === 'loading' && <StatusPanel text={LISTING_EDITOR.loading} />}
 
       {status === 'not-found' && (
         <Panel tone="glass" data-enter="2">
@@ -87,7 +84,7 @@ export default function ListingEditorPage({ params }) {
       {status === 'ready' && result && (
         <PublishSuccess
           published={result.published}
-          photo={editor.draft.photos[editor.draft.coverIndex]}
+          photo={coverPhoto(editor.draft)}
           onAnother={editor.restart}
         />
       )}

@@ -107,7 +107,7 @@ export function parseHash(hash) {
 }
 
 /** Monta o endereço de uma página com parâmetros: hrefFor(ROUTES.LISTING, { id }) → "#/anuncios/a_k3f9". */
-export function hrefFor(route, params = {}) {
+function hrefFor(route, params = {}) {
   const definition = definitionOf(route);
   if (!definition) return ROUTE_HASH[ROUTES.LANDING];
   const path = definition.path.replace(/:(\w+)/g, (_, name) => encodeURIComponent(params[name] ?? ''));

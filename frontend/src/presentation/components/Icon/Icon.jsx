@@ -82,7 +82,7 @@ const ICONS = {
     )
   },
   'chevron-down': { strokeWidth: 2.2, body: <path d="M6 9l6 6 6-6" /> },
-  'chevron-right': { strokeWidth: 2.2, body: <path d="M9 6l6 6-6 6" /> },
+
   'arrow-left': { strokeWidth: 2.4, body: <path d="M19 12H5M11 6l-6 6 6 6" /> },
   search: {
     body: (
@@ -144,15 +144,7 @@ const ICONS = {
       </>
     )
   },
-  store: {
-    body: (
-      <>
-        <path d="M4.5 10.5V19a1 1 0 001 1h13a1 1 0 001-1v-8.5" />
-        <path d="M3 7l2-3h14l2 3v1a2.7 2.7 0 01-5.3.6 2.7 2.7 0 01-5.4 0A2.7 2.7 0 013 8V7z" />
-        <path d="M10 20v-4.5h4V20" />
-      </>
-    )
-  },
+
   upload: {
     body: (
       <>
@@ -224,14 +216,7 @@ const ICONS = {
       </>
     )
   },
-  tag: {
-    body: (
-      <>
-        <path d="M3.5 12.2V4.5a1 1 0 011-1h7.7l8.3 8.3a1.5 1.5 0 010 2.1l-6.2 6.2a1.5 1.5 0 01-2.1 0l-8.7-7.9z" />
-        <circle cx="8" cy="8" r="1.4" />
-      </>
-    )
-  },
+
   shield: { body: <path d="M12 3l7 3v5.5c0 4.3-3 7.8-7 9.5-4-1.7-7-5.2-7-9.5V6l7-3z" /> },
   link: {
     body: (
@@ -257,16 +242,7 @@ const ICONS = {
       </>
     )
   },
-  cart: {
-    body: (
-      <>
-        <path d="M3.5 5h2.2l2 10.2h10.4L20 8H6.6" />
-        <circle cx="10" cy="19" r="1.4" />
-        <circle cx="17" cy="19" r="1.4" />
-      </>
-    )
-  },
-  menu: { body: <path d="M4 7h16M4 12h16M4 17h16" /> },
+
 
   /* ---------- Ícones preenchidos ---------- */
   sparkle: {
@@ -282,16 +258,7 @@ const ICONS = {
       </>
     )
   },
-  more: {
-    filled: true,
-    body: (
-      <>
-        <circle cx="5.5" cy="12" r="1.9" />
-        <circle cx="12" cy="12" r="1.9" />
-        <circle cx="18.5" cy="12" r="1.9" />
-      </>
-    )
-  },
+
   'star-filled': {
     filled: true,
     body: <path d="M12 3.6l2.6 5.2 5.7.8-4.1 4 1 5.7-5.2-2.7-5.2 2.7 1-5.7-4.1-4 5.7-.8L12 3.6z" />

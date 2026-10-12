@@ -1,6 +1,5 @@
 /** Todo o texto do painel (#/painel): topo, números, anúncios e boas vindas. */
-
-const plural = (count, one, many) => (count === 1 ? one : many);
+import { plural } from '@/domain/format/format.js';
 
 /** Saudação pelo horário do aparelho. */
 function greetingWord(hour) {
@@ -11,8 +10,7 @@ function greetingWord(hour) {
 
 export const DASHBOARD = {
   greeting: (hour, firstName) => `${greetingWord(hour)}, ${firstName}`,
-  /** Linha embaixo da saudação: "Ateliê da Marina · Plano Grátis" */
-  storeLine: 'Sua loja',
+
   lead: 'Seus anúncios, seu estoque e o que está vendendo, tudo num lugar só.',
   plan: (name) => `Plano ${name}`,
   connected: (count) =>
@@ -69,11 +67,7 @@ export const LISTINGS_PANEL = {
   listLabel: 'Lista de anúncios',
   stock: (units) => (units === 0 ? 'Sem estoque' : `${units} em estoque`),
   updated: (relative) => `Atualizado ${relative}`,
-  photoAlt: (title) => `Foto de ${title}`,
-  channels: 'Canais',
-  channelStatus: (name, status) => `${name}: ${status}`,
-  channelSoon: (name) => `${name}: em breve`,
-  columns: { listing: 'Anúncio', price: 'Preço', stock: 'Estoque', channels: 'Canais', actions: 'Ações' },
+
   soon: {
     more: (count) => `+${count}`,
     label: (names) => `${names} chegam em breve`
@@ -103,7 +97,6 @@ export const LISTINGS_PANEL = {
   loading: 'Carregando seus anúncios…',
   loadError: {
     title: 'Não deu pra carregar os anúncios.',
-    text: 'Tente de novo em instantes.',
     retry: 'Tentar de novo'
   },
   confirmDelete: {

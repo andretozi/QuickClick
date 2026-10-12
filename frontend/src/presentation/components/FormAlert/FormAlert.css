@@ -1,6 +1,6 @@
 /* ==================================================================
    Bloco: form-alert
-   Tons: --error, --info, --success
+   Tom: --error
    ================================================================== */
 .form-alert {
   --alert-rgb: var(--rgb-coral-deep);
@@ -15,15 +15,6 @@
   color: var(--color-ink);
 }
 
-.form-alert--info {
-  --alert-rgb: var(--rgb-honey-dark);
-  --alert-fg: var(--color-honey-dark);
-}
-
-.form-alert--success {
-  --alert-rgb: var(--rgb-green);
-  --alert-fg: var(--color-green-dark);
-}
 
 .form-alert__icon {
   display: flex;

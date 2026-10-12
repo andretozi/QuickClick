@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import useForm from '@/application/ui/useForm.js';
+import useMountedRef from '@/application/ui/useMountedRef.js';
+import { announceTermsSoon, formErrorFor } from '@/application/auth/authForm.js';
 import { signIn } from '@/application/session/sessionStore.js';
 import { showToast, TOAST_TONES } from '@/application/feedback/toastStore.js';
 import { ACCOUNT_ERRORS, describeAuthError } from '@/infrastructure/auth/authService.js';
@@ -13,10 +15,6 @@ const validateLogin = (values) => ({
   password: required(values.password)
 });
 
-/** Código do erro do formulário inteiro (o texto fica em LOGIN_FORM.errors). */
-function formErrorFor(code) {
-  return code === 'armazenamento_cheio' ? 'storage' : 'unknown';
-}
 
 /**
  * Aplicação · Caso de uso "entrar na conta".
@@ -28,14 +26,7 @@ export default function useLoginForm() {
   const form = useForm(EMPTY_CREDENTIALS, validateLogin);
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState(null);
-  const mounted = useRef(true);
-
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
+  const mounted = useMountedRef();
 
   const { check, values, setFieldError } = form;
 
@@ -54,7 +45,7 @@ export default function useLoginForm() {
         else setFormError(formErrorFor(code));
       }
     },
-    [setFieldError]
+    [setFieldError, mounted]
   );
 
   const handleSubmit = useCallback(
@@ -76,10 +67,6 @@ export default function useLoginForm() {
     showToast({ tone: TOAST_TONES.INFO, ...LOGIN_SOON.forgot });
   }, []);
 
-  /** Termos e privacidade ainda não têm página. */
-  const announceTermsSoon = useCallback(() => {
-    showToast({ tone: TOAST_TONES.INFO, ...LOGIN_SOON.terms });
-  }, []);
 
   return {
     values: form.values,

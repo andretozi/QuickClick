@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import useMountedRef from '@/application/ui/useMountedRef.js';
 import useSession from '@/application/session/useSession.js';
 import { showToast, TOAST_TONES } from '@/application/feedback/toastStore.js';
 import {
@@ -49,7 +50,7 @@ export default function useMarketplaces() {
   const [pendingDisconnect, setPendingDisconnect] = useState(null);
   const [disconnecting, setDisconnecting] = useState(false);
   const [sync, setSync] = useState(null); // { slug, progress }
-  const mounted = useRef(true);
+  const mounted = useMountedRef();
 
   const load = useCallback(async () => {
     if (!accountId) return;
@@ -62,14 +63,10 @@ export default function useMarketplaces() {
     } catch {
       if (mounted.current) setStatus('error');
     }
-  }, [accountId]);
+  }, [accountId, mounted]);
 
   useEffect(() => {
-    mounted.current = true;
     load();
-    return () => {
-      mounted.current = false;
-    };
   }, [load]);
 
   const marketplaces = MARKETPLACE_CATALOG.map((marketplace) => ({
@@ -112,7 +109,7 @@ export default function useMarketplaces() {
       const limit = error instanceof ConnectionError && error.code === CONNECTION_ERRORS.PLAN_LIMIT;
       setDialog({ slug, step: limit ? CONNECT_STEPS.LIMIT : CONNECT_STEPS.ERROR });
     }
-  }, [accountId, busyDialog, dialog]);
+  }, [accountId, busyDialog, dialog, mounted]);
 
   // ---------- Sincronizar ----------
   const syncNow = useCallback(
@@ -144,7 +141,7 @@ export default function useMarketplaces() {
         if (mounted.current) setSync(null);
       }
     },
-    [accountId, load, sync]
+    [accountId, load, sync, mounted]
   );
 
   // ---------- Desconectar ----------
@@ -171,7 +168,7 @@ export default function useMarketplaces() {
     } finally {
       if (mounted.current) setDisconnecting(false);
     }
-  }, [accountId, pendingDisconnect]);
+  }, [accountId, pendingDisconnect, mounted]);
 
   return {
     status,

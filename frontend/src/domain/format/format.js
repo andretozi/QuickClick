@@ -5,21 +5,11 @@
  */
 
 const MONEY = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
-const MONEY_ROUND = new Intl.NumberFormat('pt-BR', {
-  style: 'currency',
-  currency: 'BRL',
-  maximumFractionDigits: 0
-});
 const NUMBER = new Intl.NumberFormat('pt-BR');
 const DATE_LONG = new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
 const DATE_SHORT = new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short' });
+const TIME = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' });
 const RELATIVE = new Intl.RelativeTimeFormat('pt-BR', { numeric: 'auto' });
-const LIST = new Intl.ListFormat('pt-BR', { style: 'long', type: 'conjunction' });
-
-/** ["Shopee", "Amazon", "Magalu"] → "Shopee, Amazon e Magalu" */
-export function formatList(items) {
-  return LIST.format(items);
-}
 
 const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
@@ -30,10 +20,6 @@ export function formatMoney(cents) {
   return MONEY.format((Number(cents) || 0) / 100);
 }
 
-/** 18990 → "R$ 190" (eixos de gráfico, números grandes) */
-export function formatMoneyRound(cents) {
-  return MONEY_ROUND.format((Number(cents) || 0) / 100);
-}
 
 /** 1234 → "1.234" */
 export function formatNumber(value) {
@@ -50,6 +36,11 @@ export function formatShortDate(dateOrIso) {
   return dateOrIso ? DATE_SHORT.format(new Date(dateOrIso)) : '';
 }
 
+/** Hora e minuto do relógio: 14h05 → "14:05". */
+export function formatTime(date) {
+  return TIME.format(date);
+}
+
 /** Quanto tempo passou: "agora", "há 5 minutos", "ontem", "há 3 dias"... */
 export function formatRelative(iso, now = Date.now()) {
   if (!iso) return '';
@@ -63,11 +54,6 @@ export function formatRelative(iso, now = Date.now()) {
   return RELATIVE.format(Math.round(diff / (365 * DAY)), 'year');
 }
 
-/** Dias inteiros entre a data e agora. */
-export function daysSince(iso, now = Date.now()) {
-  if (!iso) return 0;
-  return Math.max(0, Math.floor((now - new Date(iso).getTime()) / DAY));
-}
 
 /** "Ana Oliveira" → "AO"; "Ana" → "A" */
 export function initials(name) {
@@ -79,6 +65,11 @@ export function initials(name) {
   const first = words[0][0];
   const last = words.length > 1 ? words[words.length - 1][0] : '';
   return `${first}${last}`.toUpperCase();
+}
+
+/** Singular ou plural pela quantidade: plural(1, 'foto', 'fotos') → "foto". */
+export function plural(count, one, many) {
+  return count === 1 ? one : many;
 }
 
 /** "Ana Oliveira" → "Ana" */

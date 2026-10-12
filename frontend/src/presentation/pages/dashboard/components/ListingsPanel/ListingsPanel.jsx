@@ -4,6 +4,7 @@ import Icon from '@/presentation/components/Icon/Icon.jsx';
 import Panel from '@/presentation/components/Panel/Panel.jsx';
 import SelectField from '@/presentation/components/Field/SelectField.jsx';
 import TextField from '@/presentation/components/Field/TextField.jsx';
+import StatusPanel from '@/presentation/components/StatusPanel/StatusPanel.jsx';
 import ListingRow from '../ListingRow/ListingRow.jsx';
 import { LISTINGS_PANEL } from '@/domain/content/dashboardContent.js';
 import './ListingsPanel.css';
@@ -16,24 +17,10 @@ export default function ListingsPanel({ dashboard }) {
   const { status, listings, visibleListings, filters, setFilter, clearFilters, busyId, mercadoLivreConnected } = dashboard;
   const { title, count, search, filter, sort, listLabel, empty, noResults, loading, loadError } = LISTINGS_PANEL;
 
-  if (status === 'loading') {
-    return (
-      <Panel tone="glass" className="listings-panel__status" role="status">
-        <span data-spin className="listings-panel__spinner" aria-hidden="true" />
-        {loading}
-      </Panel>
-    );
-  }
+  if (status === 'loading') return <StatusPanel text={loading} size="sm" />;
 
   if (status === 'error') {
-    return (
-      <Panel tone="glass" className="listings-panel__status" role="alert">
-        <p className="listings-panel__status-title">{loadError.title}</p>
-        <Button size="sm" variant="light" onClick={dashboard.retry}>
-          {loadError.retry}
-        </Button>
-      </Panel>
-    );
+    return <StatusPanel status="error" text={loadError.title} retryLabel={loadError.retry} onRetry={dashboard.retry} size="sm" />;
   }
 
   if (listings.length === 0) {

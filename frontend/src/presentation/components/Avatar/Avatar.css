@@ -28,9 +28,6 @@
   user-select: none;
 }
 
-.avatar--sm {
-  --avatar-size: 32px;
-}
 
 .avatar--lg {
   --avatar-size: 56px;

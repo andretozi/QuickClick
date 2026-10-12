@@ -6,6 +6,7 @@ import useMenu from '@/application/ui/useMenu.js';
 import usePresence from '@/application/ui/usePresence.js';
 import { useMenuAnimation } from '@/application/animation/useOverlayAnimation.js';
 import { cx } from '@/presentation/utils/cx.js';
+import { firstName } from '@/domain/format/format.js';
 import { USER_MENU, planName } from '@/domain/content/appContent.js';
 import './UserMenu.css';
 
@@ -91,7 +92,7 @@ export default function UserMenu({ account, tone = 'light', onSignOut, signingOu
       >
         <Avatar name={account.name} color={account.avatarColor} size="md" />
         <span className="user-menu__first-name" aria-hidden="true">
-          {account.name.split(' ')[0]}
+          {firstName(account.name)}
         </span>
         <Icon name="chevron-down" size={16} className="user-menu__chevron" />
       </button>

@@ -33,7 +33,7 @@ export const SIGNUP_FORM = {
     end: '.'
   },
   errors: {
-    emailTaken: 'Esse email já tem conta. Que tal entrar?',
+
     storage: {
       title: 'O navegador não deixou criar a conta.',
       text: 'O espaço do site acabou. Libere espaço nas configurações do navegador e tente de novo.'

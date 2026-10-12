@@ -71,7 +71,7 @@ export async function signUp(data) {
 
 export async function signOut() {
   await signOutRequest();
-  setState({ status: SESSION_STATUS.GUEST, account: null, welcome: false, signedOut: true });
+  forgetSession();
 }
 
 /** Depois de excluir a conta: a sessão some junto, sem chamar o servidor. */

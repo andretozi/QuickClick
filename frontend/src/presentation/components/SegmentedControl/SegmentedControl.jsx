@@ -21,7 +21,6 @@ export default function SegmentedControl({
   idPrefix,
   tone = 'glass',
   orientation = 'horizontal',
-  stretch = false,
   className
 }) {
   const ref = useRef(null);
@@ -35,13 +34,7 @@ export default function SegmentedControl({
       role={tabs ? 'tablist' : 'radiogroup'}
       aria-label={label}
       aria-orientation={tabs ? orientation : undefined}
-      className={cx(
-        'segmented',
-        `segmented--${tone}`,
-        `segmented--${orientation}`,
-        stretch && 'segmented--stretch',
-        className
-      )}
+      className={cx('segmented', `segmented--${tone}`, `segmented--${orientation}`, className)}
       onKeyDown={onKeyDown}
     >
       <span data-part="indicator" className="segmented__indicator" aria-hidden="true" />

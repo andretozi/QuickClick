@@ -50,5 +50,5 @@ Na primeira abertura depois desta versão, uma limpeza única tira o formato ant
 1. Em cada repositório de `infrastructure/storage`, troque o corpo das funções por chamadas ao `httpClient` (`infrastructure/http/httpClient.js`), mantendo os nomes e o formato devolvido. Rotas sugeridas: `POST /api/contas`, `POST /api/sessao`, `DELETE /api/sessao`, `GET /api/me`, `GET|POST|PATCH|DELETE /api/anuncios`, `GET|POST|DELETE /api/marketplaces/:slug/conexao`, `POST /api/marketplaces/:slug/sincronizar`, `GET|PUT /api/preferencias`, `GET /api/insights`.
 2. `infrastructure/auth/authService.js` passa a usar o cookie de sessão do back; o `sessionRepository` deixa de existir.
 3. `passwordHasher.js` e `imageResizer.js` (a foto original vai para o armazenamento de arquivos) deixam de ser usados.
-4. `marketplacesService.js` já fala com a API atual do back (`/api/marketplaces`). Antes de ligar, alinhe o catálogo: o back ainda marca Shopee e Amazon como disponíveis (pendência registrada no `CLAUDE.md`).
+4. `marketplacesService.js` já fala com a API atual do back (`/api/marketplaces`). Antes de ligar, alinhe o catálogo: o back ainda marca Shopee e Amazon como disponíveis (pendência registrada em `docs/arquitetura.md`).
 5. Os casos de uso em `application/` e as telas não mudam.

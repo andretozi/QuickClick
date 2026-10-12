@@ -27,7 +27,7 @@ export default function ListingRow({ listing, busy, canPublish, onToggle, onDupl
   return (
     <li data-enter="3" className={cx('listing-row', busy && 'listing-row--busy')}>
       <a href={hrefForListing(listing.id)} className="listing-row__main">
-        <ListingThumb listing={listing} size="md" className="listing-row__thumb" />
+        <ListingThumb listing={listing} className="listing-row__thumb" />
         <span className="listing-row__text">
           <span className="listing-row__title">{listing.title}</span>
           <span className="listing-row__meta">{LISTINGS_PANEL.updated(formatRelative(listing.updatedAt))}</span>

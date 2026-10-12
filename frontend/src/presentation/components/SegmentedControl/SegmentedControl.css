@@ -31,14 +31,6 @@
   border-radius: 22px;
 }
 
-.segmented--stretch {
-  display: flex;
-}
-
-.segmented--stretch .segmented__option {
-  flex: 1;
-  justify-content: center;
-}
 
 .segmented__indicator {
   position: absolute;

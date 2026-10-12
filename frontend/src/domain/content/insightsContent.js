@@ -1,9 +1,8 @@
 /** Todo o texto da aba Insights do painel. As vendas são simuladas (veja o SimulationBadge). */
-
-const plural = (count, one, many) => (count === 1 ? one : many);
+import { plural } from '@/domain/format/format.js';
 
 export const INSIGHTS = {
-  label: 'Insights da loja',
+
   loading: 'Calculando os insights…',
   loadError: { title: 'Não deu pra calcular os insights.', retry: 'Tentar de novo' },
   empty: 'Crie anúncios para este gráfico ganhar vida.',

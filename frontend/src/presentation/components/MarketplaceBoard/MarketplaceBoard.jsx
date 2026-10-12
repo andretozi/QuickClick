@@ -3,7 +3,7 @@ import ConnectDialog from '@/presentation/components/ConnectDialog/ConnectDialog
 import Icon from '@/presentation/components/Icon/Icon.jsx';
 import MarketplacePlate from '@/presentation/components/MarketplacePlate/MarketplacePlate.jsx';
 import Modal from '@/presentation/components/Modal/Modal.jsx';
-import Panel from '@/presentation/components/Panel/Panel.jsx';
+import StatusPanel from '@/presentation/components/StatusPanel/StatusPanel.jsx';
 import { cx } from '@/presentation/utils/cx.js';
 import { isMultichannel } from '@/domain/plans/planRules.js';
 import {
@@ -30,24 +30,11 @@ export default function MarketplaceBoard({ marketplaces, compact = false, classN
       ? PLAN_NOTICE.limited
       : PLAN_NOTICE.limitedOther(planName(plan));
 
-  if (status === 'loading') {
-    return (
-      <Panel tone="glass" className="marketplace-board__status" role="status">
-        <span data-spin className="marketplace-board__spinner" aria-hidden="true" />
-        {MARKETPLACES_PAGE.loading}
-      </Panel>
-    );
-  }
+  if (status === 'loading') return <StatusPanel text={MARKETPLACES_PAGE.loading} size="md" />;
 
   if (status === 'error') {
-    return (
-      <Panel tone="glass" className="marketplace-board__status" role="alert">
-        {MARKETPLACES_PAGE.loadError.title}
-        <Button size="sm" variant="light" onClick={marketplaces.retry}>
-          {MARKETPLACES_PAGE.loadError.retry}
-        </Button>
-      </Panel>
-    );
+    const { title, retry } = MARKETPLACES_PAGE.loadError;
+    return <StatusPanel status="error" text={title} retryLabel={retry} onRetry={marketplaces.retry} size="md" />;
   }
 
   return (

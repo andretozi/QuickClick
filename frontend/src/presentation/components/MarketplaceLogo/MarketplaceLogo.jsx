@@ -1,4 +1,3 @@
-import MarketplaceMark from '@/presentation/components/MarketplaceMark/MarketplaceMark.jsx';
 import { cx } from '@/presentation/utils/cx.js';
 import { getMarketplaceInfo } from '@/domain/content/marketplacesContent.js';
 import { MARKETPLACE_LOGO } from '@/domain/content/commonContent.js';
@@ -29,11 +28,10 @@ const LOGOS = {
 /** Logos com a escrita branca, feitos para fundo escuro: fora das cenas ganham um fundo escuro próprio. */
 const LIGHT_ART = new Set(['tiktok-shop']);
 
-const MARK_SIZE = { xs: 'xs', sm: 'xs', md: 'sm', lg: 'md', xl: 'lg', hero: 'xl' };
-
 /**
  * Logo oficial de um marketplace, sem mudar cor nem proporção (cabe numa caixa).
- * Sem logo, o monograma e o nome entram como reserva. Use sobre fundo claro ou na cena da marca.
+ * Um marketplace novo, ainda sem logo, mostra o monograma em coral e o nome como reserva.
+ * Use sobre fundo claro ou na cena da marca.
  * - size: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'hero' (enche a caixa do pai)
  * - muted: logo apagado, para os marketplaces que ainda vão chegar
  * - decorative: quando o nome já está escrito ao lado (o logo some para o leitor de tela)
@@ -54,7 +52,9 @@ export default function MarketplaceLogo({ slug, size = 'md', muted = false, deco
   if (!src) {
     return (
       <span className={classes} role={decorative ? undefined : 'img'} aria-label={decorative ? undefined : info.name}>
-        <MarketplaceMark slug={slug} monogram={info.monogram} size={MARK_SIZE[size]} />
+        <span className="marketplace-logo__monogram" aria-hidden="true">
+          {info.monogram}
+        </span>
         <span className="marketplace-logo__name" aria-hidden="true">
           {info.name}
         </span>

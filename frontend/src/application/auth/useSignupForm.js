@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import useForm from '@/application/ui/useForm.js';
-import { showToast, TOAST_TONES } from '@/application/feedback/toastStore.js';
+import useMountedRef from '@/application/ui/useMountedRef.js';
+import { announceTermsSoon, formErrorFor } from '@/application/auth/authForm.js';
 import { signUp } from '@/application/session/sessionStore.js';
 import { ACCOUNT_ERRORS, describeAuthError } from '@/infrastructure/auth/authService.js';
 import {
@@ -9,7 +10,6 @@ import {
   validateNewPassword,
   validatePasswordConfirmation
 } from '@/domain/validation/validators.js';
-import { LOGIN_SOON } from '@/domain/content/loginContent.js';
 
 const EMPTY = { name: '', email: '', store: '', password: '', confirmation: '' };
 
@@ -30,14 +30,7 @@ export default function useSignupForm() {
   const form = useForm(EMPTY, validateSignup);
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState(null);
-  const mounted = useRef(true);
-
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
+  const mounted = useMountedRef();
 
   const { check, values, setFieldError } = form;
 
@@ -54,16 +47,12 @@ export default function useSignupForm() {
         setLoading(false);
         const code = describeAuthError(error);
         if (code === ACCOUNT_ERRORS.EMAIL_TAKEN) setFieldError('email', 'email-taken');
-        else setFormError(code === 'armazenamento_cheio' ? 'storage' : 'unknown');
+        else setFormError(formErrorFor(code));
       }
     },
-    [check, loading, setFieldError, values]
+    [check, loading, setFieldError, values, mounted]
   );
 
-  /** Termos e privacidade ainda não têm página. */
-  const announceTermsSoon = useCallback(() => {
-    showToast({ tone: TOAST_TONES.INFO, ...LOGIN_SOON.terms });
-  }, []);
 
   return {
     values: form.values,

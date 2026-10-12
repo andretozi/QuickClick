@@ -8,7 +8,7 @@
 const MAX_SIDE = 800;
 const QUALITY = 0.8;
 
-export class InvalidImageError extends Error {
+class InvalidImageError extends Error {
   constructor() {
     super('imagem_invalida');
     this.name = 'InvalidImageError';

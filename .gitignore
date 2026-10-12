@@ -27,5 +27,9 @@ backend/data/
 .DS_Store
 Thumbs.db
 
-# Screenshots e GIFs de verificação (Claude Code)
+# Contexto do Claude Code (fica só na máquina de quem usa)
+CLAUDE.md
+CLAUDE.local.md
+.claude/
+.mcp.json
 .screens/

@@ -109,7 +109,7 @@ export const MARKETPLACE_CARD = {
   syncError: { title: 'Não deu pra sincronizar agora.', text: 'Confira a conexão e tente de novo em instantes.' },
   disconnect: 'Desconectar',
   disconnectLabel: (name) => `Desconectar ${name}`,
-  soon: 'Em breve',
+
   soonLabel: (name) => `${name} chega em breve`,
   limitReached: 'Limite do seu plano'
 };

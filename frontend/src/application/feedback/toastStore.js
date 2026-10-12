@@ -54,5 +54,3 @@ export function subscribeToToasts(listener) {
 export function getToastsSnapshot() {
   return toasts;
 }
-
-export const TOAST_LEAVE_MS = LEAVE_MS;

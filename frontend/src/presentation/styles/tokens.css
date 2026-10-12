@@ -38,28 +38,11 @@
   --color-green-light: #5fd39a;
   --color-facebook: #1877f2;
 
-  /* ---------- Cores dos marketplaces (monogramas de reserva e detalhes; os logos oficiais
-     ficam em presentation/assets/marketplaces) ---------- */
+  /* ---------- Cores dos marketplaces (detalhes: o amarelo do Mercado Livre e o fundo
+     escuro do logo do TikTok Shop; os logos oficiais ficam em presentation/assets/marketplaces) ---------- */
   --color-mercado-livre: #ffe600;
   --color-mercado-livre-ink: #2d3277;
-  --color-shopee: #ee4d2d;
-  --color-amazon: #232f3e;
-  --color-amazon-accent: #ff9900;
-  --color-magalu: #0086ff;
-  --color-americanas: #e60014;
-  --color-casas-bahia: #0033a0;
-  --color-shein: #151515;
   --color-tiktok-shop: #151515;
-  --color-tiktok-shop-accent: #fe2c55;
-  --color-aliexpress: #e62e04;
-
-  /* ---------- Cores das ilustrações dos anúncios de demonstração ---------- */
-  --color-denim: #5a78b0;
-  --color-denim-dark: #3f5a8c;
-  --color-steel: #a9b1b8;
-  --color-steel-dark: #7d868e;
-  --color-leather: #a0623a;
-  --color-leather-dark: #7a4527;
 
   /* ---------- Canais RGB (para usar com transparência) ---------- */
   --rgb-ink: 43 29 21;
@@ -73,14 +56,10 @@
   --rgb-black: 0 0 0;
   --rgb-white: 255 255 255;
   --rgb-sand-50: 246 237 219;
-  --rgb-sand: 223 203 170;
   --rgb-cocoa-600: 58 41 29;
-  --rgb-cocoa-700: 51 35 24;
-  --rgb-cocoa-950: 28 19 14;
   --rgb-night: 18 16 14;
   --rgb-coral-glow: 255 178 122;
   --rgb-coral-deep: 201 72 31;
-  --rgb-honey-dark: 217 140 26;
   --rgb-green-light: 95 211 154;
   --rgb-mercado-livre: 255 230 0;
 
@@ -121,5 +100,4 @@
   /* ---------- Sombras quentes (área logada) ---------- */
   --shadow-panel: 0 40px 80px -48px rgb(var(--rgb-black) / 0.8);
   --shadow-paper: 0 34px 70px -42px rgb(var(--rgb-black) / 0.75);
-  --shadow-glow-coral: 0 18px 40px -18px rgb(var(--rgb-coral) / 0.75);
 }

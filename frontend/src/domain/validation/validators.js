@@ -17,7 +17,7 @@ export const FIELD_ERROR = {
   STOCK: 'stock'
 };
 
-export const PASSWORD_MIN_LENGTH = 8;
+const PASSWORD_MIN_LENGTH = 8;
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
