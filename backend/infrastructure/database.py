@@ -77,13 +77,25 @@ def obter_database_url() -> str:
 
 DATABASE_URL = obter_database_url()
 
-# Engine conectada diretamente ao Azure PostgreSQL (com pool_pre_ping para manter conexões saudáveis)
-engine = create_engine(
-    DATABASE_URL,
-    pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20,
-)
+# Sem limite, cada tentativa espera o timeout de TCP do sistema (21 s no Windows, ~127 s no
+# Linux do App Service) quando o firewall do Postgres descarta a conexão. Duas tentativas na
+# partida passam dos 230 s que o App Service espera o container responder, e ele dá 503.
+TIMEOUT_CONEXAO_S = 10
+
+
+def criar_engine(url: str, timeout_s: int = TIMEOUT_CONEXAO_S):
+    """Engine do Postgres com pool_pre_ping e limite de tempo para abrir cada conexão."""
+    return create_engine(
+        url,
+        pool_pre_ping=True,
+        pool_size=10,
+        max_overflow=20,
+        connect_args={"connect_timeout": timeout_s},
+    )
+
+
+# Engine conectada diretamente ao Azure PostgreSQL
+engine = criar_engine(DATABASE_URL)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()

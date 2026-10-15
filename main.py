@@ -6,6 +6,9 @@ Uso:
     REBUILD=1 python main.py     # forca o build do front (PowerShell: $env:REBUILD=1; python main.py)
     NO_BROWSER=1 python main.py  # nao abre o navegador (util em testes automaticos)
 
+No Azure App Service (startup command "python main.py"): escuta em 0.0.0.0:$PORT,
+nao roda npm nem abre navegador. O front vem buildado pelo GitHub Actions.
+
 No PyCharm: Run 'main'. A configuracao fica no projeto, em .run/main.run.xml, e usa
 o Python da .venv (.venv/Scripts/python.exe), mesmo que o interpretador do projeto
 esteja errado.
@@ -56,9 +59,28 @@ NODE_MODULES = FRONTEND / "node_modules"
 PACKAGE_LOCK = FRONTEND / "package-lock.json"
 REQUIREMENTS = ROOT / "backend" / "requirements.txt"
 VENV = ROOT / ".venv"
-PORT = 8080
-HOST = "127.0.0.1"
-URL = f"http://{HOST}:{PORT}"
+
+
+def no_app_service(ambiente=os.environ) -> bool:
+    """True dentro do Azure App Service, que sempre define WEBSITE_SITE_NAME."""
+    return bool(ambiente.get("WEBSITE_SITE_NAME"))
+
+
+def endereco_do_servidor(ambiente=os.environ) -> tuple[str, int]:
+    """Host e porta do Uvicorn.
+
+    Local: 127.0.0.1:8080, como sempre. No App Service: 0.0.0.0 na porta da variavel
+    PORT (8000 se ela faltar), porque o Azure manda o trafego e o ping de saude para
+    a porta do container, nunca para o 127.0.0.1.
+    """
+    if no_app_service(ambiente):
+        return "0.0.0.0", int(ambiente.get("PORT") or 8000)
+    return "127.0.0.1", 8080
+
+
+NA_AZURE = no_app_service()
+HOST, PORT = endereco_do_servidor()
+URL = f"http://127.0.0.1:{PORT}"
 NODE_MINIMO = 18
 FOLGA_DO_LOCK_S = 5  # segundos entre o package-lock.json e a instalacao que ainda contam como em dia
 RELANCADO = "QUICKCLICK_RELANCADO"  # marca o processo relancado com a .venv (evita laco)
@@ -463,7 +485,7 @@ def serve() -> None:
     uvicorn, criar_app = import_backend()
 
     app = criar_app()
-    if os.environ.get("NO_BROWSER") != "1":
+    if os.environ.get("NO_BROWSER") != "1" and not NA_AZURE:
         threading.Thread(
             target=_open_browser_when_ready, args=(URL,), daemon=True
         ).start()
@@ -487,9 +509,14 @@ def main() -> None:
         _already_running()
         return
 
-    npm = _find_npm()
-    check_node(npm)
-    ensure_frontend_build(npm)
+    if NA_AZURE:
+        # No App Service o front ja chega buildado no pacote do GitHub Actions
+        # (frontend/dist). Rodar npm ci aqui atrasaria cada partida do container.
+        print(f"[main.py] Azure App Service: sem npm; servindo {DIST if DIST.is_dir() else 'so a API (sem frontend/dist)'}")
+    else:
+        npm = _find_npm()
+        check_node(npm)
+        ensure_frontend_build(npm)
     ensure_backend_deps()
     serve()
 
