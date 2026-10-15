@@ -1,13 +1,18 @@
-"""Testes da API HTTP e da entrega do front, com a aplicação montada de verdade (SQLite temporário)."""
+"""Testes da API HTTP e da entrega do front, com a aplicação montada de verdade."""
 
 import tempfile
 import unittest
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from backend.app.bootstrap import criar_app
+from backend.infrastructure.banco import models  # noqa: F401
 from backend.infrastructure.config import Config
+from backend.infrastructure.database import Base
 
 INDEX_HTML = "<!doctype html><title>Quick Click</title>"
 
@@ -27,11 +32,19 @@ class BaseApi(unittest.TestCase):
             caminho_banco=raiz / "dados" / "teste.sqlite3",
             plano_demo=self.plano_demo,
         )
-        self.cliente = TestClient(criar_app(self.config))
+        self._engine = create_engine(
+            "sqlite:///:memory:",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+        Base.metadata.create_all(bind=self._engine)
+        self.Session = sessionmaker(autocommit=False, autoflush=False, bind=self._engine)
+        self.cliente = TestClient(criar_app(self.config, session_factory=self.Session))
 
     def tearDown(self):
         self.cliente.close()
         self._pasta.cleanup()
+        self._engine.dispose()
 
     def conectar(self, slug):
         return self.cliente.post(f"/api/marketplaces/{slug}/connection")
@@ -73,7 +86,7 @@ class TestApiSistema(BaseApi):
     def test_plano_demo_invalido_para_o_boot_com_mensagem_clara(self):
         config = Config(self.config.raiz, self.config.pasta_front, self.config.caminho_banco, plano_demo="premium")
         with self.assertRaisesRegex(ValueError, "QUICKCLICK_PLANO_DEMO"):
-            criar_app(config)
+            criar_app(config, session_factory=self.Session)
 
 
 class TestApiConsultas(BaseApi):
@@ -153,7 +166,7 @@ class TestApiConexoes(BaseApi):
 
     def test_conexoes_ficam_salvas_no_banco(self):
         self.conectar("amazon")
-        outro_cliente = TestClient(criar_app(self.config))  # simula reiniciar o servidor
+        outro_cliente = TestClient(criar_app(self.config, session_factory=self.Session))  # simula reiniciar o servidor
         self.addCleanup(outro_cliente.close)
         conectados = [m["slug"] for m in outro_cliente.get("/api/marketplaces").json()["marketplaces"] if m["conectado"]]
         self.assertEqual(conectados, ["amazon"])

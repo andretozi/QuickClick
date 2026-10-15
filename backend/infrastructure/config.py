@@ -11,7 +11,6 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-BANCO_PADRAO = Path("backend") / "data" / "quickclick.sqlite3"
 PLANO_DEMO_PADRAO = "gratis"
 
 
@@ -19,7 +18,7 @@ PLANO_DEMO_PADRAO = "gratis"
 class Config:
     raiz: Path
     pasta_front: Path  # front buildado (frontend/dist), servido fora de /api
-    caminho_banco: Path  # arquivo SQLite, fora do Git
+    caminho_banco: Path | None = None  # opcional / legado
     plano_demo: str = PLANO_DEMO_PADRAO  # slug do plano do vendedor de demonstração
 
 
@@ -39,10 +38,11 @@ def ler_arquivo_env(caminho: Path) -> dict[str, str]:
 
 def carregar_config(raiz: Path, ambiente: Mapping[str, str] | None = None) -> Config:
     valores = {**ler_arquivo_env(raiz / ".env"), **(os.environ if ambiente is None else ambiente)}
-    banco = Path(valores.get("QUICKCLICK_BANCO") or BANCO_PADRAO)
+    banco_str = valores.get("QUICKCLICK_BANCO")
+    banco = Path(banco_str) if banco_str else None
     return Config(
         raiz=raiz,
         pasta_front=raiz / "frontend" / "dist",
-        caminho_banco=banco if banco.is_absolute() else raiz / banco,
+        caminho_banco=(banco if banco.is_absolute() else raiz / banco) if banco else None,
         plano_demo=(valores.get("QUICKCLICK_PLANO_DEMO") or PLANO_DEMO_PADRAO).strip().lower(),
     )
