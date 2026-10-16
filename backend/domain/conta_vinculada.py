@@ -15,6 +15,8 @@ class CredenciaisOAuth:
     access_token: str = field(repr=False)  # repr=False: token nunca aparece em log
     refresh_token: str = field(repr=False)
     expira_em: datetime
+    conta_externa_id: str | None = None
+    apelido: str | None = None
 
     def expirada(self, agora: datetime) -> bool:
         return agora >= self.expira_em

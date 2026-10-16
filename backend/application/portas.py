@@ -5,7 +5,7 @@ O que os casos de uso precisam do mundo de fora, descrito como interfaces (Proto
 A infraestrutura implementa estas portas; os testes usam versões falsas, em memória.
 """
 
-from typing import Any, Protocol
+from typing import Any, Never, Protocol
 
 from backend.domain.conta_vinculada import ContaVinculada, CredenciaisOAuth
 from backend.domain.usuario import Usuario
@@ -54,15 +54,32 @@ class GatewayMarketplace(Protocol):
     e o vendedor sempre autoriza direto no site do marketplace.
     """
 
+    slug: str
+
+    def _nao_implementado(self) -> Never:
+        raise NotImplementedError(f"Integração com '{getattr(self, 'slug', 'marketplace')}' em desenvolvimento.")
+
     def gerar_url_autorizacao(self, estado: str) -> str:
         """URL do marketplace onde o vendedor entra e autoriza a Quick Click.
         `estado` volta igual no retorno e protege contra pedidos forjados (CSRF)."""
-        ...
+        self._nao_implementado()
 
     def trocar_codigo_por_token(self, codigo: str) -> CredenciaisOAuth:
         """Troca o código que o marketplace devolveu pelos tokens de acesso."""
-        ...
+        self._nao_implementado()
 
     def renovar_token(self, refresh_token: str) -> CredenciaisOAuth:
         """Pede tokens novos antes de o access token expirar."""
-        ...
+        self._nao_implementado()
+
+    def obter_perfil_usuario(self, access_token: str) -> dict[str, Any]:
+        """Obtém dados da conta autenticada no marketplace."""
+        self._nao_implementado()
+
+    def listar_anuncios(self, access_token: str, conta_externa_id: str | None = None) -> list[dict[str, Any]]:
+        """Lista os produtos/anúncios para monitoramento."""
+        self._nao_implementado()
+
+    def publicar_anuncio(self, access_token: str, dados_produto: dict[str, Any]) -> dict[str, Any]:
+        """Publica um novo produto no marketplace."""
+        self._nao_implementado()

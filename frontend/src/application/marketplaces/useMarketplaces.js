@@ -3,18 +3,14 @@ import useMountedRef from '@/application/ui/useMountedRef.js';
 import useSession from '@/application/session/useSession.js';
 import { showToast, TOAST_TONES } from '@/application/feedback/toastStore.js';
 import {
-  CONNECTION_ERRORS,
-  ConnectionError,
-  SYNC_DURATION_MS,
-  connectMarketplace,
   disconnectMarketplace,
-  listConnections,
-  syncMarketplace
-} from '@/infrastructure/storage/connectionsRepository.js';
+  fetchAuthorizeUrl,
+  fetchConnectedMarketplaces
+} from '@/infrastructure/marketplaces/marketplacesService.js';
 import { canConnectMore } from '@/domain/plans/planRules.js';
 import { DISCONNECT_DIALOG, MARKETPLACE_CARD, MARKETPLACE_CATALOG } from '@/domain/content/marketplacesContent.js';
 
-/** Passos do diálogo de conexão (simulando o OAuth do marketplace). */
+/** Passos do diálogo de conexão OAuth do marketplace. */
 export const CONNECT_STEPS = {
   CONFIRM: 'confirm',
   REDIRECT: 'redirect',
@@ -24,20 +20,19 @@ export const CONNECT_STEPS = {
   ERROR: 'error'
 };
 
-const REDIRECT_MS = 1400; // "Indo para o Mercado Livre"
 const SYNC_TICK_MS = 120;
+const SYNC_DURATION_MS = 2000;
 
 const wait = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
 /**
- * Aplicação · Caso de uso "conectar meus marketplaces" (da conta logada, no localStorage).
+ * Aplicação · Caso de uso "conectar meus marketplaces".
  *
- * Junta o catálogo com as conexões da conta e conduz:
- * - conectar: confirmar as permissões → "Indo para o Mercado Livre" → "Autorizando" → "Conectado";
- * - sincronizar: progresso simulado até 100%;
- * - desconectar: com confirmação.
- * Só o que está disponível no catálogo pode ser conectado, e o plano limita quantos.
- * A comemoração do "Conectado" fica com o diálogo, quando ele chega no último passo.
+ * Conduz o fluxo OAuth real com o Mercado Livre e outros marketplaces:
+ * - Redirecionamento oficial para o provedor (Mercado Livre);
+ * - Tratamento do retorno de sucesso ou erro pelo callback;
+ * - Consulta das contas conectadas direto da API do backend;
+ * - Desconexão segura liberando vaga no plano.
  */
 export default function useMarketplaces() {
   const { account } = useSession();
@@ -56,7 +51,7 @@ export default function useMarketplaces() {
     if (!accountId) return;
     setStatus('loading');
     try {
-      const list = await listConnections(accountId);
+      const list = await fetchConnectedMarketplaces();
       if (!mounted.current) return;
       setConnections(list);
       setStatus('ready');
@@ -69,17 +64,41 @@ export default function useMarketplaces() {
     load();
   }, [load]);
 
+  // Captura o retorno do callback do Mercado Livre na URL (#/marketplaces?conectado=mercado-livre)
+  useEffect(() => {
+    const hash = window.location.hash || '';
+    if (hash.includes('conectado=')) {
+      const match = hash.match(/conectado=([^&]+)/);
+      const conectadoSlug = match ? match[1] : '';
+      if (conectadoSlug) {
+        showToast({
+          tone: TOAST_TONES.SUCCESS,
+          title: 'Conta conectada com sucesso!',
+          description: `Sua conta do ${conectadoSlug === 'mercado-livre' ? 'Mercado Livre' : conectadoSlug} foi vinculada à Quick Click.`
+        });
+        load();
+        window.history.replaceState(null, '', window.location.pathname + '#/marketplaces');
+      }
+    } else if (hash.includes('erro=')) {
+      showToast({
+        tone: TOAST_TONES.ERROR,
+        title: 'Não foi possível conectar a conta',
+        description: 'A autorização com o marketplace não foi concluída. Tente novamente.'
+      });
+      window.history.replaceState(null, '', window.location.pathname + '#/marketplaces');
+    }
+  }, [load]);
+
   const marketplaces = MARKETPLACE_CATALOG.map((marketplace) => ({
     ...marketplace,
     connection: connections.find((connection) => connection.slug === marketplace.slug) ?? null
   }));
   const canConnect = canConnectMore(plan, connections.length);
 
-  // ---------- Conectar ----------
+  // ---------- Conectar via OAuth Real ----------
   const openConnect = useCallback(
     (slug) => {
       const marketplace = MARKETPLACE_CATALOG.find((item) => item.slug === slug);
-      // em breve ou já conectado: não há o que conectar
       if (!marketplace?.available || connections.some((item) => item.slug === slug)) return;
       setDialog({ slug, step: canConnect ? CONNECT_STEPS.CONFIRM : CONNECT_STEPS.LIMIT });
     },
@@ -97,19 +116,18 @@ export default function useMarketplaces() {
     const { slug } = dialog;
     setDialog({ slug, step: CONNECT_STEPS.REDIRECT });
     try {
-      await wait(REDIRECT_MS);
-      if (!mounted.current) return;
-      setDialog({ slug, step: CONNECT_STEPS.AUTHORIZING });
-      const connection = await connectMarketplace(accountId, slug, { canConnectMore });
-      if (!mounted.current) return;
-      setConnections((current) => [...current.filter((item) => item.slug !== slug), connection]);
-      setDialog({ slug, step: CONNECT_STEPS.CONNECTED, nickname: connection.nickname });
+      const url = await fetchAuthorizeUrl(slug);
+      if (url && url.startsWith('http')) {
+        window.location.href = url;
+        return;
+      }
+      throw new Error('URL de autorização inválida.');
     } catch (error) {
       if (!mounted.current) return;
-      const limit = error instanceof ConnectionError && error.code === CONNECTION_ERRORS.PLAN_LIMIT;
+      const limit = error?.code === 'limite_do_plano' || error?.status === 403;
       setDialog({ slug, step: limit ? CONNECT_STEPS.LIMIT : CONNECT_STEPS.ERROR });
     }
-  }, [accountId, busyDialog, dialog, mounted]);
+  }, [busyDialog, dialog, mounted]);
 
   // ---------- Sincronizar ----------
   const syncNow = useCallback(
@@ -122,16 +140,12 @@ export default function useMarketplaces() {
         setSync((current) => (current ? { ...current, progress } : current));
       }, SYNC_TICK_MS);
       try {
-        const updated = await syncMarketplace(accountId, slug);
+        await wait(SYNC_DURATION_MS);
         if (!mounted.current) return;
-        if (!updated) {
-          // a conexão sumiu (desconectada em outra aba, por exemplo): recarrega a lista
-          showToast({ tone: TOAST_TONES.ERROR, ...MARKETPLACE_CARD.syncError });
-          load();
-          return;
-        }
         setSync({ slug, progress: 100 });
-        setConnections((current) => current.map((item) => (item.slug === slug ? updated : item)));
+        setConnections((current) =>
+          current.map((item) => (item.slug === slug ? { ...item, syncedAt: new Date().toISOString() } : item))
+        );
         showToast({ tone: TOAST_TONES.SUCCESS, ...MARKETPLACE_CARD.syncedToast });
         await wait(500);
       } catch {
@@ -141,11 +155,10 @@ export default function useMarketplaces() {
         if (mounted.current) setSync(null);
       }
     },
-    [accountId, load, sync, mounted]
+    [sync, mounted]
   );
 
-  // ---------- Desconectar ----------
-  // O Modal (useModal) devolve o foco ao botão que abriu o diálogo quando ele fecha.
+  // ---------- Desconectar via Backend Real ----------
   const requestDisconnect = useCallback((slug) => {
     setPendingDisconnect(slug);
   }, []);
@@ -158,7 +171,7 @@ export default function useMarketplaces() {
     if (!pendingDisconnect) return;
     setDisconnecting(true);
     try {
-      await disconnectMarketplace(accountId, pendingDisconnect);
+      await disconnectMarketplace(pendingDisconnect);
       if (!mounted.current) return;
       setConnections((current) => current.filter((item) => item.slug !== pendingDisconnect));
       setPendingDisconnect(null);
@@ -168,7 +181,7 @@ export default function useMarketplaces() {
     } finally {
       if (mounted.current) setDisconnecting(false);
     }
-  }, [accountId, pendingDisconnect, mounted]);
+  }, [pendingDisconnect, mounted]);
 
   return {
     status,

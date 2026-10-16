@@ -52,3 +52,5 @@ class ContaVinculadaModel(Base):
     access_token = Column(String, nullable=False)
     refresh_token = Column(String, nullable=False)
     token_expira_em = Column(String, nullable=False)
+    conta_externa_id = Column(String, nullable=True)
+    apelido = Column(String, nullable=True)

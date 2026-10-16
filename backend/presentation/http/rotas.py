@@ -6,9 +6,10 @@ HTTP para um caso de uso e o resultado de volta para JSON: a regra mora no domí
 """
 
 from collections.abc import Callable
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import RedirectResponse
 
 from backend.application.casos_de_uso import CasosDeUso
 from backend.application.portas import ServicoToken
@@ -18,10 +19,12 @@ from backend.presentation.http.esquemas import (
     ListaDePlanos,
     MarketplaceSaida,
     RequisicaoCadastro,
+    RequisicaoConectar,
     RequisicaoLogin,
     RespostaAutenticacao,
     RespostaDeErro,
     Saude,
+    UrlAutorizacaoSaida,
     UsuarioSaida,
     VendedorSaida,
     marketplace_saida,
@@ -35,6 +38,7 @@ ERRO_404 = {404: {"model": RespostaDeErro, "description": "Marketplace ou vended
 ERROS_AO_CONECTAR = {
     **ERRO_401,
     **ERRO_404,
+    400: {"model": RespostaDeErro, "description": "Código de autorização OAuth ausente"},
     403: {"model": RespostaDeErro, "description": "Limite de marketplaces do plano atingido"},
     409: {"model": RespostaDeErro, "description": "Marketplace ainda em breve"},
 }
@@ -162,6 +166,59 @@ def criar_rotas(
         itens = casos.listar_marketplaces.executar(vendedor_id)
         return ListaDeMarketplaces(marketplaces=[marketplace_saida(item) for item in itens])
 
+    @rotas.get(
+        "/marketplaces/{slug}/authorize-url",
+        tags=["marketplaces"],
+        summary="Gera a URL de consentimento OAuth oficial no marketplace",
+        response_model=UrlAutorizacaoSaida,
+        responses=ERROS_AO_CONECTAR,
+    )
+    def obter_url_autorizacao(slug: str, vendedor_id: VendedorAtual) -> UrlAutorizacaoSaida:
+        estado = (
+            servico_token.gerar_token(user_id=vendedor_id, email=f"oauth:{slug}")
+            if servico_token is not None
+            else str(vendedor_id)
+        )
+        url = casos.conectar_marketplace.gerar_url_autorizacao(vendedor_id, slug, estado)
+        return UrlAutorizacaoSaida(url=url)
+
+    @rotas.get(
+        "/marketplaces/{slug}/callback",
+        tags=["marketplaces"],
+        summary="Callback OAuth 2.0 que recebe o retorno de autorização do marketplace",
+    )
+    def callback_marketplace(
+        slug: str,
+        code: str | None = None,
+        state: str | None = None,
+        error: str | None = None,
+        error_description: str | None = None,
+    ) -> RedirectResponse:
+        if error:
+            return RedirectResponse(url=f"/#/marketplaces?erro={error}", status_code=302)
+
+        if not code or not state:
+            return RedirectResponse(url="/#/marketplaces?erro=parametros_invalidos", status_code=302)
+
+        vendedor_id = None
+        if servico_token is not None:
+            try:
+                payload = servico_token.validar_token(state)
+                vendedor_id = int(payload["sub"])
+            except Exception:
+                return RedirectResponse(url="/#/marketplaces?erro=state_invalido", status_code=302)
+        elif state.isdigit():
+            vendedor_id = int(state)
+
+        if vendedor_id is None:
+            return RedirectResponse(url="/#/marketplaces?erro=nao_autenticado", status_code=302)
+
+        try:
+            casos.conectar_marketplace.executar(vendedor_id, slug, codigo_autorizacao=code)
+            return RedirectResponse(url=f"/#/marketplaces?conectado={slug}", status_code=302)
+        except Exception as erro:
+            return RedirectResponse(url=f"/#/marketplaces?erro={str(erro)}", status_code=302)
+
     @rotas.post(
         "/marketplaces/{slug}/connection",
         tags=["marketplaces"],
@@ -169,8 +226,15 @@ def criar_rotas(
         response_model=MarketplaceSaida,
         responses=ERROS_AO_CONECTAR,
     )
-    def conectar(slug: str, vendedor_id: VendedorAtual) -> MarketplaceSaida:
-        return marketplace_saida(casos.conectar_marketplace.executar(vendedor_id, slug))
+    def conectar(
+        slug: str,
+        vendedor_id: VendedorAtual,
+        dados: RequisicaoConectar | None = None,
+    ) -> MarketplaceSaida:
+        codigo = dados.codigo_autorizacao if dados and dados.codigo_autorizacao else ""
+        return marketplace_saida(
+            casos.conectar_marketplace.executar(vendedor_id, slug, codigo_autorizacao=codigo)
+        )
 
     @rotas.delete(
         "/marketplaces/{slug}/connection",
@@ -181,5 +245,23 @@ def criar_rotas(
     )
     def desconectar(slug: str, vendedor_id: VendedorAtual) -> MarketplaceSaida:
         return marketplace_saida(casos.desconectar_marketplace.executar(vendedor_id, slug))
+
+    @rotas.get(
+        "/marketplaces/{slug}/products",
+        tags=["marketplaces"],
+        summary="Lista os produtos/anúncios do marketplace para monitoramento",
+        responses={**ERRO_401, **ERRO_404},
+    )
+    def listar_produtos(slug: str, vendedor_id: VendedorAtual) -> list[dict[str, Any]]:
+        return casos.conectar_marketplace.listar_produtos(vendedor_id, slug)
+
+    @rotas.post(
+        "/marketplaces/{slug}/products",
+        tags=["marketplaces"],
+        summary="Publica um novo produto na conta do vendedor no marketplace",
+        responses={**ERRO_401, **ERRO_404},
+    )
+    def publicar_produto(slug: str, dados_produto: dict[str, Any], vendedor_id: VendedorAtual) -> dict[str, Any]:
+        return casos.conectar_marketplace.publicar_produto(vendedor_id, slug, dados_produto)
 
     return rotas
