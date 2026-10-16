@@ -6,6 +6,7 @@ As funções de conversão traduzem os resultados dos casos de uso para JSON.
 """
 
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -53,6 +54,14 @@ class MarketplaceSaida(BaseModel):
 
 class ListaDeMarketplaces(BaseModel):
     marketplaces: list[MarketplaceSaida]
+
+
+class UrlAutorizacaoSaida(BaseModel):
+    url: str = Field(description="URL de autorização OAuth no marketplace")
+
+
+class RequisicaoConectar(BaseModel):
+    codigo_autorizacao: str | None = Field(default=None, description="Código retornado pelo fluxo OAuth oficial")
 
 
 class UsuarioSaida(BaseModel):

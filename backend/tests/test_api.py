@@ -1,9 +1,12 @@
 """Testes da API HTTP e da entrega do front, com a aplicação montada de verdade."""
 
+import os
 import tempfile
 import unittest
 from datetime import timedelta
 from pathlib import Path
+from unittest.mock import MagicMock, patch
+from urllib.parse import parse_qs, urlparse
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -11,6 +14,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from backend.app.bootstrap import criar_app
+from backend.domain.marketplace import Marketplace, StatusMarketplace
 from backend.infrastructure.banco import models
 from backend.infrastructure.config import Config
 from backend.infrastructure.database import Base
@@ -18,9 +22,107 @@ from backend.infrastructure.seguranca.token_jwt import ServicoJWT
 
 INDEX_HTML = "<!doctype html><title>Quick Click</title>"
 
+CATALOGO_TESTE: tuple[Marketplace, ...] = (
+    Marketplace("mercado-livre", "Mercado Livre", StatusMarketplace.DISPONIVEL),
+    Marketplace("shopee", "Shopee", StatusMarketplace.DISPONIVEL),
+    Marketplace("amazon", "Amazon", StatusMarketplace.DISPONIVEL),
+    Marketplace("magalu", "Magalu", StatusMarketplace.EM_BREVE),
+    Marketplace("americanas", "Americanas", StatusMarketplace.EM_BREVE),
+    Marketplace("casas-bahia", "Casas Bahia", StatusMarketplace.EM_BREVE),
+    Marketplace("shein", "Shein", StatusMarketplace.EM_BREVE),
+    Marketplace("tiktok-shop", "TikTok Shop", StatusMarketplace.EM_BREVE),
+    Marketplace("aliexpress", "AliExpress", StatusMarketplace.EM_BREVE),
+)
+
+
+class MockMeliClient:
+    def __init__(self, *args, **kwargs):
+        self.is_closed = False
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        pass
+
+    def close(self):
+        self.is_closed = True
+
+    def request(self, method, url, *args, **kwargs):
+        if str(method).upper() == "POST":
+            return self.post(url, *args, **kwargs)
+        return self.get(url, *args, **kwargs)
+
+    def post(self, url, *args, **kwargs):
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.is_success = True
+        url_str = str(url)
+        if "/oauth/token" in url_str:
+            resp.json.return_value = {
+                "access_token": "token_ml_123",
+                "refresh_token": "refresh_ml_123",
+                "expires_in": 21600,
+                "user_id": 123456,
+            }
+        elif "/items" in url_str:
+            dados = kwargs.get("json", {})
+            resp.json.return_value = {
+                "id": "MLB999888",
+                "title": dados.get("title", "Novo Anúncio"),
+                "price": dados.get("price", 0.0),
+                "status": "active",
+            }
+        else:
+            resp.json.return_value = {}
+        resp.raise_for_status = MagicMock()
+        return resp
+
+    def get(self, url, *args, **kwargs):
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.is_success = True
+        url_str = str(url)
+        if "/users/me" in url_str:
+            resp.json.return_value = {"id": 123456, "nickname": "LOJA_TESTE_ML", "email": "teste@exemplo.com"}
+        elif "/items/search" in url_str:
+            resp.json.return_value = {"results": ["MLB123"]}
+        elif "/items" in url_str:
+            resp.json.return_value = [
+                {
+                    "code": 200,
+                    "body": {
+                        "id": "MLB123",
+                        "title": "Produto Teste",
+                        "price": 99.90,
+                        "status": "active",
+                        "available_quantity": 5,
+                        "sold_quantity": 1,
+                        "permalink": "https://www.mercadolivre.com.br",
+                    },
+                }
+            ]
+        else:
+            resp.json.return_value = {}
+        resp.raise_for_status = MagicMock()
+        return resp
+
 
 class BaseApi(unittest.TestCase):
     def setUp(self):
+        self._env_patch = patch.dict(
+            os.environ,
+            {
+                "MERCADO_LIVRE_CLIENT_ID": "6777085794691459",
+                "MERCADO_LIVRE_CLIENT_SECRET": "secret_teste",
+                "MERCADO_LIVRE_REDIRECT_URI": "https://quickclick.azurewebsites.net/api/marketplaces/mercado-livre/callback",
+            },
+        )
+        self._env_patch.start()
+
+        self._patch_meli = patch("backend.infrastructure.marketplaces.mercado_livre.httpx.Client", new=MockMeliClient)
+        self._patch_meli.start()
+
         self._pasta = tempfile.TemporaryDirectory()
         raiz = Path(self._pasta.name)
         front = raiz / "frontend" / "dist"
@@ -38,6 +140,7 @@ class BaseApi(unittest.TestCase):
         )
         Base.metadata.create_all(bind=self._engine)
         self.Session = sessionmaker(autocommit=False, autoflush=False, bind=self._engine)
+        self.jwt = ServicoJWT()
         self.cliente = TestClient(criar_app(self.config, session_factory=self.Session))
 
         # Criação real da conta do vendedor via endpoint de cadastro (sem dados mockados/seeds)
@@ -57,9 +160,14 @@ class BaseApi(unittest.TestCase):
         self.cliente.close()
         self._pasta.cleanup()
         self._engine.dispose()
+        self._patch_meli.stop()
+        self._env_patch.stop()
 
-    def conectar(self, slug):
-        return self.cliente.post(f"/api/marketplaces/{slug}/connection")
+    def conectar(self, slug, codigo="codigo_teste"):
+        return self.cliente.post(
+            f"/api/marketplaces/{slug}/connection",
+            json={"codigo_autorizacao": codigo},
+        )
 
     def conectados(self):
         return [m["slug"] for m in self.cliente.get("/api/marketplaces").json()["marketplaces"] if m["conectado"]]
@@ -101,17 +209,17 @@ class TestApiSistema(BaseApi):
             "/api/me",
             "/api/marketplaces",
             "/api/marketplaces/{slug}/connection",
+            "/api/marketplaces/{slug}/authorize-url",
+            "/api/marketplaces/{slug}/callback",
+            "/api/marketplaces/{slug}/products",
         ):
             self.assertIn(caminho, caminhos)
 
     def test_quando_nao_ha_vendedor_no_banco_api_me_retorna_404(self):
-        token_inexistente = ServicoJWT().gerar_token(user_id=999, email="nao_existe@quickclick.com.br")
-        cliente_sem_vendedor = TestClient(criar_app(self.config, session_factory=self.Session))
-        cliente_sem_vendedor.headers["Authorization"] = f"Bearer {token_inexistente}"
-        resposta = cliente_sem_vendedor.get("/api/me")
+        token_inexistente = self.jwt.gerar_token(user_id=999, email="nao_existe@quickclick.com.br")
+        resposta = self.cliente.get("/api/me", headers={"Authorization": f"Bearer {token_inexistente}"})
         self.assertEqual(resposta.status_code, 404)
         self.assertEqual(resposta.json()["erro"]["codigo"], "vendedor_nao_encontrado")
-        cliente_sem_vendedor.close()
 
 
 class TestAutenticacaoJWT(BaseApi):
@@ -197,42 +305,31 @@ class TestAutenticacaoJWT(BaseApi):
         self.assertEqual(cad_resp.status_code, 200)
         token = cad_resp.json()["token"]
 
-        cliente_carla = TestClient(criar_app(self.config, session_factory=self.Session))
-        cliente_carla.headers["Authorization"] = f"Bearer {token}"
-        me_resp = cliente_carla.get("/api/auth/me")
+        me_resp = self.cliente.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
         self.assertEqual(me_resp.status_code, 200)
         usuario = me_resp.json()
         self.assertEqual(usuario["email"], "carla@exemplo.com")
         self.assertEqual(usuario["nome"], "Carla Diaz")
         self.assertEqual(usuario["loja"], "Loja da Carla")
         self.assertEqual(usuario["plano"], "gratis")
-        cliente_carla.close()
 
     def test_acesso_a_rota_protegida_sem_token_retorna_401(self):
-        cliente_sem_auth = TestClient(criar_app(self.config, session_factory=self.Session))
-        resposta = cliente_sem_auth.get("/api/me")
+        resposta = self.cliente.get("/api/me", headers={"Authorization": ""})
         self.assertEqual(resposta.status_code, 401)
         self.assertEqual(resposta.json()["erro"]["codigo"], "nao_autenticado")
-        cliente_sem_auth.close()
 
     def test_acesso_com_token_invalido_retorna_401(self):
-        cliente_invalido = TestClient(criar_app(self.config, session_factory=self.Session))
-        cliente_invalido.headers["Authorization"] = "Bearer token_falsificado_invalido"
-        resposta = cliente_invalido.get("/api/me")
+        resposta = self.cliente.get("/api/me", headers={"Authorization": "Bearer token_falsificado_invalido"})
         self.assertEqual(resposta.status_code, 401)
         self.assertEqual(resposta.json()["erro"]["codigo"], "token_invalido")
-        cliente_invalido.close()
 
     def test_acesso_com_token_expirado_retorna_401(self):
         jwt_expirado = ServicoJWT(duracao=timedelta(seconds=-10))
         token_velho = jwt_expirado.gerar_token(user_id=1, email="teste@quickclick.com.br")
 
-        cliente_expirado = TestClient(criar_app(self.config, session_factory=self.Session))
-        cliente_expirado.headers["Authorization"] = f"Bearer {token_velho}"
-        resposta = cliente_expirado.get("/api/me")
+        resposta = self.cliente.get("/api/me", headers={"Authorization": f"Bearer {token_velho}"})
         self.assertEqual(resposta.status_code, 401)
         self.assertEqual(resposta.json()["erro"]["codigo"], "token_invalido")
-        cliente_expirado.close()
 
 
 class TestApiConsultas(BaseApi):
@@ -254,9 +351,9 @@ class TestApiConsultas(BaseApi):
         marketplaces = self.cliente.get("/api/marketplaces").json()["marketplaces"]
         self.assertEqual(len(marketplaces), 9)
         self.assertEqual(
-            [m["nome"] for m in marketplaces if m["status"] == "disponivel"], ["Mercado Livre", "Shopee", "Amazon"]
+            [m["nome"] for m in marketplaces if m["status"] == "disponivel"], ["Mercado Livre"]
         )
-        self.assertEqual(sum(m["status"] == "em_breve" for m in marketplaces), 6)
+        self.assertEqual(sum(m["status"] == "em_breve" for m in marketplaces), 8)
         self.assertFalse(any(m["conectado"] for m in marketplaces))
 
 
@@ -273,6 +370,44 @@ class TestApiConexoes(BaseApi):
         self.assertFalse(resposta.json()["conectado"])
         self.assertEqual(self.conectados(), [])
 
+    def test_obter_url_autorizacao_mercado_livre(self):
+        resposta = self.cliente.get("/api/marketplaces/mercado-livre/authorize-url")
+        self.assertEqual(resposta.status_code, 200)
+        dados = resposta.json()
+        self.assertIn("url", dados)
+        self.assertTrue(dados["url"].startswith("http"))
+        self.assertIn("state=", dados["url"])
+
+    def test_callback_oauth_mercado_livre(self):
+        auth_url_resp = self.cliente.get("/api/marketplaces/mercado-livre/authorize-url")
+        url = auth_url_resp.json()["url"]
+        query = parse_qs(urlparse(url).query)
+        estado = query["state"][0]
+
+        # Simula o redirecionamento de retorno do Mercado Livre para a nossa API
+        callback_resp = self.cliente.get(
+            f"/api/marketplaces/mercado-livre/callback?code=codigo_teste_oauth&state={estado}",
+            follow_redirects=False,
+        )
+        self.assertEqual(callback_resp.status_code, 302)
+        self.assertIn("/#/marketplaces?conectado=mercado-livre", callback_resp.headers["location"])
+        self.assertIn("mercado-livre", self.conectados())
+
+    def test_listar_e_publicar_produtos_mercado_livre(self):
+        self.conectar("mercado-livre")
+        # Listar produtos para monitoramento
+        produtos_resp = self.cliente.get("/api/marketplaces/mercado-livre/products")
+        self.assertEqual(produtos_resp.status_code, 200)
+        self.assertIsInstance(produtos_resp.json(), list)
+
+        # Publicar um novo anúncio
+        novo_produto = {"title": "Fone de Ouvido Bluetooth", "price": 149.90}
+        pub_resp = self.cliente.post("/api/marketplaces/mercado-livre/products", json=novo_produto)
+        self.assertEqual(pub_resp.status_code, 200)
+        self.assertIn("id", pub_resp.json())
+        self.assertEqual(pub_resp.json()["title"], "Fone de Ouvido Bluetooth")
+
+    @patch("backend.domain.marketplace.CATALOGO", CATALOGO_TESTE)
     def test_limite_do_plano_gratis_responde_403_dizendo_o_plano(self):
         self.conectar("mercado-livre")
 
@@ -301,22 +436,24 @@ class TestApiConexoes(BaseApi):
                 self.assertEqual(resposta.json()["erro"]["codigo"], "marketplace_nao_encontrado")
 
     def test_conectar_duas_vezes_nao_da_erro(self):
-        self.assertEqual(self.conectar("amazon").status_code, 200)
-        self.assertEqual(self.conectar("amazon").status_code, 200)
-        self.assertEqual(self.conectados(), ["amazon"])
+        self.assertEqual(self.conectar("mercado-livre").status_code, 200)
+        self.assertEqual(self.conectar("mercado-livre").status_code, 200)
+        self.assertEqual(self.conectados(), ["mercado-livre"])
 
     def test_desconectar_libera_a_vaga(self):
         self.conectar("mercado-livre")
-        self.cliente.delete("/api/marketplaces/mercado-livre/connection")
-        self.assertEqual(self.conectar("shopee").status_code, 200)
+        resposta = self.cliente.delete("/api/marketplaces/mercado-livre/connection")
+        self.assertEqual(resposta.status_code, 200)
+        self.assertEqual(self.conectados(), [])
 
     def test_conexoes_ficam_salvas_no_banco(self):
-        self.conectar("amazon")
-        outro_cliente = TestClient(criar_app(self.config, session_factory=self.Session))
-        outro_cliente.headers["Authorization"] = f"Bearer {self.token}"
-        self.addCleanup(outro_cliente.close)
-        conectados = [m["slug"] for m in outro_cliente.get("/api/marketplaces").json()["marketplaces"] if m["conectado"]]
-        self.assertEqual(conectados, ["amazon"])
+        self.conectar("mercado-livre")
+        with self.Session() as session:
+            salvas = [
+                c.marketplace
+                for c in session.query(models.ContaVinculadaModel).filter_by(vendedor_id=1).all()
+            ]
+        self.assertEqual(salvas, ["mercado-livre"])
 
 
 class TestApiPlanoPro(BaseApi):
@@ -328,12 +465,10 @@ class TestApiPlanoPro(BaseApi):
                 vendedor.plano = "pro"
                 session.commit()
 
-    def test_pro_conecta_os_tres_disponiveis(self):
-        for slug in ("mercado-livre", "shopee", "amazon"):
-            self.assertEqual(self.conectar(slug).status_code, 200)
+    def test_pro_mostra_dados_do_plano(self):
         eu = self.cliente.get("/api/me").json()
         self.assertEqual(eu["plano"]["nome"], "Pro")
-        self.assertEqual(eu["marketplaces_conectados"], 3)
+        self.assertEqual(eu["marketplaces_conectados"], 0)
         self.assertTrue(eu["pode_conectar_mais"])
         self.assertIsNone(eu["plano_para_mais_marketplaces"])
 

@@ -35,6 +35,7 @@ STATUS_POR_ERRO: tuple[tuple[type[ErroDeDominio], int], ...] = (
 )
 
 ERROS_HTTP = {
+    400: ("parametro_invalido", "Parâmetro inválido na requisição."),
     401: ("nao_autenticado", "Autenticação necessária para acessar este recurso."),
     404: ("nao_encontrado", "Esse endereço não existe na API."),
     405: ("metodo_nao_permitido", "Esse endereço não aceita esse tipo de pedido."),
@@ -54,10 +55,14 @@ def registrar_tratamento_de_erros(app: FastAPI) -> None:
             extras["plano_sugerido"] = erro.plano_sugerido.slug
         return _resposta(status, erro.codigo, erro.mensagem, **extras)
 
+    @app.exception_handler(ValueError)
+    async def erro_valor(request: Request, erro: ValueError) -> JSONResponse:
+        return _resposta(400, "parametro_invalido", str(erro))
+
     @app.exception_handler(HTTPException)
     async def erro_http(request: Request, erro: HTTPException):
         # Dentro de /api, o mesmo formato dos erros de negócio; fora dela, o padrão do FastAPI
         if not request.url.path.startswith("/api"):
             return await http_exception_handler(request, erro)
-        codigo, mensagem = ERROS_HTTP.get(erro.status_code, ("erro_http", "Não deu pra atender esse pedido."))
+        codigo, mensagem = ERROS_HTTP.get(erro.status_code, ("erro_http", erro.detail or "Não deu pra atender esse pedido."))
         return _resposta(erro.status_code, codigo, mensagem)

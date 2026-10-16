@@ -18,6 +18,8 @@ def _para_conta(linha: ContaVinculadaModel) -> ContaVinculada:
             access_token=linha.access_token,
             refresh_token=linha.refresh_token,
             expira_em=datetime.fromisoformat(linha.token_expira_em),
+            conta_externa_id=linha.conta_externa_id,
+            apelido=linha.apelido,
         ),
     )
 
@@ -56,17 +58,15 @@ class RepositorioContasVinculadasSQL:
                 linha = ContaVinculadaModel(
                     vendedor_id=conta.vendedor_id,
                     marketplace=conta.marketplace,
-                    conectada_em=conta.conectada_em.isoformat(),
-                    access_token=conta.credenciais.access_token,
-                    refresh_token=conta.credenciais.refresh_token,
-                    token_expira_em=conta.credenciais.expira_em.isoformat(),
                 )
                 session.add(linha)
-            else:
-                linha.conectada_em = conta.conectada_em.isoformat()
-                linha.access_token = conta.credenciais.access_token
-                linha.refresh_token = conta.credenciais.refresh_token
-                linha.token_expira_em = conta.credenciais.expira_em.isoformat()
+
+            linha.conectada_em = conta.conectada_em.isoformat()
+            linha.access_token = conta.credenciais.access_token
+            linha.refresh_token = conta.credenciais.refresh_token
+            linha.token_expira_em = conta.credenciais.expira_em.isoformat()
+            linha.conta_externa_id = conta.credenciais.conta_externa_id
+            linha.apelido = conta.credenciais.apelido
             session.commit()
 
     def remover(self, vendedor_id: int, marketplace: str) -> None:

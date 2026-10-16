@@ -7,7 +7,7 @@ import useListingPhotos from '@/application/listings/useListingPhotos.js';
 import useAiDetails from '@/application/listings/useAiDetails.js';
 import { showToast, TOAST_TONES } from '@/application/feedback/toastStore.js';
 import { createListing, getListing, updateListing } from '@/infrastructure/storage/listingsRepository.js';
-import { listConnections } from '@/infrastructure/storage/connectionsRepository.js';
+import { fetchConnectedMarketplaces } from '@/infrastructure/marketplaces/marketplacesService.js';
 import { clearDraft, getDraft, saveDraft } from '@/infrastructure/storage/draftsRepository.js';
 import { StorageFullError } from '@/infrastructure/storage/localStore.js';
 import { focusFirstInvalid } from '@/infrastructure/browser/focus.js';
@@ -59,7 +59,7 @@ export default function useListingEditor({ listingId, celebrate }) {
     loaded.current = false;
     (async () => {
       try {
-        const connections = await listConnections(accountId);
+        const connections = await fetchConnectedMarketplaces().catch(() => []);
         if (!mounted.current) return;
         setConnection(connections.find((item) => item.slug === PRIMARY_CHANNEL) ?? null);
         if (editing) {
@@ -283,8 +283,6 @@ export default function useListingEditor({ listingId, celebrate }) {
     publishing,
     result,
     restart,
-    savedAt: autosave.savedAt,
-    storageFull: autosave.storageFull,
-    original
+    clearSavedAt
   };
 }

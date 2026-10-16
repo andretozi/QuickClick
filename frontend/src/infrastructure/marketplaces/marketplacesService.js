@@ -1,15 +1,10 @@
 /**
  * Infraestrutura · Serviço de marketplaces
  *
- * Conversa com a API do back e traduz o JSON (em português) para o formato do front.
- * A autorização OAuth ainda é simulada no back: aqui o "Autorizando…" dura um instante,
- * como se o vendedor tivesse ido até o marketplace e voltado. Com a integração real,
- * connectMarketplace passa a levar o vendedor para a URL de autorização do marketplace.
+ * Comunicação direta com a API do backend para listagem, autorização OAuth,
+ * monitoramento e publicação de produtos nos marketplaces conectados.
  */
-import { ApiError, requestJson } from '@/infrastructure/http/httpClient.js';
-
-const SIMULATED_AUTHORIZATION_MS = 1500; // tempo do "Autorizando…" quando dá certo
-const MIN_FEEDBACK_MS = 450; // quando dá errado, o suficiente para a tela não piscar
+import { ApiError, requestJson } from '../http/httpClient.js';
 
 /** Tipos de erro que a tela sabe explicar. */
 export const CONNECTION_ERRORS = {
@@ -35,8 +30,6 @@ export function describeError(error) {
   return { kind: CONNECTION_ERRORS.UNKNOWN, message: '' };
 }
 
-const waitUntil = (timestamp) => new Promise((resolve) => setTimeout(resolve, Math.max(0, timestamp - Date.now())));
-
 const toPlan = (plano) => plano && { slug: plano.slug, name: plano.nome, limit: plano.limite_marketplaces };
 
 const toSeller = (vendedor) => ({
@@ -51,10 +44,11 @@ const toMarketplace = (marketplace) => ({
   slug: marketplace.slug,
   name: marketplace.nome,
   available: marketplace.status === 'disponivel',
-  connected: marketplace.conectado
+  connected: marketplace.conectado,
+  connectedAt: marketplace.conectado_em
 });
 
-const connectionPath = (slug) => `/marketplaces/${encodeURIComponent(slug)}/connection`;
+const marketplaceRoute = (slug, action = '') => `/marketplaces/${encodeURIComponent(slug)}${action}`;
 
 export async function fetchSeller() {
   return toSeller(await requestJson('/me'));
@@ -65,18 +59,37 @@ export async function fetchMarketplaces() {
   return marketplaces.map(toMarketplace);
 }
 
-export async function connectMarketplace(slug) {
-  const startedAt = Date.now();
-  try {
-    const marketplace = await requestJson(connectionPath(slug), { method: 'POST' });
-    await waitUntil(startedAt + SIMULATED_AUTHORIZATION_MS);
-    return toMarketplace(marketplace);
-  } catch (error) {
-    await waitUntil(startedAt + MIN_FEEDBACK_MS);
-    throw error;
-  }
+export async function fetchConnectedMarketplaces() {
+  const marketplaces = await fetchMarketplaces();
+  return marketplaces
+    .filter((m) => m.connected)
+    .map((m) => ({
+      slug: m.slug,
+      nickname: m.name,
+      connectedAt: m.connectedAt ?? new Date().toISOString(),
+      syncedAt: m.connectedAt ?? new Date().toISOString()
+    }));
+}
+
+/** Obtém a URL de autorização OAuth real do marketplace para redirecionar o vendedor. */
+export async function fetchAuthorizeUrl(slug) {
+  const data = await requestJson(marketplaceRoute(slug, '/authorize-url'));
+  return data.url;
 }
 
 export async function disconnectMarketplace(slug) {
-  return toMarketplace(await requestJson(connectionPath(slug), { method: 'DELETE' }));
+  return toMarketplace(await requestJson(marketplaceRoute(slug, '/connection'), { method: 'DELETE' }));
+}
+
+/** Consulta os produtos/anúncios do marketplace para monitoramento. */
+export async function fetchMarketplaceProducts(slug) {
+  return await requestJson(marketplaceRoute(slug, '/products'));
+}
+
+/** Publica um novo anúncio na conta do vendedor no marketplace. */
+export async function publishMarketplaceProduct(slug, productData) {
+  return await requestJson(marketplaceRoute(slug, '/products'), {
+    method: 'POST',
+    body: productData
+  });
 }

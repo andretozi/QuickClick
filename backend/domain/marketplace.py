@@ -30,8 +30,8 @@ class Marketplace:
 
 CATALOGO: tuple[Marketplace, ...] = (
     Marketplace("mercado-livre", "Mercado Livre", StatusMarketplace.DISPONIVEL),
-    Marketplace("shopee", "Shopee", StatusMarketplace.DISPONIVEL),
-    Marketplace("amazon", "Amazon", StatusMarketplace.DISPONIVEL),
+    Marketplace("shopee", "Shopee", StatusMarketplace.EM_BREVE),
+    Marketplace("amazon", "Amazon", StatusMarketplace.EM_BREVE),
     Marketplace("magalu", "Magalu", StatusMarketplace.EM_BREVE),
     Marketplace("americanas", "Americanas", StatusMarketplace.EM_BREVE),
     Marketplace("casas-bahia", "Casas Bahia", StatusMarketplace.EM_BREVE),

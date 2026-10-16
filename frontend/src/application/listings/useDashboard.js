@@ -9,7 +9,7 @@ import {
   removeListing,
   updateListing
 } from '@/infrastructure/storage/listingsRepository.js';
-import { listConnections } from '@/infrastructure/storage/connectionsRepository.js';
+import { fetchConnectedMarketplaces } from '@/infrastructure/marketplaces/marketplacesService.js';
 import { currentHour } from '@/infrastructure/browser/events.js';
 import {
   LISTING_STATUS,
@@ -49,7 +49,10 @@ export default function useDashboard() {
     if (!accountId) return;
     setData((current) => ({ ...current, status: 'loading' }));
     try {
-      const [listings, connections] = await Promise.all([listListings(accountId), listConnections(accountId)]);
+      const [listings, connections] = await Promise.all([
+        listListings(accountId),
+        fetchConnectedMarketplaces().catch(() => [])
+      ]);
       if (mounted.current) setData({ status: 'ready', listings, connections });
     } catch {
       if (mounted.current) setData((current) => ({ ...current, status: 'error' }));

@@ -20,18 +20,14 @@ except ImportError:
 
 # Carrega .env somente se o arquivo existir fisicamente (na Azure, o os.environ já é injetado pelo portal)
 _raiz = Path(__file__).resolve().parents[2]
-if (_raiz / ".env").is_file():
-    try:
-        from dotenv import load_dotenv
-        load_dotenv(_raiz / ".env")
-    except ImportError:
-        pass
-elif (_raiz / "backend" / ".env").is_file():
-    try:
-        from dotenv import load_dotenv
-        load_dotenv(_raiz / "backend" / ".env")
-    except ImportError:
-        pass
+for _caminho_env in (_raiz / ".env", _raiz / "backend" / ".env"):
+    if _caminho_env.is_file():
+        try:
+            from dotenv import load_dotenv
+            load_dotenv(_caminho_env)
+        except ImportError:
+            pass
+        break
 
 
 def normalizar_url_postgres(url: str) -> str:
