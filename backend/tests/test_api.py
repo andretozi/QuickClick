@@ -2,6 +2,7 @@
 
 import tempfile
 import unittest
+from datetime import timedelta
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -10,16 +11,15 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from backend.app.bootstrap import criar_app
-from backend.infrastructure.banco import models  # noqa: F401
+from backend.infrastructure.banco import models
 from backend.infrastructure.config import Config
 from backend.infrastructure.database import Base
+from backend.infrastructure.seguranca.token_jwt import ServicoJWT
 
 INDEX_HTML = "<!doctype html><title>Quick Click</title>"
 
 
 class BaseApi(unittest.TestCase):
-    plano_demo = "gratis"
-
     def setUp(self):
         self._pasta = tempfile.TemporaryDirectory()
         raiz = Path(self._pasta.name)
@@ -30,7 +30,6 @@ class BaseApi(unittest.TestCase):
             raiz=raiz,
             pasta_front=front,
             caminho_banco=raiz / "dados" / "teste.sqlite3",
-            plano_demo=self.plano_demo,
         )
         self._engine = create_engine(
             "sqlite:///:memory:",
@@ -40,6 +39,19 @@ class BaseApi(unittest.TestCase):
         Base.metadata.create_all(bind=self._engine)
         self.Session = sessionmaker(autocommit=False, autoflush=False, bind=self._engine)
         self.cliente = TestClient(criar_app(self.config, session_factory=self.Session))
+
+        # Criação real da conta do vendedor via endpoint de cadastro (sem dados mockados/seeds)
+        resp = self.cliente.post(
+            "/api/auth/register",
+            json={
+                "nome": "Vendedor Teste",
+                "email": "teste@quickclick.com.br",
+                "loja": "Loja Teste",
+                "senha": "senha_segura_123",
+            },
+        )
+        self.token = resp.json()["token"]
+        self.cliente.headers["Authorization"] = f"Bearer {self.token}"
 
     def tearDown(self):
         self.cliente.close()
@@ -80,13 +92,147 @@ class TestApiSistema(BaseApi):
     def test_documentacao_automatica(self):
         self.assertEqual(self.cliente.get("/docs").status_code, 200)
         caminhos = self.cliente.get("/openapi.json").json()["paths"]
-        for caminho in ("/api/health", "/api/plans", "/api/me", "/api/marketplaces", "/api/marketplaces/{slug}/connection"):
+        for caminho in (
+            "/api/health",
+            "/api/plans",
+            "/api/auth/register",
+            "/api/auth/login",
+            "/api/auth/me",
+            "/api/me",
+            "/api/marketplaces",
+            "/api/marketplaces/{slug}/connection",
+        ):
             self.assertIn(caminho, caminhos)
 
-    def test_plano_demo_invalido_para_o_boot_com_mensagem_clara(self):
-        config = Config(self.config.raiz, self.config.pasta_front, self.config.caminho_banco, plano_demo="premium")
-        with self.assertRaisesRegex(ValueError, "QUICKCLICK_PLANO_DEMO"):
-            criar_app(config, session_factory=self.Session)
+    def test_quando_nao_ha_vendedor_no_banco_api_me_retorna_404(self):
+        token_inexistente = ServicoJWT().gerar_token(user_id=999, email="nao_existe@quickclick.com.br")
+        cliente_sem_vendedor = TestClient(criar_app(self.config, session_factory=self.Session))
+        cliente_sem_vendedor.headers["Authorization"] = f"Bearer {token_inexistente}"
+        resposta = cliente_sem_vendedor.get("/api/me")
+        self.assertEqual(resposta.status_code, 404)
+        self.assertEqual(resposta.json()["erro"]["codigo"], "vendedor_nao_encontrado")
+        cliente_sem_vendedor.close()
+
+
+class TestAutenticacaoJWT(BaseApi):
+    def test_cadastro_com_sucesso_retorna_token_jwt_e_usuario(self):
+        dados = {
+            "nome": "Carlos Silva",
+            "email": "carlos@exemplo.com",
+            "loja": "Loja do Carlos",
+            "senha": "senha_segura_123",
+        }
+        resposta = self.cliente.post("/api/auth/register", json=dados)
+        self.assertEqual(resposta.status_code, 200)
+        corpo = resposta.json()
+        self.assertIn("token", corpo)
+        self.assertTrue(len(corpo["token"]) > 20)
+        self.assertEqual(corpo["usuario"]["email"], "carlos@exemplo.com")
+        self.assertEqual(corpo["usuario"]["nome"], "Carlos Silva")
+        self.assertEqual(corpo["usuario"]["plano"], "gratis")
+
+    def test_cadastro_com_email_duplicado_retorna_409(self):
+        dados = {
+            "nome": "Maria",
+            "email": "maria@exemplo.com",
+            "loja": "Loja Maria",
+            "senha": "senha_secreta_456",
+        }
+        primeiro = self.cliente.post("/api/auth/register", json=dados)
+        self.assertEqual(primeiro.status_code, 200)
+
+        segundo = self.cliente.post("/api/auth/register", json=dados)
+        self.assertEqual(segundo.status_code, 409)
+        self.assertEqual(segundo.json()["erro"]["codigo"], "email_em_uso")
+
+    def test_login_com_credenciais_corretas_retorna_token_jwt(self):
+        dados = {
+            "nome": "Ana",
+            "email": "ana@exemplo.com",
+            "loja": "Loja da Ana",
+            "senha": "minha_senha_forte",
+        }
+        self.cliente.post("/api/auth/register", json=dados)
+
+        login_resp = self.cliente.post(
+            "/api/auth/login",
+            json={"email": "ana@exemplo.com", "senha": "minha_senha_forte"},
+        )
+        self.assertEqual(login_resp.status_code, 200)
+        self.assertIn("token", login_resp.json())
+        self.assertEqual(login_resp.json()["usuario"]["email"], "ana@exemplo.com")
+
+    def test_login_com_senha_incorreta_retorna_401(self):
+        dados = {
+            "nome": "Bia",
+            "email": "bia@exemplo.com",
+            "loja": "Loja da Bia",
+            "senha": "senha_correta_123",
+        }
+        self.cliente.post("/api/auth/register", json=dados)
+
+        login_resp = self.cliente.post(
+            "/api/auth/login",
+            json={"email": "bia@exemplo.com", "senha": "senha_errada"},
+        )
+        self.assertEqual(login_resp.status_code, 401)
+        self.assertEqual(login_resp.json()["erro"]["codigo"], "credenciais_invalidas")
+
+    def test_login_com_email_inexistente_retorna_401(self):
+        login_resp = self.cliente.post(
+            "/api/auth/login",
+            json={"email": "fantasma@exemplo.com", "senha": "qualquer_senha"},
+        )
+        self.assertEqual(login_resp.status_code, 401)
+        self.assertEqual(login_resp.json()["erro"]["codigo"], "credenciais_invalidas")
+
+    def test_obter_usuario_atual_via_token_jwt(self):
+        dados = {
+            "nome": "Carla Diaz",
+            "email": "carla@exemplo.com",
+            "loja": "Loja da Carla",
+            "senha": "senha_segura_123",
+        }
+        cad_resp = self.cliente.post("/api/auth/register", json=dados)
+        self.assertEqual(cad_resp.status_code, 200)
+        token = cad_resp.json()["token"]
+
+        cliente_carla = TestClient(criar_app(self.config, session_factory=self.Session))
+        cliente_carla.headers["Authorization"] = f"Bearer {token}"
+        me_resp = cliente_carla.get("/api/auth/me")
+        self.assertEqual(me_resp.status_code, 200)
+        usuario = me_resp.json()
+        self.assertEqual(usuario["email"], "carla@exemplo.com")
+        self.assertEqual(usuario["nome"], "Carla Diaz")
+        self.assertEqual(usuario["loja"], "Loja da Carla")
+        self.assertEqual(usuario["plano"], "gratis")
+        cliente_carla.close()
+
+    def test_acesso_a_rota_protegida_sem_token_retorna_401(self):
+        cliente_sem_auth = TestClient(criar_app(self.config, session_factory=self.Session))
+        resposta = cliente_sem_auth.get("/api/me")
+        self.assertEqual(resposta.status_code, 401)
+        self.assertEqual(resposta.json()["erro"]["codigo"], "nao_autenticado")
+        cliente_sem_auth.close()
+
+    def test_acesso_com_token_invalido_retorna_401(self):
+        cliente_invalido = TestClient(criar_app(self.config, session_factory=self.Session))
+        cliente_invalido.headers["Authorization"] = "Bearer token_falsificado_invalido"
+        resposta = cliente_invalido.get("/api/me")
+        self.assertEqual(resposta.status_code, 401)
+        self.assertEqual(resposta.json()["erro"]["codigo"], "token_invalido")
+        cliente_invalido.close()
+
+    def test_acesso_com_token_expirado_retorna_401(self):
+        jwt_expirado = ServicoJWT(duracao=timedelta(seconds=-10))
+        token_velho = jwt_expirado.gerar_token(user_id=1, email="teste@quickclick.com.br")
+
+        cliente_expirado = TestClient(criar_app(self.config, session_factory=self.Session))
+        cliente_expirado.headers["Authorization"] = f"Bearer {token_velho}"
+        resposta = cliente_expirado.get("/api/me")
+        self.assertEqual(resposta.status_code, 401)
+        self.assertEqual(resposta.json()["erro"]["codigo"], "token_invalido")
+        cliente_expirado.close()
 
 
 class TestApiConsultas(BaseApi):
@@ -97,7 +243,7 @@ class TestApiConsultas(BaseApi):
         self.assertIsNone(planos[2]["preco_mensal_centavos"])
         self.assertEqual([p["limite_marketplaces"] for p in planos], [1, 1, None, None])
 
-    def test_me_e_o_vendedor_de_demonstracao_no_plano_gratis(self):
+    def test_me_retorna_dados_do_vendedor_no_plano_gratis(self):
         eu = self.cliente.get("/api/me").json()
         self.assertEqual(eu["plano"]["slug"], "gratis")
         self.assertEqual(eu["marketplaces_conectados"], 0)
@@ -166,14 +312,21 @@ class TestApiConexoes(BaseApi):
 
     def test_conexoes_ficam_salvas_no_banco(self):
         self.conectar("amazon")
-        outro_cliente = TestClient(criar_app(self.config, session_factory=self.Session))  # simula reiniciar o servidor
+        outro_cliente = TestClient(criar_app(self.config, session_factory=self.Session))
+        outro_cliente.headers["Authorization"] = f"Bearer {self.token}"
         self.addCleanup(outro_cliente.close)
         conectados = [m["slug"] for m in outro_cliente.get("/api/marketplaces").json()["marketplaces"] if m["conectado"]]
         self.assertEqual(conectados, ["amazon"])
 
 
 class TestApiPlanoPro(BaseApi):
-    plano_demo = "pro"
+    def setUp(self):
+        super().setUp()
+        with self.Session() as session:
+            vendedor = session.query(models.VendedorModel).filter_by(id=1).first()
+            if vendedor:
+                vendedor.plano = "pro"
+                session.commit()
 
     def test_pro_conecta_os_tres_disponiveis(self):
         for slug in ("mercado-livre", "shopee", "amazon"):

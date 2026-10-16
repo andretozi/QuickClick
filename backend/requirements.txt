@@ -8,3 +8,5 @@ psycopg2-binary>=2.9,<3
 psycopg[binary]>=3.1,<4
 sqlalchemy>=2.0,<3
 python-dotenv>=1.0,<2
+# Autenticação e Segurança (JWT)
+pyjwt>=2.8,<3

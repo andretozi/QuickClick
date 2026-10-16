@@ -69,3 +69,31 @@ class LimiteDoPlanoAtingido(ErroDeDominio):
         super().__init__(mensagem)
         self.plano = plano
         self.plano_sugerido = plano_sugerido
+
+
+class NaoAutenticado(ErroDeDominio):
+    codigo = "nao_autenticado"
+
+    def __init__(self, mensagem: str = "Autenticação necessária para acessar este recurso."):
+        super().__init__(mensagem)
+
+
+class CredenciaisInvalidas(ErroDeDominio):
+    codigo = "credenciais_invalidas"
+
+    def __init__(self, mensagem: str = "Email ou senha incorretos."):
+        super().__init__(mensagem)
+
+
+class EmailJaCadastrado(ErroDeDominio):
+    codigo = "email_em_uso"
+
+    def __init__(self, mensagem: str = "Este email já está cadastrado."):
+        super().__init__(mensagem)
+
+
+class TokenInvalido(ErroDeDominio):
+    codigo = "token_invalido"
+
+    def __init__(self, mensagem: str = "Token de autenticação inválido ou expirado."):
+        super().__init__(mensagem)

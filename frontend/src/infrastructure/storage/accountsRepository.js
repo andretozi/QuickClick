@@ -143,3 +143,38 @@ export async function deleteAccount(id, password) {
   save(load().filter((item) => item.id !== id));
   clearUser(id);
 }
+
+/**
+ * Garante que a conta autenticada pela API ou recuperada com o token JWT
+ * esteja salva localmente para os repositórios locais (rascunhos, preferências).
+ */
+export function upsertAccount(contaData) {
+  const contas = load();
+  const id = contaData.id;
+  const normalizedEmail = normalizeEmail(contaData.email);
+  const index = contas.findIndex((c) => c.id === id || c.email === normalizedEmail);
+  const now = nowIso();
+  const existing = index >= 0 ? contas[index] : null;
+
+  const conta = {
+    id: contaData.id,
+    nome: (contaData.name ?? contaData.nome ?? existing?.nome ?? '').trim(),
+    email: normalizedEmail,
+    telefone: (contaData.phone ?? contaData.telefone ?? existing?.telefone ?? '').trim(),
+    loja: (contaData.store ?? contaData.loja ?? existing?.loja ?? '').trim(),
+    plano: contaData.plan ?? contaData.plano ?? existing?.plano ?? 'gratis',
+    cor_avatar: contaData.avatarColor ?? contaData.cor_avatar ?? existing?.cor_avatar ?? 'coral',
+    senha: existing?.senha ?? '',
+    criada_em: existing?.criada_em ?? now,
+    atualizada_em: now
+  };
+
+  if (index >= 0) {
+    const next = [...contas];
+    next[index] = conta;
+    save(next);
+  } else {
+    save([...contas, conta]);
+  }
+  return toAccount(conta);
+}
