@@ -2,11 +2,14 @@
 
 from dataclasses import dataclass
 
+from backend.application.casos_de_uso.autenticar_usuario import AutenticarUsuario, ResultadoAutenticacao
 from backend.application.casos_de_uso.conectar_marketplace import ConectarMarketplace
 from backend.application.casos_de_uso.desconectar_marketplace import DesconectarMarketplace
 from backend.application.casos_de_uso.listar_marketplaces import ListarMarketplaces
 from backend.application.casos_de_uso.listar_planos import ListarPlanos
+from backend.application.casos_de_uso.obter_usuario_atual import ObterUsuarioAtual
 from backend.application.casos_de_uso.obter_vendedor_atual import ObterVendedorAtual
+from backend.application.casos_de_uso.registrar_usuario import RegistrarUsuario
 
 
 @dataclass(frozen=True)
@@ -18,3 +21,6 @@ class CasosDeUso:
     listar_marketplaces: ListarMarketplaces
     conectar_marketplace: ConectarMarketplace
     desconectar_marketplace: DesconectarMarketplace
+    autenticar_usuario: AutenticarUsuario | None = None
+    registrar_usuario: RegistrarUsuario | None = None
+    obter_usuario_atual: ObterUsuarioAtual | None = None

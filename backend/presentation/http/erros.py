@@ -12,10 +12,14 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
 
 from backend.domain.erros import (
+    CredenciaisInvalidas,
+    EmailJaCadastrado,
     ErroDeDominio,
     LimiteDoPlanoAtingido,
     MarketplaceEmBreve,
     MarketplaceNaoEncontrado,
+    NaoAutenticado,
+    TokenInvalido,
     VendedorNaoEncontrado,
 )
 
@@ -24,9 +28,14 @@ STATUS_POR_ERRO: tuple[tuple[type[ErroDeDominio], int], ...] = (
     (VendedorNaoEncontrado, 404),
     (MarketplaceEmBreve, 409),
     (LimiteDoPlanoAtingido, 403),
+    (NaoAutenticado, 401),
+    (CredenciaisInvalidas, 401),
+    (TokenInvalido, 401),
+    (EmailJaCadastrado, 409),
 )
 
 ERROS_HTTP = {
+    401: ("nao_autenticado", "Autenticação necessária para acessar este recurso."),
     404: ("nao_encontrado", "Esse endereço não existe na API."),
     405: ("metodo_nao_permitido", "Esse endereço não aceita esse tipo de pedido."),
 }

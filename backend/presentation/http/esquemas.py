@@ -7,12 +7,13 @@ As funções de conversão traduzem os resultados dos casos de uso para JSON.
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 from backend.application.casos_de_uso.comum import MarketplaceDoVendedor
 from backend.application.casos_de_uso.obter_vendedor_atual import ResumoDoVendedor
 from backend.domain.marketplace import StatusMarketplace
 from backend.domain.plano import Plano
+from backend.domain.usuario import Usuario
 
 
 class Saude(BaseModel):
@@ -54,6 +55,31 @@ class ListaDeMarketplaces(BaseModel):
     marketplaces: list[MarketplaceSaida]
 
 
+class UsuarioSaida(BaseModel):
+    id: int
+    email: str
+    nome: str
+    loja: str
+    plano: str
+
+
+class RespostaAutenticacao(BaseModel):
+    token: str = Field(description="Token de autenticação JWT Bearer")
+    usuario: UsuarioSaida
+
+
+class RequisicaoCadastro(BaseModel):
+    email: str = Field(examples=["vendedor@quickclick.com.br"])
+    senha: str = Field(min_length=6, description="Senha com no mínimo 6 caracteres")
+    nome: str = Field(default="", examples=["André Tozi"])
+    loja: str = Field(default="", examples=["Minha Loja Oficial"])
+
+
+class RequisicaoLogin(BaseModel):
+    email: str = Field(examples=["vendedor@quickclick.com.br"])
+    senha: str = Field(description="Senha do usuário")
+
+
 class DetalheDoErro(BaseModel):
     codigo: str = Field(examples=["limite_do_plano"])
     mensagem: str = Field(description="Texto amigável, pronto para aparecer na tela")
@@ -93,4 +119,14 @@ def marketplace_saida(item: MarketplaceDoVendedor) -> MarketplaceSaida:
         status=item.marketplace.status,
         conectado=item.conectado,
         conectado_em=None if item.conta is None else item.conta.conectada_em,
+    )
+
+
+def usuario_saida(usuario: Usuario) -> UsuarioSaida:
+    return UsuarioSaida(
+        id=usuario.id,
+        email=usuario.email,
+        nome=usuario.nome,
+        loja=usuario.loja,
+        plano=usuario.plano,
     )
