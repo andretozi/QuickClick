@@ -11,15 +11,12 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-PLANO_DEMO_PADRAO = "gratis"
-
 
 @dataclass(frozen=True)
 class Config:
     raiz: Path
     pasta_front: Path  # front buildado (frontend/dist), servido fora de /api
     caminho_banco: Path | None = None  # opcional / legado
-    plano_demo: str = PLANO_DEMO_PADRAO  # slug do plano do vendedor de demonstração
 
 
 def ler_arquivo_env(caminho: Path) -> dict[str, str]:
@@ -44,5 +41,4 @@ def carregar_config(raiz: Path, ambiente: Mapping[str, str] | None = None) -> Co
         raiz=raiz,
         pasta_front=raiz / "frontend" / "dist",
         caminho_banco=(banco if banco.is_absolute() else raiz / banco) if banco else None,
-        plano_demo=(valores.get("QUICKCLICK_PLANO_DEMO") or PLANO_DEMO_PADRAO).strip().lower(),
     )

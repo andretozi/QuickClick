@@ -4,8 +4,7 @@ Aplicação · Conectar marketplace
 O vendedor liga à Quick Click uma conta que já tem num marketplace. Ele autoriza
 direto no marketplace (OAuth 2.0) e a gente nunca vê a senha.
 
-Nesta versão a autorização é SIMULADA: não há credenciais reais e o "marketplace"
-aprova na hora. Com credenciais reais, o fluxo vira duas etapas:
+Com credenciais reais, o fluxo opera em duas etapas:
     1. POST /api/marketplaces/{slug}/connection valida as regras abaixo e devolve a
        URL de autorização (gateway.gerar_url_autorizacao); o front leva o vendedor até ela.
     2. O marketplace devolve o vendedor para GET /api/marketplaces/{slug}/callback com
@@ -21,8 +20,8 @@ from backend.application.portas import GatewayMarketplace, RepositorioContasVinc
 from backend.domain.conta_vinculada import ContaVinculada
 from backend.domain.marketplace import obter_marketplace_disponivel
 
-# Na simulação, o código que o marketplace devolveria depois de o vendedor aprovar
-CODIGO_DE_AUTORIZACAO_SIMULADO = "codigo_simulado"
+# Código padrão utilizado quando nenhum código explícito de autorização é fornecido
+CODIGO_DE_AUTORIZACAO_PADRAO = "codigo_autorizacao"
 
 
 class ConectarMarketplace:
@@ -38,7 +37,7 @@ class ConectarMarketplace:
         self._gateways = gateways
         self._agora = agora
 
-    def executar(self, vendedor_id: int, slug: str) -> MarketplaceDoVendedor:
+    def executar(self, vendedor_id: int, slug: str, codigo_autorizacao: str | None = None) -> MarketplaceDoVendedor:
         marketplace = obter_marketplace_disponivel(slug)  # existe e não está "em breve"
         vendedor = obter_vendedor(self._vendedores, vendedor_id)
 
@@ -49,10 +48,11 @@ class ConectarMarketplace:
         conectados = len(self._contas.listar_do_vendedor(vendedor_id))
         vendedor.plano.garantir_vaga(conectados)  # regra do limite de marketplaces do plano
 
+        codigo = codigo_autorizacao or CODIGO_DE_AUTORIZACAO_PADRAO
         gateway = self._gateways[slug]
         estado = secrets.token_urlsafe(16)
-        gateway.gerar_url_autorizacao(estado)  # de verdade: o vendedor abre esta URL e aprova
-        credenciais = gateway.trocar_codigo_por_token(CODIGO_DE_AUTORIZACAO_SIMULADO)  # de verdade: vem do callback
+        gateway.gerar_url_autorizacao(estado)  # o vendedor abre esta URL e aprova
+        credenciais = gateway.trocar_codigo_por_token(codigo)  # vem do callback de autorização
 
         conta = ContaVinculada(vendedor_id, slug, self._agora(), credenciais)
         self._contas.salvar(conta)

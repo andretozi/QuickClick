@@ -10,15 +10,18 @@ from backend.infrastructure.database import Base
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(Integer, primary_key=True, index=True)
-    email = Column(String, unique=True, index=True)
-    password_hash = Column(String)
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    email = Column(String, unique=True, index=True, nullable=False)
+    password_hash = Column(String, nullable=False)
+    nome = Column(String, nullable=True)
+    loja = Column(String, nullable=True)
+    criado_em = Column(String, nullable=True)
 
 
 class MarketplaceToken(Base):
     __tablename__ = "marketplace_tokens"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id"))
     access_token = Column(String)
     refresh_token = Column(String)
@@ -27,7 +30,7 @@ class MarketplaceToken(Base):
 class AiUsage(Base):
     __tablename__ = "ai_usage"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id"))
     credits_left = Column(Integer, default=3)
 
