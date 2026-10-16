@@ -14,10 +14,9 @@ backend/data/
 *.sqlite3
 *.sqlite3-journal
 
-# Segredos: nunca vão para o Git (o modelo é o .env.example)
+# Segredos: nunca vão para o Git
 .env
 .env.*
-!.env.example
 
 # Configurações locais de editor e sistema
 .idea/
