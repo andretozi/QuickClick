@@ -15,7 +15,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from backend.application.casos_de_uso.conectar_marketplace import ConectarMarketplace
-from backend.application.ia.modelos import ArquivoDeFoto
+from backend.application.ia.modelos import ArquivoDeFoto, FotoPreparada
 from backend.application.ia.portas import FontePrecosMarketplace, PreparadorDeFotos, RepositorioDeAnalises
 from backend.application.portas import FalhaNoMarketplace, PublicadorMercadoLivre
 from backend.domain.erros import (
@@ -128,6 +128,12 @@ def _pede_family_name(corpo: Any) -> bool:
     return "family_name" in texto or ("title" in texto and "invalid" in texto)
 
 
+def _erro_tamanho_imagem_ml(corpo: Any) -> bool:
+    """Detecta recusa do Mercado Livre por resolução mínima (< 500 px após recorte de bordas brancas)."""
+    texto = str(corpo or "").lower()
+    return any(termo in texto for termo in ("500", "píxeles", "pixeles", "bordes", "tamaño", "tamano"))
+
+
 class PublicarNoMercadoLivre:
     def __init__(self, conectar: ConectarMarketplace, publicador: PublicadorMercadoLivre,
                  fonte: FontePrecosMarketplace, analises: RepositorioDeAnalises, preparador: PreparadorDeFotos):
@@ -136,6 +142,22 @@ class PublicarNoMercadoLivre:
         self._fonte = fonte
         self._analises = analises
         self._preparador = preparador
+
+    def _subir_imagens(self, token: str, preparadas: list[FotoPreparada]) -> list[dict[str, str]]:
+        enviadas: list[dict[str, str]] = []
+        for foto in preparadas:
+            nome = f"foto{foto.indice + 1}.jpg"
+            try:
+                pic_id = self._publicador.subir_imagem(token, foto.leitura_jpeg, nome)
+            except FalhaNoMarketplace as erro:
+                ampliar = getattr(self._preparador, "ampliar_para_publicacao", None)
+                if not callable(ampliar) or not _erro_tamanho_imagem_ml(erro.corpo):
+                    raise
+                log.info("Mercado Livre recusou %s por bordas brancas/tamanho; reenviando versão ampliada.", nome)
+                ampliada = ampliar(foto.leitura_jpeg)
+                pic_id = self._publicador.subir_imagem(token, ampliada, nome)
+            enviadas.append({"id": pic_id})
+        return enviadas
 
     def _ml_da_analise(self, vendedor_id: int, analise_id: str | None) -> dict[str, Any]:
         if not analise_id:
@@ -188,10 +210,7 @@ class PublicarNoMercadoLivre:
         )
 
         try:
-            imagens_novas = [
-                {"id": self._publicador.subir_imagem(token, f.leitura_jpeg, f"foto{f.indice + 1}.jpg")}
-                for f in preparadas
-            ]
+            imagens_novas = self._subir_imagens(token, preparadas)
             imagens = ([{"source": url} for url in dados.fotos_mantidas] + imagens_novas)[:6]
             item = {
                 "title": dados.titulo, "category_id": categoria_id, "price": dados.preco_centavos / 100,
@@ -250,10 +269,7 @@ class PublicarNoMercadoLivre:
         preparadas = self._preparador.preparar(fotos) if fotos else []
 
         try:
-            novas = [
-                {"id": self._publicador.subir_imagem(token, f.leitura_jpeg, f"foto{f.indice + 1}.jpg")}
-                for f in preparadas
-            ]
+            novas = self._subir_imagens(token, preparadas)
         except FalhaNoMarketplace as erro:
             raise PublicacaoRecusada(_causas(erro.corpo)) from erro
 

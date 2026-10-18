@@ -15,7 +15,7 @@ import io
 import logging
 import warnings
 
-from PIL import Image, ImageFilter, ImageOps, ImageStat, UnidentifiedImageError
+from PIL import Image, ImageDraw, ImageFilter, ImageOps, ImageStat, UnidentifiedImageError
 
 from backend.application.ia.modelos import ArquivoDeFoto, FotoPreparada
 from backend.domain.erros import FotoInvalida
@@ -38,6 +38,7 @@ Image.MAX_IMAGE_PIXELS = MAX_PIXELS  # acima disso o Pillow recusa (bomba de des
 LADO_DA_MEDIDA = 512
 LADO_MINIMO_ML = 1200  # Mercado Livre exige >= 500 px após cortar bordas brancas e recomenda 1200 px para zoom
 LADO_UTIL_MINIMO_ML = 1000
+LADO_AMPLIADO_ML = 1600
 
 try:  # HEIC do iPhone, se a biblioteca abrir
     from pillow_heif import register_heif_opener
@@ -60,15 +61,37 @@ def _redimensionada(imagem: Image.Image, lado_maior: int) -> Image.Image:
     return imagem.resize(tamanho, Image.Resampling.LANCZOS)
 
 
+def _caixa_util_sem_borda_clara(imagem: Image.Image) -> tuple[int, int, int, int] | None:
+    """Encontra a caixa do produto ignorando bordas brancas ou quase brancas e ruído de JPEG nas extremidades."""
+    cinza = imagem.convert("L")
+    if min(cinza.size) >= 64:
+        cinza = cinza.filter(ImageFilter.MedianFilter(size=3))
+    # Limiar 28 em imagem invertida equivale a considerar branco/fundo claro qualquer pixel com luminância >= 227
+    mascara = ImageOps.invert(cinza).point(lambda p: 255 if p > 28 else 0)
+    # Ignora 2% da borda externa na detecção para que artefatos de moldura de 1-2 px não impeçam o recorte
+    if mascara.width > 50 and mascara.height > 50:
+        borda_x = max(1, round(mascara.width * 0.02))
+        borda_y = max(1, round(mascara.height * 0.02))
+        interior = mascara.crop((borda_x, borda_y, mascara.width - borda_x, mascara.height - borda_y))
+        caixa_int = interior.getbbox()
+        if caixa_int is not None:
+            return (
+                caixa_int[0] + borda_x,
+                caixa_int[1] + borda_y,
+                caixa_int[2] + borda_x,
+                caixa_int[3] + borda_y,
+            )
+    return mascara.getbbox()
+
+
 def _garantir_minimo_mercado_livre(imagem: Image.Image) -> Image.Image:
     """Garante que a imagem e a área útil (sem bordas brancas) tenham pelo menos 1200 px no lado maior,
     evitando a recusa do Mercado Livre quando o produto tem fundo branco amplo (< 500 px após corte)."""
-    invertida = ImageOps.invert(imagem.convert("L")).point(lambda p: 255 if p > 12 else 0)
-    caixa = invertida.getbbox()
+    caixa = _caixa_util_sem_borda_clara(imagem)
     if caixa is not None:
         x0, y0, x1, y1 = caixa
         largura_util, altura_util = x1 - x0, y1 - y0
-        if max(largura_util, altura_util) < LADO_UTIL_MINIMO_ML:
+        if largura_util >= 16 and altura_util >= 16 and min(largura_util, altura_util) < LADO_UTIL_MINIMO_ML:
             margem_x = max(12, round(largura_util * 0.08))
             margem_y = max(12, round(altura_util * 0.08))
             recorte = imagem.crop((
@@ -77,17 +100,65 @@ def _garantir_minimo_mercado_livre(imagem: Image.Image) -> Image.Image:
                 min(imagem.width, x1 + margem_x),
                 min(imagem.height, y1 + margem_y),
             ))
-            escala = LADO_MINIMO_ML / max(1, max(recorte.width, recorte.height))
-            nova_largura = max(600, round(recorte.width * escala))
-            nova_altura = max(600, round(recorte.height * escala))
+            escala = max(
+                LADO_MINIMO_ML / max(1, max(recorte.width, recorte.height)),
+                900 / max(1, min(recorte.width, recorte.height)),
+            )
+            nova_largura = max(900, round(recorte.width * escala))
+            nova_altura = max(900, round(recorte.height * escala))
             return recorte.resize((nova_largura, nova_altura), Image.Resampling.LANCZOS)
-    if max(imagem.size) < LADO_MINIMO_ML:
-        escala = LADO_MINIMO_ML / max(1, max(imagem.size))
+    if max(imagem.size) < LADO_MINIMO_ML or min(imagem.size) < 800:
+        escala = max(
+            LADO_MINIMO_ML / max(1, max(imagem.size)),
+            800 / max(1, min(imagem.size)),
+        )
         return imagem.resize(
-            (max(600, round(imagem.width * escala)), max(600, round(imagem.height * escala))),
+            (max(800, round(imagem.width * escala)), max(800, round(imagem.height * escala))),
             Image.Resampling.LANCZOS,
         )
     return imagem
+
+
+def ampliar_para_mercado_livre(conteudo_jpeg: bytes) -> bytes:
+    """Segunda passagem para fotos de produtos brancos em fundo branco recusadas pelo corte de bordas do ML:
+    aproxima o centro, amplia para 1600 px e adiciona uma moldura neutra sutil que impede o corte excessivo."""
+    with Image.open(io.BytesIO(conteudo_jpeg)) as aberta:
+        aberta.load()
+        rgb = aberta.convert("RGB")
+    caixa = _caixa_util_sem_borda_clara(rgb)
+    if caixa is not None and (caixa[2] - caixa[0]) >= 32 and (caixa[3] - caixa[1]) >= 32:
+        x0, y0, x1, y1 = caixa
+        margem_x = max(8, round((x1 - x0) * 0.06))
+        margem_y = max(8, round((y1 - y0) * 0.06))
+        recorte = rgb.crop((
+            max(0, x0 - margem_x),
+            max(0, y0 - margem_y),
+            min(rgb.width, x1 + margem_x),
+            min(rgb.height, y1 + margem_y),
+        ))
+    else:
+        corte_x = round(rgb.width * 0.14)
+        corte_y = round(rgb.height * 0.14)
+        recorte = rgb.crop((corte_x, corte_y, max(corte_x + 1, rgb.width - corte_x), max(corte_y + 1, rgb.height - corte_y)))
+    escala = max(
+        LADO_AMPLIADO_ML / max(1, max(recorte.width, recorte.height)),
+        1200 / max(1, min(recorte.width, recorte.height)),
+    )
+    ampliada = recorte.resize(
+        (max(1200, round(recorte.width * escala)), max(1200, round(recorte.height * escala))),
+        Image.Resampling.LANCZOS,
+    )
+    # Moldura neutra a 2% da borda garante que o detector de bordas brancas do Mercado Livre
+    # preserve pelo menos ~96% de 1600 px (> 1500 px), mesmo em produtos totalmente brancos (ex.: caneca branca).
+    desenho = ImageDraw.Draw(ampliada)
+    mx = max(10, round(ampliada.width * 0.02))
+    my = max(10, round(ampliada.height * 0.02))
+    desenho.rectangle(
+        [mx, my, ampliada.width - 1 - mx, ampliada.height - 1 - my],
+        outline=(185, 185, 190),
+        width=2,
+    )
+    return _jpeg(ampliada, QUALIDADE_JPEG_LEITURA)
 
 
 def _em_rgb_com_fundo_branco(imagem: Image.Image) -> Image.Image:
@@ -170,3 +241,6 @@ class PillowPreparador:
                 recorte = recorte.resize((max(1, round(recorte.width * escala)), max(1, round(recorte.height * escala))),
                                          Image.Resampling.LANCZOS)
             return _jpeg(recorte.convert("RGB"), 92)
+
+    def ampliar_para_publicacao(self, conteudo_jpeg: bytes) -> bytes:
+        return ampliar_para_mercado_livre(conteudo_jpeg)

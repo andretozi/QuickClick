@@ -47,6 +47,10 @@ class PreparadorDeFotos(Protocol):
         """Recorte da caixa (0 a 1000) na versão de detalhe, em JPEG."""
         ...
 
+    def ampliar_para_publicacao(self, conteudo_jpeg: bytes) -> bytes:
+        """Amplia e reforça a área útil da foto quando o marketplace recusa por excesso de bordas brancas."""
+        ...
+
 
 class TratadorDeFoto(Protocol):
     """Versão final: tratar a foto (fundo branco, luz, recorte) preservando o produto e os defeitos.

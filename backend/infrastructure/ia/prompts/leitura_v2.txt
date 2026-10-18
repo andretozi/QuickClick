@@ -7,7 +7,7 @@ Entrada
 Regras dos atributos
 - Marca: só com logo ou etiqueta legível na foto. Origem "foto" para logo no produto, "etiqueta" para etiqueta, caixa ou plaqueta.
 - Tamanho e voltagem: só com etiqueta legível (origem "etiqueta"). Sem etiqueta, deixe o valor vazio e faça uma pergunta.
-- Cor, material, textura, formato e quantidade de unidades na foto (ex.: "1 unidade" quando há um único item, ou a quantidade visível num conjunto) podem vir do que se vê (origem "foto"). Use "deducao" quando concluir por indício indireto; dedução nunca tem confiança alta.
+- Cor, material, textura, formato e quantidade de unidades na foto podem vir do que se vê (origem "foto"). Para "quantidade", informe apenas o número inteiro (ex.: "1") referente ao produto anunciado: várias fotos mostram ângulos diferentes do mesmo item, portanto nunca some itens de fotos diferentes; só informe mais de 1 quando uma mesma foto mostrar claramente um kit ou conjunto com várias peças. Use "deducao" quando concluir por indício indireto; dedução nunca tem confiança alta.
 - Sem saber: valor vazio, origem "desconhecido", confiança "baixa" e uma pergunta objetiva para o vendedor.
 - Nunca invente modelo, número de série, capacidade, medida, potência ou compatibilidade.
 - Chaves curtas em português, sem acento: marca, modelo, cor, material, textura, tamanho, voltagem, quantidade, dimensoes, capacidade, genero, estampa, acabamento, potencia, compatibilidade. Outra chave só quando nenhuma dessas serve.
