@@ -13,6 +13,7 @@ from typing import Any
 # chave nossa → IDs de atributo do Mercado Livre que costumam significar a mesma coisa
 SINONIMOS_ML: dict[str, tuple[str, ...]] = {
     "marca": ("BRAND",),
+    "fabricante": ("MANUFACTURER",),
     "modelo": ("MODEL", "LINE"),
     "cor": ("COLOR", "MAIN_COLOR"),
     "material": ("MATERIAL", "MAIN_MATERIAL"),
@@ -20,15 +21,24 @@ SINONIMOS_ML: dict[str, tuple[str, ...]] = {
     "voltagem": ("VOLTAGE",),
     "quantidade": ("UNITS_PER_PACK", "UNITS_PER_PACKAGE", "PACKAGE_QUANTITY"),
     "genero": ("GENDER",),
-    "capacidade": ("CAPACITY",),
+    "capacidade": ("CAPACITY", "VOLUME_CAPACITY"),
     "potencia": ("POWER",),
     "estampa": ("PATTERN_NAME",),
 }
+
+MARCA_GENERICA_ML = "Genérica"
+MODELO_PADRAO_ML = "Padrão"
 
 
 def _normalizar(texto: str) -> str:
     sem_acento = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode("ascii")
     return re.sub(r"[^a-z0-9]+", " ", sem_acento.lower()).strip()
+
+
+def _neutro(texto: str) -> str:
+    """Flexão de gênero comum em cores e adjetivos ('branca' → 'branco', 'rosa clara' → 'rosa claro')."""
+    palavras = _normalizar(texto).split()
+    return " ".join(p[:-1] + "o" if len(p) > 3 and p.endswith("a") else p for p in palavras)
 
 
 @dataclass(frozen=True)
@@ -66,7 +76,11 @@ class AtributoLigado:
 
 def _valor_id(atributo: AtributoML, valor: str) -> str | None:
     alvo = _normalizar(valor)
-    return next((vid for vid, nome in atributo.valores if _normalizar(nome) == alvo), None)
+    exato = next((vid for vid, nome in atributo.valores if _normalizar(nome) == alvo), None)
+    if exato is not None:
+        return exato
+    alvo_neutro = _neutro(valor)
+    return next((vid for vid, nome in atributo.valores if _neutro(nome) == alvo_neutro), None)
 
 
 def ligar_por_regra(confirmados: list[tuple[str, str]], da_categoria: list[AtributoML]
@@ -148,3 +162,43 @@ def ligar_confirmados(confirmados: list[tuple[str, str]], da_categoria: list[Atr
             ligados.append(AtributoLigado(ml_id, valor, _valor_id(por_id[ml_id], valor), chave))
             usados.add(ml_id)
     return ligados
+
+
+def completar_para_publicacao(ligados: list[AtributoLigado], da_categoria: list[AtributoML],
+                              titulo: str = "") -> list[AtributoLigado]:
+    """Preenche na hora de publicar o que o título já diz (valores fechados da categoria) e os padrões
+    do Mercado Livre para marca, fabricante e modelo quando a categoria exige e o produto não tem."""
+    saida = list(ligados)
+    por_id = {a.id: a for a in da_categoria}
+    usados = {l.id: l for l in saida}
+    palavras_titulo = set(_neutro(titulo).split())
+
+    for atributo in da_categoria:
+        if atributo.id in usados or not atributo.valores or not palavras_titulo:
+            continue
+        for vid, nome in atributo.valores:
+            termos = _neutro(nome).split()
+            if termos and all(t in palavras_titulo for t in termos):
+                ligado = AtributoLigado(atributo.id, nome, vid)
+                saida.append(ligado)
+                usados[atributo.id] = ligado
+                break
+
+    marca = usados["BRAND"].valor if "BRAND" in usados else MARCA_GENERICA_ML
+    if "BRAND" in por_id and "BRAND" not in usados:
+        ligado = AtributoLigado("BRAND", MARCA_GENERICA_ML, _valor_id(por_id["BRAND"], MARCA_GENERICA_ML))
+        saida.append(ligado)
+        usados["BRAND"] = ligado
+
+    if "MANUFACTURER" in por_id and por_id["MANUFACTURER"].obrigatorio and "MANUFACTURER" not in usados:
+        ligado = AtributoLigado("MANUFACTURER", marca, _valor_id(por_id["MANUFACTURER"], marca))
+        saida.append(ligado)
+        usados["MANUFACTURER"] = ligado
+
+    if "MODEL" in por_id and por_id["MODEL"].obrigatorio and "MODEL" not in usados:
+        modelo = (titulo.split()[0] if titulo.strip() else "") or MODELO_PADRAO_ML
+        ligado = AtributoLigado("MODEL", modelo, _valor_id(por_id["MODEL"], modelo))
+        saida.append(ligado)
+        usados["MODEL"] = ligado
+
+    return saida

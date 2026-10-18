@@ -11,6 +11,7 @@ from backend.application.ia.modelos import ArquivoDeFoto
 from backend.application.portas import FalhaNoMarketplace
 from backend.domain.conta_vinculada import ContaVinculada, CredenciaisOAuth
 from backend.domain.erros import FotoInvalida, MercadoLivreDesconectado, PublicacaoRecusada
+from backend.domain.ia.atributos_ml import AtributoML, completar_para_publicacao
 from backend.domain.plano import GRATIS
 from backend.domain.vendedor import Vendedor
 from backend.infrastructure.ia.preparador_pillow import PillowPreparador
@@ -92,11 +93,28 @@ class TestPublicarNoMercadoLivre(unittest.TestCase):
         with self.assertRaises(MercadoLivreDesconectado):
             publicar.executar(1, ANUNCIO, fotos(1))
 
-    def test_categoria_do_modelo_novo_pede_family_name(self):
+    def test_categoria_do_modelo_novo_pede_family_name_sem_title(self):
         erro = FalhaNoMarketplace("400", 400, {"cause": [{"code": "item.family_name.missing"}]})
         publicar, publicador = caso(PublicadorFalso(erros_ao_publicar=[erro]))
         publicar.executar(1, ANUNCIO, fotos(1))
         self.assertEqual(publicador.itens[1]["family_name"], ANUNCIO["titulo"])
+        self.assertNotIn("title", publicador.itens[1])
+
+    def test_completa_atributos_obrigatorios_e_do_titulo_na_publicacao(self):
+        da_categoria = [
+            AtributoML("BRAND", "Marca", False),
+            AtributoML("MANUFACTURER", "Fabricante", True),
+            AtributoML("MODEL", "Modelo", True),
+            AtributoML("MATERIAL", "Material", True, (("2282603", "Cerâmica"), ("2431731", "Vidro"))),
+            AtributoML("COLOR", "Cor", False, (("52055", "Branco"), ("52049", "Preto"))),
+        ]
+        ligados = completar_para_publicacao([], da_categoria, "Caneca Branca de Cerâmica 250ml Acabamento Brilhante")
+        por_id = {l.id: l.para_api() for l in ligados}
+        self.assertEqual(por_id["BRAND"], {"id": "BRAND", "value_name": "Genérica"})
+        self.assertEqual(por_id["MANUFACTURER"], {"id": "MANUFACTURER", "value_name": "Genérica"})
+        self.assertEqual(por_id["MODEL"], {"id": "MODEL", "value_name": "Caneca"})
+        self.assertEqual(por_id["MATERIAL"], {"id": "MATERIAL", "value_id": "2282603"})
+        self.assertEqual(por_id["COLOR"], {"id": "COLOR", "value_id": "52055"})
 
     def test_recusa_do_mercado_livre_traz_as_causas(self):
         erro = FalhaNoMarketplace("400", 400, {"message": "validation", "cause": [{"message": "Price too low"}]})
