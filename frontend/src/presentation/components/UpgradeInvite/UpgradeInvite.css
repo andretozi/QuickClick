@@ -1,0 +1,47 @@
+/* ==================================================================
+   Bloco: upgrade-invite (convite do plano pago, no papel claro)
+   ================================================================== */
+.upgrade-invite {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 14px;
+  padding: 14px 16px;
+  border: 1px dashed rgb(var(--rgb-coral) / 0.45);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, rgb(var(--rgb-coral) / 0.07), rgb(var(--rgb-honey) / 0.09));
+}
+
+.upgrade-invite__icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--color-cocoa);
+  color: var(--color-coral-glow);
+  box-shadow: 0 0 18px rgb(var(--rgb-coral) / 0.35);
+}
+
+.upgrade-invite__text {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.upgrade-invite__title {
+  margin: 0;
+  color: var(--color-ink);
+  font-weight: 800;
+}
+
+.upgrade-invite__body {
+  margin: 2px 0 0;
+  color: rgb(var(--rgb-ink) / 0.68);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.upgrade-invite__action {
+  flex: none;
+}

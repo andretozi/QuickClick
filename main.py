@@ -30,9 +30,11 @@ O que ele faz, em ordem:
        Se na hora de subir o servidor ainda faltar alguma peca (uma dependencia de
        dependencia, ou uma instalacao que ficou pela metade), ele roda o
        requirements de novo sozinho e tenta mais uma vez, antes de desistir.
-    3. Sobe um unico servidor (Uvicorn) em http://127.0.0.1:8080:
+    3. Banco: aplica as migracoes do Alembic que faltarem, so se forem aditivas
+       (criar tabela, coluna que aceita vazio, indice). Ver scripts/migrar.py.
+    4. Sobe um unico servidor (Uvicorn) em http://127.0.0.1:8080:
        a API em /api (documentacao automatica em /docs) e o front buildado no resto.
-    4. Abre o navegador padrao.
+    5. Abre o navegador padrao.
 """
 
 from __future__ import annotations
@@ -40,6 +42,7 @@ from __future__ import annotations
 import importlib
 import importlib.metadata
 import json
+import logging
 import os
 import re
 import shutil
@@ -470,6 +473,35 @@ def import_backend():
         )
 
 
+def migrar_banco() -> None:
+    """Deixa o banco na ultima revisao do Alembic, so com migracoes aditivas.
+
+    Banco antigo (sem Alembic) que bate com a revisao inicial e marcado nela sem mexer nas
+    tabelas. Migracao que apaga, renomeia ou muda tipo e recusada: o site sobe, mas avisa.
+    Sem DATABASE_URL em producao a partida para (ConfiguracaoObrigatoriaAusente).
+    """
+    from backend.infrastructure.banco.migrador import MigracaoNaoAditiva, preparar_banco
+    from backend.infrastructure.configuracao import configuracao, database_url
+    from backend.infrastructure.database import obter_engine
+
+    url = database_url(configuracao())
+    if url is None:
+        print("[main.py] Sem DATABASE_URL: o site sobe sem banco. Rode: python -m scripts.verificar_config")
+        return
+    try:
+        resultado = preparar_banco(obter_engine(), url)
+    except MigracaoNaoAditiva as erro:
+        print(f"[main.py] ERRO no banco: {erro}. Nada foi aplicado.")
+        return
+    except Exception as erro:  # banco fora do ar ou firewall: o site sobe e o que usa o banco avisa
+        print(f"[main.py] Aviso: nao deu para conferir as migracoes do banco ({type(erro).__name__}). "
+              "Confira o firewall do db-quickclick e rode: python -m scripts.verificar_config")
+        return
+    marcado = " (banco antigo marcado na revisao inicial)" if resultado.marcado_na_inicial else ""
+    acao = "migracoes aplicadas" if resultado.aplicadas else "em dia"
+    print(f"[main.py] Banco {acao}: revisao {resultado.revisao_depois}{marcado}")
+
+
 def serve() -> None:
     if not _port_is_free(HOST, PORT):
         if _quickclick_is_running():
@@ -481,9 +513,13 @@ def serve() -> None:
             f"e rode de novo. Nao vou trocar de porta silenciosamente."
         )
 
+    # Avisos do back (configuracao ausente, IA desligada, banco) aparecem no console e no Log Stream
+    logging.basicConfig(level=logging.INFO, format="[%(name)s] %(levelname)s %(message)s")
+
     # So importa o back depois de garantir as dependencias
     uvicorn, criar_app = import_backend()
 
+    migrar_banco()
     app = criar_app()
     if os.environ.get("NO_BROWSER") != "1" and not NA_AZURE:
         threading.Thread(

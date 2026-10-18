@@ -9,7 +9,9 @@ from backend.application.casos_de_uso.listar_marketplaces import ListarMarketpla
 from backend.application.casos_de_uso.listar_planos import ListarPlanos
 from backend.application.casos_de_uso.obter_usuario_atual import ObterUsuarioAtual
 from backend.application.casos_de_uso.obter_vendedor_atual import ObterVendedorAtual
+from backend.application.casos_de_uso.publicar_no_mercado_livre import PublicarNoMercadoLivre
 from backend.application.casos_de_uso.registrar_usuario import RegistrarUsuario
+from backend.application.ia.servico import ServicoDeAnalises
 
 
 @dataclass(frozen=True)
@@ -24,3 +26,5 @@ class CasosDeUso:
     autenticar_usuario: AutenticarUsuario | None = None
     registrar_usuario: RegistrarUsuario | None = None
     obter_usuario_atual: ObterUsuarioAtual | None = None
+    analises_ia: ServicoDeAnalises | None = None
+    publicar_no_mercado_livre: PublicarNoMercadoLivre | None = None

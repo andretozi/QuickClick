@@ -1,12 +1,24 @@
 # Back da Quick Click. O main.py instala o que faltar na primeira execução.
 fastapi>=0.115,<1
 uvicorn>=0.30,<1
-# Cliente HTTP: usado pelos testes da API (TestClient) e, no futuro, nas chamadas OAuth aos marketplaces.
+# Cliente HTTP: chamadas ao Mercado Livre e TestClient dos testes.
 httpx>=0.27,<1
-# Banco de dados e ORM (Azure PostgreSQL)
+# Upload de fotos (multipart/form-data) nas rotas da IA e da publicação.
+python-multipart>=0.0.20
+# Banco de dados e ORM (Azure PostgreSQL), com migrações aditivas pelo Alembic.
 psycopg2-binary>=2.9,<3
-psycopg[binary]>=3.1,<4
 sqlalchemy>=2.0,<3
-python-dotenv>=1.0,<2
-# Autenticação e Segurança (JWT)
+alembic>=1.14,<2
+# Autenticação e segurança: JWT e criptografia dos tokens dos marketplaces.
 pyjwt>=2.8,<3
+cryptography>=44
+# Configuração: Gerenciador de Credenciais do Windows (só no PC) e Azure Key Vault (quando existir).
+keyring>=25
+azure-identity>=1.19
+azure-keyvault-secrets>=4.9
+# IA: Claude (Anthropic) e Gemini (Google).
+anthropic>=1.0,<2
+google-genai>=1.0
+# Fotos: validação, metadados, qualidade e redimensionamento, com HEIC.
+pillow>=11
+pillow-heif>=0.20

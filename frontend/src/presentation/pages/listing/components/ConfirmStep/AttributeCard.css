@@ -1,0 +1,120 @@
+/* ==================================================================
+   Bloco: attribute-card (um atributo lido pela IA, no papel claro)
+   Modificador: --seen, --check, --confirmed, --ask
+   ================================================================== */
+.attribute-card {
+  position: relative;
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgb(var(--rgb-ink) / 0.1);
+  border-radius: var(--radius-lg);
+  background: var(--color-white);
+  box-shadow: var(--shadow-paper);
+  transition:
+    border-color var(--duration-base),
+    box-shadow var(--duration-base),
+    transform var(--duration-slow) var(--ease-spring);
+}
+
+.attribute-card:hover {
+  transform: translateY(-2px);
+}
+
+/* "Confere?": o valor em destaque, com a borda acesa */
+.attribute-card--check {
+  border-color: rgb(var(--rgb-honey) / 0.7);
+  box-shadow:
+    0 0 0 3px rgb(var(--rgb-honey) / 0.16),
+    var(--shadow-paper);
+}
+
+.attribute-card--confirmed {
+  border-color: rgb(var(--rgb-green) / 0.55);
+  box-shadow:
+    0 0 0 3px rgb(var(--rgb-green-light) / 0.16),
+    var(--shadow-paper);
+}
+
+.attribute-card--ask {
+  border-style: dashed;
+  border-color: rgb(var(--rgb-coral) / 0.5);
+  background: linear-gradient(180deg, var(--color-white), rgb(var(--rgb-coral) / 0.04));
+}
+
+.attribute-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.attribute-card__label {
+  color: rgb(var(--rgb-ink) / 0.7);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.attribute-card__check {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.attribute-card__value {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.attribute-card__answers {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.attribute-card__answer {
+  min-width: 56px;
+  padding: 8px 14px;
+  border: 1px solid rgb(var(--rgb-ink) / 0.16);
+  border-radius: var(--radius-pill);
+  background: var(--color-sand-50);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  transition:
+    background var(--duration-base),
+    color var(--duration-base),
+    transform var(--duration-slow) var(--ease-spring);
+}
+
+.attribute-card__answer:hover {
+  transform: scale(1.05);
+}
+
+.attribute-card__answer--on {
+  border-color: transparent;
+  background: var(--color-green);
+  color: var(--color-white);
+}
+
+.attribute-card__field--quiet input {
+  font-weight: 700;
+}
+
+.attribute-card__photo {
+  justify-self: start;
+}
+
+.attribute-card__evidence {
+  margin: 0;
+  color: rgb(var(--rgb-ink) / 0.55);
+  font-size: 12.5px;
+  font-weight: 600;
+}

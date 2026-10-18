@@ -1,0 +1,154 @@
+/* ==================================================================
+   Bloco: confirm-step (passo de conferir o que a IA viu)
+   Defeito: --removed
+   ================================================================== */
+.confirm-step {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.confirm-step__title {
+  margin: 0;
+  font-size: clamp(22px, 2.6vw, 30px);
+}
+
+.confirm-step__lead {
+  margin: 6px 0 0;
+  color: rgb(var(--rgb-ink) / 0.65);
+  font-weight: 600;
+}
+
+.confirm-step__basics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.confirm-step__wide {
+  grid-column: 1 / -1;
+}
+
+.confirm-step__label {
+  margin: 0 0 8px;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.confirm-step__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* ---------- Defeitos em destaque ---------- */
+.confirm-step__defects {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--radius-lg);
+  background: rgb(var(--rgb-coral) / 0.08);
+}
+
+.confirm-step__defects-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--color-coral-deep);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.confirm-step__defect-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.confirm-step__defect {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--color-white);
+  transition:
+    opacity var(--duration-base),
+    transform var(--duration-slow) var(--ease-spring);
+}
+
+.confirm-step__defect--removed {
+  opacity: 0.55;
+  transform: scale(0.98);
+}
+
+.confirm-step__defect--removed .confirm-step__defect-text {
+  text-decoration: line-through;
+}
+
+.confirm-step__defect-text {
+  color: var(--color-ink);
+  font-weight: 700;
+}
+
+.confirm-step__defect-answer {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.confirm-step__defect-question {
+  color: rgb(var(--rgb-ink) / 0.6);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.confirm-step__defect-button {
+  padding: 6px 12px;
+  border: 1px solid rgb(var(--rgb-ink) / 0.16);
+  border-radius: var(--radius-pill);
+  background: var(--color-sand-50);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform var(--duration-slow) var(--ease-spring);
+}
+
+.confirm-step__defect-button:hover {
+  transform: scale(1.06);
+}
+
+.confirm-step__defect-button--on {
+  border-color: transparent;
+  background: var(--color-coral);
+  color: var(--color-white);
+}
+
+.confirm-step__defect-button--off {
+  border-color: transparent;
+  background: var(--color-cocoa);
+  color: var(--color-cream);
+}
+
+.confirm-step__pending {
+  margin: 0;
+  color: var(--color-honey-dark);
+  font-weight: 800;
+}
+
+@media (max-width: 560px) {
+  .confirm-step__basics {
+    grid-template-columns: 1fr;
+  }
+}

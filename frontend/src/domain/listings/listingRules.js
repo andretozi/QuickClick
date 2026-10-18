@@ -3,6 +3,7 @@
  * Limites, situações possíveis e a validação de cada etapa do assistente.
  */
 import { FIELD_ERROR, maxLength, required } from '@/domain/validation/validators.js';
+import { writingProblems } from '@/domain/listings/writingRules.js';
 
 export const LISTING_LIMITS = {
   /** Limite de caracteres do título no Mercado Livre */
@@ -39,8 +40,16 @@ export function coverPhoto(item) {
   return photos[item?.coverIndex ?? 0] ?? photos[0];
 }
 
-/** Etapas do assistente "criar anúncio", na ordem. */
-export const WIZARD_STEPS = ['photos', 'details', 'price', 'channels', 'publish'];
+/** Etapas do assistente "criar anúncio", na ordem: a IA lê as fotos, o vendedor confirma e ela escreve. */
+export const WIZARD_STEPS = ['photos', 'analysis', 'confirm', 'details', 'price', 'channels', 'publish'];
+
+/** Passos que só existem no criar (na edição, o anúncio já tem tudo e a IA não roda de novo). */
+export const AI_STEPS = ['analysis', 'confirm'];
+
+/** Texto fora da regra de escrita (emoji, barra, travessão, traço solto ou marcador de lista). */
+function writing(value) {
+  return writingProblems(value).length ? FIELD_ERROR.WRITING : null;
+}
 
 /** Erros de cada campo de uma etapa (objeto vazio = pode seguir). */
 export function validateListingStep(step, draft) {
@@ -49,8 +58,8 @@ export function validateListingStep(step, draft) {
     if (!draft.photos?.length) errors.photos = FIELD_ERROR.REQUIRED;
   }
   if (step === 'details') {
-    errors.title = required(draft.title) ?? maxLength(draft.title, LISTING_LIMITS.TITLE_MAX);
-    errors.description = maxLength(draft.description, LISTING_LIMITS.DESCRIPTION_MAX);
+    errors.title = required(draft.title) ?? maxLength(draft.title, LISTING_LIMITS.TITLE_MAX) ?? writing(draft.title);
+    errors.description = maxLength(draft.description, LISTING_LIMITS.DESCRIPTION_MAX) ?? writing(draft.description);
     errors.category = required(draft.category);
     const stock = Number(draft.stock);
     errors.stock =

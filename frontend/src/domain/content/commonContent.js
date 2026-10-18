@@ -22,6 +22,8 @@ export const FIELD_ERRORS = {
   'too-long': 'Passou do limite de caracteres.',
   price: 'Escolha um preço entre R$ 1,00 e R$ 100.000,00.',
   stock: 'Use um número inteiro, de 0 em diante.',
+  writing: 'Tire emojis, barras, travessões e traços soltos. Traço só dentro de nome técnico.',
+  age: 'Para criar a conta, confirme que você tem 18 anos ou mais.',
   'email-taken': 'Esse email já tem conta. Que tal entrar?',
   'wrong-password': 'A senha atual não confere.',
   'invalid-credentials': 'Email ou senha não conferem. Confira os dois e tente de novo.',

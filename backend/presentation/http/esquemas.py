@@ -82,6 +82,7 @@ class RequisicaoCadastro(BaseModel):
     senha: str = Field(min_length=6, description="Senha com no mínimo 6 caracteres")
     nome: str = Field(default="", examples=["André Tozi"])
     loja: str = Field(default="", examples=["Minha Loja Oficial"])
+    maior_de_idade: bool = Field(default=False, description="Confirma que tem 18 anos ou mais (obrigatório)")
 
 
 class RequisicaoLogin(BaseModel):

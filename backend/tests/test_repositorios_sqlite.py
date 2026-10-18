@@ -14,6 +14,8 @@ from backend.infrastructure.banco import models  # noqa: F401
 from backend.infrastructure.banco.repositorio_contas import RepositorioContasVinculadasSQL
 from backend.infrastructure.banco.repositorio_vendedores import RepositorioVendedoresSQL
 from backend.infrastructure.database import Base
+from backend.infrastructure.seguranca.cripto_tokens import CifradorDeTokens
+from backend.tests.test_api import CHAVE_CRIPTO_TESTE
 
 AGORA = datetime(2026, 10, 7, 12, 0, tzinfo=UTC)
 
@@ -37,7 +39,7 @@ class TestRepositoriosSQL(unittest.TestCase):
         Base.metadata.create_all(bind=self._engine)
         self.Session = sessionmaker(autocommit=False, autoflush=False, bind=self._engine)
         self.vendedores = RepositorioVendedoresSQL(self.Session)
-        self.contas = RepositorioContasVinculadasSQL(self.Session)
+        self.contas = RepositorioContasVinculadasSQL(self.Session, CifradorDeTokens(CHAVE_CRIPTO_TESTE))
         self.vendedores.salvar(Vendedor(1, "Loja de teste", GRATIS))
 
     def tearDown(self):
@@ -74,6 +76,37 @@ class TestRepositoriosSQL(unittest.TestCase):
         self.contas.remover(1, "amazon")
         self.assertIsNone(self.contas.buscar(1, "amazon"))
         self.assertEqual(self.contas.listar_do_vendedor(1), [])
+
+    def test_tokens_ficam_cifrados_no_banco(self):
+        self.contas.salvar(conta("mercado-livre"))
+        with self.Session() as session:
+            linha = session.query(models.ContaVinculadaModel).filter_by(marketplace="mercado-livre").one()
+            self.assertTrue(linha.access_token.startswith("enc:v1:"))
+            self.assertTrue(linha.refresh_token.startswith("enc:v1:"))
+            self.assertNotIn("tok_mercado-livre", linha.access_token)
+        self.assertEqual(self.contas.buscar(1, "mercado-livre").credenciais.access_token, "tok_mercado-livre")
+
+    def test_token_legado_em_texto_puro_e_lido_e_volta_cifrado_na_proxima_gravacao(self):
+        with self.Session() as session:
+            session.add(models.ContaVinculadaModel(
+                vendedor_id=1, marketplace="mercado-livre", conectada_em=AGORA.isoformat(),
+                access_token="legado_access", refresh_token="legado_refresh",
+                token_expira_em=(AGORA + timedelta(hours=1)).isoformat(),
+            ))
+            session.commit()
+        lida = self.contas.buscar(1, "mercado-livre")
+        self.assertEqual(lida.credenciais.access_token, "legado_access")
+        self.contas.salvar(lida)
+        with self.Session() as session:
+            linha = session.query(models.ContaVinculadaModel).filter_by(marketplace="mercado-livre").one()
+            self.assertTrue(linha.access_token.startswith("enc:v1:"))
+
+    def test_sem_chave_de_criptografia_nao_grava_token(self):
+        from backend.domain.erros import ServicoIndisponivel
+
+        sem_chave = RepositorioContasVinculadasSQL(self.Session, CifradorDeTokens(None, avisar=False))
+        with self.assertRaises(ServicoIndisponivel):
+            sem_chave.salvar(conta("amazon"))
 
 
 if __name__ == "__main__":

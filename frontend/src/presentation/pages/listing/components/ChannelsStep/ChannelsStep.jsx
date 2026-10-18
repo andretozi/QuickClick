@@ -1,21 +1,29 @@
 import Button from '@/presentation/components/Button/Button.jsx';
+import Icon from '@/presentation/components/Icon/Icon.jsx';
 import ListingPreview from '@/presentation/components/ListingPreview/ListingPreview.jsx';
 import MarketplaceLogo from '@/presentation/components/MarketplaceLogo/MarketplaceLogo.jsx';
 import StatusPill from '@/presentation/components/StatusPill/StatusPill.jsx';
 import Toggle from '@/presentation/components/Toggle/Toggle.jsx';
 import { formatMoney } from '@/domain/format/format.js';
-import { coverPhoto } from '@/domain/listings/listingRules.js';
-import { MARKETPLACE_CATALOG } from '@/domain/content/marketplacesContent.js';
-import { LISTING_WIZARD } from '@/domain/content/listingContent.js';
+import { PRIMARY_CHANNEL, coverPhoto } from '@/domain/listings/listingRules.js';
+import { MARKETPLACE_CATALOG, getMarketplaceInfo } from '@/domain/content/marketplacesContent.js';
+import { CHANNEL_REASONS, CHANNEL_SIGNUP, LISTING_WIZARD } from '@/domain/content/listingContent.js';
 import './ChannelsStep.css';
 
-const SOON = MARKETPLACE_CATALOG.filter((marketplace) => !marketplace.available);
-
-/** Passo 4: só o Mercado Livre pode ser escolhido (e só conectado); os outros vêm "em breve". */
+/**
+ * Passo 6: "Suas contas" (as conectadas, na ordem em que o vendedor conectou) e "Vale abrir conta"
+ * (os marketplaces que combinam com o produto, com o motivo e o link de cadastro).
+ * Só o Mercado Livre publica por enquanto.
+ */
 export default function ChannelsStep({ editor }) {
-  const { draft, update, connection, canPublishMl, priceCents } = editor;
+  const { draft, update, connection, canPublishMl, priceCents, ai } = editor;
   const texts = LISTING_WIZARD.channels;
   const stock = Number(draft.stock) || 0;
+  const fromAnalysis = ai.analysis?.channels;
+  const others = (fromAnalysis ?? MARKETPLACE_CATALOG.map((m) => ({ slug: m.slug, connected: false, reason: null })))
+    .filter((channel) => channel.slug !== PRIMARY_CHANNEL);
+  const yours = others.filter((channel) => channel.connected);
+  const worth = others.filter((channel) => !channel.connected);
 
   return (
     <div className="channels-step">
@@ -26,18 +34,19 @@ export default function ChannelsStep({ editor }) {
 
       <div className="channels-step__layout">
         <div className="channels-step__list">
+          <h3 className="channels-step__group">{texts.yours}</h3>
           <section className="channels-step__main" aria-labelledby="canal-ml">
             <div className="channels-step__main-head">
               <span className="channels-step__logo">
-                <MarketplaceLogo slug="mercado-livre" size="lg" />
+                <MarketplaceLogo slug={PRIMARY_CHANNEL} size="lg" />
               </span>
               <StatusPill tone={canPublishMl ? 'green' : 'honey'} size="sm">
                 {canPublishMl ? texts.connected(connection.nickname) : texts.available}
               </StatusPill>
             </div>
-            <h3 id="canal-ml" className="visually-hidden">
+            <h4 id="canal-ml" className="visually-hidden">
               {texts.toggleLabel}
-            </h3>
+            </h4>
             {canPublishMl ? (
               <Toggle
                 checked={draft.publishMl}
@@ -55,15 +64,41 @@ export default function ChannelsStep({ editor }) {
             )}
           </section>
 
-          <ul className="channels-step__soon">
-            {SOON.map((marketplace) => (
-              <li key={marketplace.slug} className="channels-step__soon-item">
-                <span data-shimmer className="channels-step__shine" aria-hidden="true" />
-                <MarketplaceLogo slug={marketplace.slug} size="sm" muted />
-                <span className="channels-step__soon-label">{texts.soon}</span>
-              </li>
-            ))}
-          </ul>
+          {yours.map((channel) => (
+            <div key={channel.slug} className="channels-step__account" data-enter="3">
+              <MarketplaceLogo slug={channel.slug} size="sm" />
+              <span className="channels-step__account-text">{texts.publishesSoon}</span>
+            </div>
+          ))}
+
+          {worth.length > 0 && (
+            <>
+              <h3 className="channels-step__group">{texts.worthOpening}</h3>
+              <ul className="channels-step__worth">
+                {worth.map((channel) => (
+                  <li key={channel.slug} className="channels-step__worth-item" data-enter="3">
+                    <span data-shimmer className="channels-step__shine" aria-hidden="true" />
+                    <MarketplaceLogo slug={channel.slug} size="sm" />
+                    <p className="channels-step__reason">
+                      <strong>{getMarketplaceInfo(channel.slug).name}</strong>
+                      <span>{channel.reason ?? CHANNEL_REASONS[channel.slug]}</span>
+                    </p>
+                    {CHANNEL_SIGNUP[channel.slug] && (
+                      <a
+                        className="channels-step__open"
+                        href={CHANNEL_SIGNUP[channel.slug]}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {texts.openAccount}
+                        <Icon name="external" size={14} />
+                      </a>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
         </div>
 
         <ListingPreview

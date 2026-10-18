@@ -1,0 +1,132 @@
+/* ==================================================================
+   Bloco: ai-progress (etapas reais da análise da IA, no vidro escuro)
+   Item: --done, --active, --todo
+   ================================================================== */
+.ai-progress {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 16px;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, var(--color-cocoa-700), var(--color-cocoa));
+  color: var(--color-cream);
+  box-shadow: 0 20px 36px -24px rgb(var(--rgb-black) / 0.8);
+}
+
+/* Borda iluminada */
+.ai-progress::before {
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgb(var(--rgb-coral-glow) / 0.55), transparent 45%, rgb(var(--rgb-honey) / 0.35));
+  content: '';
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.ai-progress__photo {
+  position: relative;
+  flex: none;
+  width: 92px;
+  height: 92px;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: rgb(var(--rgb-cream) / 0.08);
+}
+
+.ai-progress__photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ai-progress__beam {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 25%, rgb(var(--rgb-coral-glow) / 0.75), transparent 75%);
+  mix-blend-mode: screen;
+}
+
+.ai-progress__body {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.ai-progress__title {
+  margin: 0;
+  font-weight: 800;
+}
+
+.ai-progress__list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ai-progress__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: rgb(var(--rgb-cream) / 0.45);
+  font-size: 14.5px;
+  font-weight: 700;
+  transition:
+    color var(--duration-base),
+    transform var(--duration-slow) var(--ease-spring);
+}
+
+.ai-progress__item--active {
+  color: var(--color-coral-glow);
+  transform: translateX(4px);
+}
+
+.ai-progress__item--done {
+  color: var(--color-green-light);
+}
+
+.ai-progress__mark {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgb(var(--rgb-cream) / 0.08);
+  transition:
+    background var(--duration-base),
+    transform var(--duration-slow) var(--ease-spring);
+}
+
+.ai-progress__item--active .ai-progress__mark {
+  background: rgb(var(--rgb-coral) / 0.2);
+  transform: scale(1.12);
+}
+
+.ai-progress__item--done .ai-progress__mark {
+  background: rgb(var(--rgb-green-light) / 0.18);
+}
+
+.ai-progress__spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgb(var(--rgb-coral-glow) / 0.35);
+  border-top-color: var(--color-coral-glow);
+  border-radius: 50%;
+}
+
+@media (max-width: 420px) {
+  .ai-progress__photo {
+    width: 64px;
+    height: 64px;
+  }
+}

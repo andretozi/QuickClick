@@ -48,6 +48,7 @@ class RepositorioUsuariosSQL:
         nome: str,
         loja: str,
         plano: str = "gratis",
+        confirmou_maioridade_em: str | None = None,
     ) -> Usuario:
         email_normalizado = email.strip().lower()
         nome_limpo = nome.strip()
@@ -66,6 +67,8 @@ class RepositorioUsuariosSQL:
             user.password_hash = password_hash
             user.nome = nome_limpo
             user.loja = loja_limpa
+            if confirmou_maioridade_em:
+                user.confirmou_maioridade_em = confirmou_maioridade_em
             session.flush()
 
             vendedor = session.query(VendedorModel).filter_by(id=user.id).first()

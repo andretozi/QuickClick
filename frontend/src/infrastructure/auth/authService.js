@@ -73,7 +73,8 @@ export async function signUp(data) {
         nome: data.name,
         email: data.email,
         loja: data.store,
-        senha: data.password
+        senha: data.password,
+        maior_de_idade: Boolean(data.adult)
       }
     });
     const token = res.token;

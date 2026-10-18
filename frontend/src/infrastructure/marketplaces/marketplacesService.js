@@ -85,11 +85,3 @@ export async function disconnectMarketplace(slug) {
 export async function fetchMarketplaceProducts(slug) {
   return await requestJson(marketplaceRoute(slug, '/products'));
 }
-
-/** Publica um novo anúncio na conta do vendedor no marketplace. */
-export async function publishMarketplaceProduct(slug, productData) {
-  return await requestJson(marketplaceRoute(slug, '/products'), {
-    method: 'POST',
-    body: productData
-  });
-}

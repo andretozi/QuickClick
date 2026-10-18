@@ -1,6 +1,5 @@
 """Testes da API HTTP e da entrega do front, com a aplicação montada de verdade."""
 
-import os
 import tempfile
 import unittest
 from datetime import timedelta
@@ -14,11 +13,16 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from backend.app.bootstrap import criar_app
+from backend.application.ia.escolha import ProvedoresDeIA
 from backend.domain.marketplace import Marketplace, StatusMarketplace
 from backend.infrastructure.banco import models
-from backend.infrastructure.config import Config
+from backend.infrastructure.configuracao import Config
 from backend.infrastructure.database import Base
 from backend.infrastructure.seguranca.token_jwt import ServicoJWT
+from backend.tests import leitor_de_teste
+
+SEGREDO_JWT_TESTE = "segredo-jwt-so-dos-testes-com-mais-de-32-caracteres"
+CHAVE_CRIPTO_TESTE = "nN1Yc8pK0wVQx3vT1o6m2f9W1u0Hq2c5e7Kx8Zl4bD0="
 
 INDEX_HTML = "<!doctype html><title>Quick Click</title>"
 
@@ -110,15 +114,13 @@ class MockMeliClient:
 
 class BaseApi(unittest.TestCase):
     def setUp(self):
-        self._env_patch = patch.dict(
-            os.environ,
-            {
-                "MERCADO_LIVRE_CLIENT_ID": "6777085794691459",
-                "MERCADO_LIVRE_CLIENT_SECRET": "secret_teste",
-                "MERCADO_LIVRE_REDIRECT_URI": "https://quickclick.azurewebsites.net/api/marketplaces/mercado-livre/callback",
-            },
+        self.leitor = leitor_de_teste(
+            MERCADO_LIVRE_CLIENT_ID="1234567890123456",
+            MERCADO_LIVRE_CLIENT_SECRET="secret_teste",
+            MERCADO_LIVRE_REDIRECT_URI="https://quickclick.azurewebsites.net/api/marketplaces/mercado-livre/callback",
+            QUICKCLICK_JWT_SECRET=SEGREDO_JWT_TESTE,
+            TOKENS_CHAVE_CRIPTO=CHAVE_CRIPTO_TESTE,
         )
-        self._env_patch.start()
 
         self._patch_meli = patch("backend.infrastructure.marketplaces.mercado_livre.httpx.Client", new=MockMeliClient)
         self._patch_meli.start()
@@ -128,11 +130,7 @@ class BaseApi(unittest.TestCase):
         front = raiz / "frontend" / "dist"
         front.mkdir(parents=True)
         (front / "index.html").write_text(INDEX_HTML, encoding="utf-8")
-        self.config = Config(
-            raiz=raiz,
-            pasta_front=front,
-            caminho_banco=raiz / "dados" / "teste.sqlite3",
-        )
+        self.config = Config(raiz=raiz, pasta_front=front)
         self._engine = create_engine(
             "sqlite:///:memory:",
             connect_args={"check_same_thread": False},
@@ -140,8 +138,9 @@ class BaseApi(unittest.TestCase):
         )
         Base.metadata.create_all(bind=self._engine)
         self.Session = sessionmaker(autocommit=False, autoflush=False, bind=self._engine)
-        self.jwt = ServicoJWT()
-        self.cliente = TestClient(criar_app(self.config, session_factory=self.Session))
+        self.jwt = ServicoJWT(SEGREDO_JWT_TESTE)
+        self.cliente = TestClient(criar_app(self.config, session_factory=self.Session, leitor=self.leitor,
+                                            provedores=ProvedoresDeIA()))
 
         # Criação real da conta do vendedor via endpoint de cadastro (sem dados mockados/seeds)
         resp = self.cliente.post(
@@ -151,6 +150,7 @@ class BaseApi(unittest.TestCase):
                 "email": "teste@quickclick.com.br",
                 "loja": "Loja Teste",
                 "senha": "senha_segura_123",
+                "maior_de_idade": True,
             },
         )
         self.token = resp.json()["token"]
@@ -161,7 +161,6 @@ class BaseApi(unittest.TestCase):
         self._pasta.cleanup()
         self._engine.dispose()
         self._patch_meli.stop()
-        self._env_patch.stop()
 
     def conectar(self, slug, codigo="codigo_teste"):
         return self.cliente.post(
@@ -229,6 +228,7 @@ class TestAutenticacaoJWT(BaseApi):
             "email": "carlos@exemplo.com",
             "loja": "Loja do Carlos",
             "senha": "senha_segura_123",
+                "maior_de_idade": True,
         }
         resposta = self.cliente.post("/api/auth/register", json=dados)
         self.assertEqual(resposta.status_code, 200)
@@ -239,12 +239,25 @@ class TestAutenticacaoJWT(BaseApi):
         self.assertEqual(corpo["usuario"]["nome"], "Carlos Silva")
         self.assertEqual(corpo["usuario"]["plano"], "gratis")
 
+    def test_cadastro_sem_confirmar_maioridade_e_recusado(self):
+        resposta = self.cliente.post("/api/auth/register", json={"nome": "Leo", "email": "leo@exemplo.com",
+                                                                 "loja": "Loja", "senha": "senha_forte_789"})
+        self.assertEqual((resposta.status_code, resposta.json()["erro"]["codigo"]), (400, "maioridade_obrigatoria"))
+
+    def test_cadastro_grava_quando_confirmou_a_maioridade(self):
+        self.cliente.post("/api/auth/register", json={"nome": "Lia", "email": "lia@exemplo.com", "loja": "Loja",
+                                                      "senha": "senha_forte_789", "maior_de_idade": True})
+        with self.Session() as session:
+            user = session.query(models.User).filter_by(email="lia@exemplo.com").one()
+            self.assertTrue(user.confirmou_maioridade_em)
+
     def test_cadastro_com_email_duplicado_retorna_409(self):
         dados = {
             "nome": "Maria",
             "email": "maria@exemplo.com",
             "loja": "Loja Maria",
             "senha": "senha_secreta_456",
+            "maior_de_idade": True,
         }
         primeiro = self.cliente.post("/api/auth/register", json=dados)
         self.assertEqual(primeiro.status_code, 200)
@@ -259,6 +272,7 @@ class TestAutenticacaoJWT(BaseApi):
             "email": "ana@exemplo.com",
             "loja": "Loja da Ana",
             "senha": "minha_senha_forte",
+            "maior_de_idade": True,
         }
         self.cliente.post("/api/auth/register", json=dados)
 
@@ -276,6 +290,7 @@ class TestAutenticacaoJWT(BaseApi):
             "email": "bia@exemplo.com",
             "loja": "Loja da Bia",
             "senha": "senha_correta_123",
+            "maior_de_idade": True,
         }
         self.cliente.post("/api/auth/register", json=dados)
 
@@ -300,6 +315,7 @@ class TestAutenticacaoJWT(BaseApi):
             "email": "carla@exemplo.com",
             "loja": "Loja da Carla",
             "senha": "senha_segura_123",
+                "maior_de_idade": True,
         }
         cad_resp = self.cliente.post("/api/auth/register", json=dados)
         self.assertEqual(cad_resp.status_code, 200)
@@ -324,7 +340,7 @@ class TestAutenticacaoJWT(BaseApi):
         self.assertEqual(resposta.json()["erro"]["codigo"], "token_invalido")
 
     def test_acesso_com_token_expirado_retorna_401(self):
-        jwt_expirado = ServicoJWT(duracao=timedelta(seconds=-10))
+        jwt_expirado = ServicoJWT(SEGREDO_JWT_TESTE, duracao=timedelta(seconds=-10))
         token_velho = jwt_expirado.gerar_token(user_id=1, email="teste@quickclick.com.br")
 
         resposta = self.cliente.get("/api/me", headers={"Authorization": f"Bearer {token_velho}"})
@@ -393,19 +409,16 @@ class TestApiConexoes(BaseApi):
         self.assertIn("/#/marketplaces?conectado=mercado-livre", callback_resp.headers["location"])
         self.assertIn("mercado-livre", self.conectados())
 
-    def test_listar_e_publicar_produtos_mercado_livre(self):
+    def test_listar_produtos_e_rota_antiga_de_publicar_desativada(self):
         self.conectar("mercado-livre")
         # Listar produtos para monitoramento
         produtos_resp = self.cliente.get("/api/marketplaces/mercado-livre/products")
         self.assertEqual(produtos_resp.status_code, 200)
         self.assertIsInstance(produtos_resp.json(), list)
 
-        # Publicar um novo anúncio
-        novo_produto = {"title": "Fone de Ouvido Bluetooth", "price": 149.90}
-        pub_resp = self.cliente.post("/api/marketplaces/mercado-livre/products", json=novo_produto)
-        self.assertEqual(pub_resp.status_code, 200)
-        self.assertIn("id", pub_resp.json())
-        self.assertEqual(pub_resp.json()["title"], "Fone de Ouvido Bluetooth")
+        # A rota antiga que publicava um dict qualquer foi desativada (a publicação é montada no back)
+        pub_resp = self.cliente.post("/api/marketplaces/mercado-livre/products", json={"title": "x", "price": 1})
+        self.assertEqual(pub_resp.status_code, 405)
 
     @patch("backend.domain.marketplace.CATALOGO", CATALOGO_TESTE)
     def test_limite_do_plano_gratis_responde_403_dizendo_o_plano(self):

@@ -1,0 +1,36 @@
+/* ==================================================================
+   Bloco: ai-quota (selo do plano e análises restantes, no fundo escuro)
+   Modificador: --empty
+   ================================================================== */
+.ai-quota {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 6px 12px 6px 6px;
+  border: 1px solid rgb(var(--rgb-cream) / 0.14);
+  border-radius: var(--radius-pill);
+  background: rgb(var(--rgb-cream) / 0.06);
+  color: rgb(var(--rgb-cream) / 0.85);
+  font-size: 13px;
+  font-weight: 700;
+  backdrop-filter: blur(12px);
+}
+
+.ai-quota__plan {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(135deg, var(--color-coral), var(--color-honey));
+  color: var(--color-cocoa);
+  font-weight: 800;
+  box-shadow: 0 0 16px rgb(var(--rgb-coral) / 0.45);
+}
+
+.ai-quota--empty {
+  border-color: rgb(var(--rgb-coral) / 0.45);
+  color: var(--color-coral-glow);
+}

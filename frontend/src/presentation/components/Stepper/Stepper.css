@@ -4,6 +4,7 @@
    ================================================================== */
 .stepper {
   --stepper-dot: 38px;
+  --stepper-count: 5; /* quantos passos (vem do componente) */
 
   position: relative;
 }
@@ -12,8 +13,8 @@
 .stepper__rail {
   position: absolute;
   top: calc(var(--stepper-dot) / 2 - 2px);
-  right: 10%;
-  left: 10%;
+  right: calc(50% / var(--stepper-count));
+  left: calc(50% / var(--stepper-count));
   height: 4px;
   overflow: hidden;
   border-radius: var(--radius-pill);
@@ -33,7 +34,7 @@
 .stepper__list {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--stepper-count), minmax(0, 1fr));
   margin: 0;
   padding: 0;
   list-style: none;
@@ -128,5 +129,25 @@
 
   .stepper__label {
     font-size: 12px;
+  }
+}
+
+/* Muitos passos numa tela estreita: só o passo atual mostra o nome */
+@media (max-width: 480px) {
+  .stepper {
+    --stepper-dot: 30px;
+  }
+
+  .stepper__item:not(.stepper__item--active) .stepper__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .stepper__item--active .stepper__label {
+    white-space: nowrap;
   }
 }

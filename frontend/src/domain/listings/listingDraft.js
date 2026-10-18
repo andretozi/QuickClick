@@ -16,7 +16,18 @@ export const EMPTY_DRAFT = {
   condition: 'new',
   stock: '1',
   priceInput: '',
-  publishMl: true
+  publishMl: true,
+  // IA (só no criar): a análise, o que o vendedor confirmou e o que a IA preencheu
+  analysisId: null,
+  analysisPhotos: '', // marca das fotos que foram para a análise
+  resultAppliedFor: null, // análise cujo resultado já entrou no rascunho
+  product: '',
+  cards: [],
+  defects: [],
+  attributes: [], // confirmados: [{ key, value }], vão para o anúncio e para o Mercado Livre
+  specs: [],
+  mlCategoryId: null,
+  aiFilled: {}
 };
 
 /** Rascunho do assistente → campos do anúncio guardado. */
@@ -30,7 +41,8 @@ export function toListingData(draft, range) {
     suggestedPriceCents: range?.suggestedCents ?? null,
     stock: Number(draft.stock),
     photos: draft.photos,
-    coverIndex: Math.min(draft.coverIndex, Math.max(0, draft.photos.length - 1))
+    coverIndex: Math.min(draft.coverIndex, Math.max(0, draft.photos.length - 1)),
+    attributes: (draft.attributes ?? []).map((attribute) => ({ name: attribute.key, value: attribute.value }))
   };
 }
 
@@ -45,7 +57,8 @@ export function toDraft(listing) {
     condition: listing.condition,
     stock: String(listing.stock),
     priceInput: centsToInput(listing.priceCents),
-    publishMl: listingStatus(listing) !== LISTING_STATUS.UNPUBLISHED
+    publishMl: listingStatus(listing) !== LISTING_STATUS.UNPUBLISHED,
+    attributes: (listing.attributes ?? []).map((attribute) => ({ key: attribute.name, value: attribute.value }))
   };
 }
 

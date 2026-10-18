@@ -10,7 +10,7 @@ import main
 from backend.infrastructure.database import TIMEOUT_CONEXAO_S, criar_engine
 
 # Endereço de documentação (RFC 5737): nunca responde, como o Postgres atrás de um firewall fechado.
-ENDERECO_QUE_NAO_RESPONDE = "postgresql+psycopg2://usuario:senha@192.0.2.1:5432/postgres"
+ENDERECO_QUE_NAO_RESPONDE = "postgresql+psycopg2://usuario:senha@192.0.2.1:5432/postgres"  # verificar_segredos: ignorar
 
 
 class TestEnderecoDoServidor(unittest.TestCase):

@@ -7,9 +7,9 @@ import { LISTING_WIZARD } from '@/domain/content/listingContent.js';
 import { FIELD_ERRORS } from '@/domain/content/commonContent.js';
 import './PhotosStep.css';
 
-/** Passo 1: até 6 fotos, arrastando ou escolhendo, e a escolha da capa. */
+/** Passo 1: até 6 fotos, arrastando ou escolhendo, e a escolha da capa. No Grátis, o aviso de uso de dados. */
 export default function PhotosStep({ editor }) {
-  const { draft, photos, errors } = editor;
+  const { draft, photos, errors, quota, editing } = editor;
   const texts = LISTING_WIZARD.photos;
   const max = LISTING_LIMITS.PHOTOS_MAX;
   const photoError =
@@ -21,6 +21,13 @@ export default function PhotosStep({ editor }) {
         <h2 className="heading photos-step__title">{texts.title}</h2>
         <p className="photos-step__lead">{texts.lead}</p>
       </header>
+
+      {!editing && quota?.freeDataNotice && (
+        <p className="photos-step__notice">
+          <Icon name="shield" size={17} />
+          <span>{texts.freeNotice}</span>
+        </p>
+      )}
 
       <FileDrop
         id="anuncio-fotos"

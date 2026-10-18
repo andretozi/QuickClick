@@ -2,9 +2,11 @@
 Aplicação · Caso de uso: Registrar novo usuário (Cadastro).
 """
 
+from datetime import UTC, datetime
+
 from backend.application.casos_de_uso.autenticar_usuario import ResultadoAutenticacao
 from backend.application.portas import RepositorioUsuarios, ServicoHashSenha, ServicoToken
-from backend.domain.erros import EmailJaCadastrado
+from backend.domain.erros import EmailJaCadastrado, MaioridadeNaoConfirmada
 
 
 class RegistrarUsuario:
@@ -25,10 +27,13 @@ class RegistrarUsuario:
         loja: str,
         senha: str,
         plano: str = "gratis",
+        maior_de_idade: bool = False,
     ) -> ResultadoAutenticacao:
         email_normalizado = email.strip().lower()
         if not email_normalizado or not senha:
             raise ValueError("Email e senha são obrigatórios.")
+        if not maior_de_idade:
+            raise MaioridadeNaoConfirmada()
 
         existente = self._usuarios.obter_por_email(email_normalizado)
         if existente is not None:
@@ -41,6 +46,7 @@ class RegistrarUsuario:
             nome=nome,
             loja=loja,
             plano=plano,
+            confirmou_maioridade_em=datetime.now(UTC).isoformat(),
         )
 
         token = self._token_service.gerar_token(usuario.id, usuario.email)
