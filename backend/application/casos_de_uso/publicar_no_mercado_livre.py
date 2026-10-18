@@ -16,7 +16,7 @@ from backend.application.ia.modelos import ArquivoDeFoto
 from backend.application.ia.portas import FontePrecosMarketplace, PreparadorDeFotos, RepositorioDeAnalises
 from backend.application.portas import FalhaNoMarketplace, PublicadorMercadoLivre
 from backend.domain.erros import FotoInvalida, MercadoLivreDesconectado, PublicacaoRecusada
-from backend.domain.ia.atributos_ml import ligar_confirmados
+from backend.domain.ia.atributos_ml import completar_para_publicacao, ligar_confirmados
 from backend.domain.ia.escrita import cortar_titulo
 from backend.domain.ia.leitura import normalizar_chave
 
@@ -85,7 +85,8 @@ def _causas(corpo: Any) -> list[str]:
 
 def _pede_family_name(corpo: Any) -> bool:
     """Categorias no modelo novo do Mercado Livre (User Products) pedem family_name em vez de title."""
-    return "family_name" in str(corpo or "")
+    texto = str(corpo or "").lower()
+    return "family_name" in texto or ("title" in texto and "invalid" in texto)
 
 
 class PublicarNoMercadoLivre:
@@ -122,7 +123,11 @@ class PublicarNoMercadoLivre:
                 raise PublicacaoRecusada(["Não consegui descobrir a categoria do Mercado Livre para esse título."])
             categoria_id = sugerida.categoria_id
         da_categoria = self._fonte.atributos_da_categoria(categoria_id, token)
-        ligados = ligar_confirmados(list(dados.atributos), da_categoria, ml.get("mapa") or {})
+        ligados = completar_para_publicacao(
+            ligar_confirmados(list(dados.atributos), da_categoria, ml.get("mapa") or {}),
+            da_categoria,
+            dados.titulo,
+        )
 
         try:
             imagens = [self._publicador.subir_imagem(token, f.leitura_jpeg, f"foto{f.indice + 1}.jpg") for f in preparadas]
@@ -139,10 +144,13 @@ class PublicarNoMercadoLivre:
                 if not _pede_family_name(erro.corpo):
                     raise
                 log.info("Mercado Livre pediu family_name (User Products): publicando de novo com ele.")
-                criado = self._publicador.publicar_anuncio(token, {**item, "family_name": dados.titulo})
+                sem_titulo = {k: v for k, v in item.items() if k != "title"}
+                criado = self._publicador.publicar_anuncio(token, {**sem_titulo, "family_name": dados.titulo})
         except FalhaNoMarketplace as erro:
-            log.warning("Mercado Livre recusou a publicação (%s).", erro.status or "sem resposta")
-            raise PublicacaoRecusada(_causas(erro.corpo)) from erro
+            causas = _causas(erro.corpo)
+            log.warning("Mercado Livre recusou a publicação (%s): %s", erro.status or "sem resposta",
+                        "; ".join(causas) or "sem detalhes")
+            raise PublicacaoRecusada(causas) from erro
 
         avisos = []
         item_id = str(criado.get("id") or "")
