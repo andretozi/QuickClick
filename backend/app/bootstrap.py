@@ -152,7 +152,13 @@ def criar_app(
                                                          preparador),
     )
 
-    app = criar_api(casos, identificar_vendedor=identificar_vendedor, servico_token=token_service)
+    documentacao_ativa = leitor.booleano("DOCUMENTACAO_API_ATIVA", False)
+    app = criar_api(
+        casos,
+        identificar_vendedor=identificar_vendedor,
+        servico_token=token_service,
+        documentacao_ativa=documentacao_ativa,
+    )
     if executor_padrao:
         app.router.on_shutdown.append(lambda: executor.shutdown(wait=False, cancel_futures=True))
     montar_front(app, config.pasta_front)

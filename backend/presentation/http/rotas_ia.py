@@ -11,16 +11,16 @@ Apresentação · Rotas da IA no criar anúncio (todas exigem JWT)
 As fotos ficam só em memória (uploads.py).
 """
 
-from typing import Annotated, Any
+from typing import Any
 
-from fastapi import APIRouter, Body, Request
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 from backend.application.casos_de_uso import CasosDeUso
 from backend.domain.erros import FotoInvalida, IAIndisponivel
 from backend.domain.ia.fotos import MAX_FOTOS_POR_ANALISE
-from backend.presentation.http.esquemas import RespostaDeErro
+from backend.presentation.http.esquemas import RequisicaoConfirmacaoIA, RespostaDeErro
 from backend.presentation.http.uploads import campo_de_texto, ler_fotos
 
 ERROS_IA = {
@@ -67,9 +67,8 @@ def criar_rotas_ia(casos: CasosDeUso, VendedorAtual) -> APIRouter:  # noqa: N803
         return await run_in_threadpool(servico().foto_extra, vendedor_id, analise_id, fotos[0], tipo)
 
     @rotas.post("/analises/{analise_id}/confirmacao", summary="Confirma os atributos e continua", responses=ERROS_IA)
-    def confirmar(analise_id: str, vendedor_id: VendedorAtual,
-                  corpo: Annotated[dict[str, Any], Body()]) -> dict[str, Any]:
-        return servico().confirmar(vendedor_id, analise_id, corpo)
+    def confirmar(analise_id: str, vendedor_id: VendedorAtual, corpo: RequisicaoConfirmacaoIA) -> dict[str, Any]:
+        return servico().confirmar(vendedor_id, analise_id, corpo.model_dump())
 
     @rotas.post("/analises/{analise_id}/retomar", summary="Retoma uma análise interrompida ou com falha",
                 responses=ERROS_IA)

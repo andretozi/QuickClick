@@ -178,6 +178,16 @@ class TestApiSistema(BaseApi):
         self.assertEqual(resposta.status_code, 200)
         self.assertEqual(resposta.json(), {"status": "ok"})
 
+    def test_cabecalhos_de_seguranca_presentes(self):
+        resposta = self.cliente.get("/api/health")
+        self.assertIn("max-age=31536000", resposta.headers["strict-transport-security"])
+        self.assertEqual(resposta.headers["x-content-type-options"], "nosniff")
+        self.assertEqual(resposta.headers["x-frame-options"], "DENY")
+        self.assertEqual(resposta.headers["referrer-policy"], "strict-origin-when-cross-origin")
+        self.assertIn("camera=()", resposta.headers["permissions-policy"])
+        self.assertIn("default-src 'self'", resposta.headers["content-security-policy"])
+        self.assertIn("frame-ancestors 'none'", resposta.headers["content-security-policy"])
+
     def test_front_na_raiz(self):
         resposta = self.cliente.get("/")
         self.assertEqual(resposta.status_code, 200)
@@ -196,23 +206,38 @@ class TestApiSistema(BaseApi):
                 self.assertEqual(resposta.status_code, 404)
                 self.assertEqual(resposta.json()["erro"]["codigo"], "nao_encontrado")
 
-    def test_documentacao_automatica(self):
-        self.assertEqual(self.cliente.get("/docs").status_code, 200)
-        caminhos = self.cliente.get("/openapi.json").json()["paths"]
-        for caminho in (
-            "/api/health",
-            "/api/plans",
-            "/api/auth/register",
-            "/api/auth/login",
-            "/api/auth/me",
-            "/api/me",
-            "/api/marketplaces",
-            "/api/marketplaces/{slug}/connection",
-            "/api/marketplaces/{slug}/authorize-url",
-            "/api/marketplaces/{slug}/callback",
-            "/api/marketplaces/{slug}/products",
-        ):
-            self.assertIn(caminho, caminhos)
+    def test_documentacao_desligada_por_padrao_e_ligavel_por_configuracao(self):
+        # Por padrão (/docs, /redoc e /openapi.json desligados): caem no index.html do front, sem expor Swagger/OpenAPI
+        for caminho in ("/docs", "/redoc", "/openapi.json"):
+            with self.subTest(caminho=caminho):
+                resposta = self.cliente.get(caminho)
+                self.assertEqual(resposta.text, INDEX_HTML)
+                self.assertNotIn("swagger", resposta.text.lower())
+
+        # Quando DOCUMENTACAO_API_ATIVA=true, expõe normalmente os esquemas para inspeção local
+        leitor_doc = leitor_de_teste(
+            QUICKCLICK_JWT_SECRET=SEGREDO_JWT_TESTE,
+            TOKENS_CHAVE_CRIPTO=CHAVE_CRIPTO_TESTE,
+            DOCUMENTACAO_API_ATIVA="true",
+        )
+        with TestClient(criar_app(self.config, session_factory=self.Session, leitor=leitor_doc,
+                                  provedores=ProvedoresDeIA())) as cliente_doc:
+            self.assertEqual(cliente_doc.get("/docs").status_code, 200)
+            caminhos = cliente_doc.get("/openapi.json").json()["paths"]
+            for caminho in (
+                "/api/health",
+                "/api/plans",
+                "/api/auth/register",
+                "/api/auth/login",
+                "/api/auth/me",
+                "/api/me",
+                "/api/marketplaces",
+                "/api/marketplaces/{slug}/connection",
+                "/api/marketplaces/{slug}/authorize-url",
+                "/api/marketplaces/{slug}/callback",
+                "/api/marketplaces/{slug}/products",
+            ):
+                self.assertIn(caminho, caminhos)
 
     def test_quando_nao_ha_vendedor_no_banco_api_me_retorna_404(self):
         token_inexistente = self.jwt.gerar_token(user_id=999, email="nao_existe@quickclick.com.br")
@@ -228,7 +253,7 @@ class TestAutenticacaoJWT(BaseApi):
             "email": "carlos@exemplo.com",
             "loja": "Loja do Carlos",
             "senha": "senha_segura_123",
-                "maior_de_idade": True,
+            "maior_de_idade": True,
         }
         resposta = self.cliente.post("/api/auth/register", json=dados)
         self.assertEqual(resposta.status_code, 200)
@@ -309,13 +334,27 @@ class TestAutenticacaoJWT(BaseApi):
         self.assertEqual(login_resp.status_code, 401)
         self.assertEqual(login_resp.json()["erro"]["codigo"], "credenciais_invalidas")
 
+    def test_bloqueio_contra_forca_bruta_no_login_retorna_429(self):
+        for _ in range(8):
+            resp = self.cliente.post(
+                "/api/auth/login",
+                json={"email": "teste@quickclick.com.br", "senha": "senha_incorreta"},
+            )
+            self.assertEqual(resp.status_code, 401)
+
+        bloqueado = self.cliente.post(
+            "/api/auth/login",
+            json={"email": "teste@quickclick.com.br", "senha": "senha_segura_123"},
+        )
+        self.assertEqual((bloqueado.status_code, bloqueado.json()["erro"]["codigo"]), (429, "muitas_tentativas"))
+
     def test_obter_usuario_atual_via_token_jwt(self):
         dados = {
             "nome": "Carla Diaz",
             "email": "carla@exemplo.com",
             "loja": "Loja da Carla",
             "senha": "senha_segura_123",
-                "maior_de_idade": True,
+            "maior_de_idade": True,
         }
         cad_resp = self.cliente.post("/api/auth/register", json=dados)
         self.assertEqual(cad_resp.status_code, 200)
@@ -408,6 +447,18 @@ class TestApiConexoes(BaseApi):
         self.assertEqual(callback_resp.status_code, 302)
         self.assertIn("/#/marketplaces?conectado=mercado-livre", callback_resp.headers["location"])
         self.assertIn("mercado-livre", self.conectados())
+
+    def test_callback_oauth_nao_vaza_excecao_interna_na_url(self):
+        auth_url_resp = self.cliente.get("/api/marketplaces/mercado-livre/authorize-url")
+        estado = parse_qs(urlparse(auth_url_resp.json()["url"]).query)["state"][0]
+        with patch.object(MockMeliClient, "post", side_effect=RuntimeError("segredo_interno_do_banco")):
+            callback_resp = self.cliente.get(
+                f"/api/marketplaces/mercado-livre/callback?code=codigo_teste&state={estado}",
+                follow_redirects=False,
+            )
+        self.assertEqual(callback_resp.status_code, 302)
+        self.assertEqual(callback_resp.headers["location"], "/#/marketplaces?erro=falha_ao_conectar")
+        self.assertNotIn("segredo_interno_do_banco", callback_resp.headers["location"])
 
     def test_listar_produtos_e_rota_antiga_de_publicar_desativada(self):
         self.conectar("mercado-livre")
