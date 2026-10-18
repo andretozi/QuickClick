@@ -30,6 +30,7 @@ MARCA_GENERICA_ML = "Genérica"
 MODELO_PADRAO_ML = "Padrão"
 MOTIVO_SEM_GTIN_ML = "O produto não tem código cadastrado"
 TERMOS_DE_KIT = ("kit", "conjunto", "jogo", "pack")
+IDS_QUANTIDADE_ML = ("UNITS_PER_PACK", "UNITS_PER_PACKAGE", "PACKAGE_QUANTITY")
 UNIDADES_CANONICAS = {"ml": "mL", "l": "L", "cc": "cc", "cm": "cm", "mm": "mm", "m": "m", "g": "g", "kg": "kg"}
 
 
@@ -89,8 +90,12 @@ def _valor_id(atributo: AtributoML, valor: str) -> str | None:
 
 
 def _formatar_valor(atributo: AtributoML, valor: str) -> str:
-    """Normaliza medidas com unidade ('250ml' → '250 mL') quando a categoria usa number_unit."""
+    """Normaliza quantidades inteiras ('1 unidade' → '1') e medidas com unidade ('250ml' → '250 mL')."""
     limpo = valor.strip()
+    if atributo.id in IDS_QUANTIDADE_ML:
+        numeros = re.findall(r"\d+", limpo)
+        if numeros:
+            return str(max(1, int(numeros[0])))
     casamento = re.fullmatch(r"(\d+(?:[.,]\d+)?)\s*([a-zA-Z]{1,4})?", limpo)
     if not casamento:
         return limpo
@@ -189,7 +194,7 @@ def ligar_confirmados(confirmados: list[tuple[str, str]], da_categoria: list[Atr
 
 
 def _unidades_do_kit(titulo: str, usados: dict[str, AtributoLigado]) -> int:
-    for id_qtd in ("UNITS_PER_PACK", "UNITS_PER_PACKAGE", "PACKAGE_QUANTITY"):
+    for id_qtd in IDS_QUANTIDADE_ML:
         if id_qtd in usados:
             numeros = re.findall(r"\d+", usados[id_qtd].valor)
             if numeros:
@@ -198,6 +203,18 @@ def _unidades_do_kit(titulo: str, usados: dict[str, AtributoLigado]) -> int:
     if casamento:
         return max(1, int(casamento.group(1)))
     return 1
+
+
+def _definir_ou_substituir(saida: list[AtributoLigado], usados: dict[str, AtributoLigado],
+                           novo: AtributoLigado) -> None:
+    if novo.id in usados:
+        for idx, item in enumerate(saida):
+            if item.id == novo.id:
+                saida[idx] = novo
+                break
+    else:
+        saida.append(novo)
+    usados[novo.id] = novo
 
 
 def completar_para_publicacao(ligados: list[AtributoLigado], da_categoria: list[AtributoML],
@@ -250,19 +267,27 @@ def completar_para_publicacao(ligados: list[AtributoLigado], da_categoria: list[
         usados["MODEL"] = ligado
 
     unidades = _unidades_do_kit(titulo, usados)
-    eh_kit = unidades > 1 or any(t in _normalizar(titulo).split() for t in TERMOS_DE_KIT)
+    # O Mercado Livre só aceita SALE_FORMAT="Kit" quando UNITS_PER_PACK >= 2; para 1 unidade exige "Unidade" e "1".
+    eh_kit = unidades >= 2
 
-    if "SALE_FORMAT" in por_id and "SALE_FORMAT" not in usados:
+    if "SALE_FORMAT" in por_id:
         formato = "Kit" if eh_kit else "Unidade"
-        ligado = AtributoLigado("SALE_FORMAT", formato, _valor_id(por_id["SALE_FORMAT"], formato))
-        saida.append(ligado)
-        usados["SALE_FORMAT"] = ligado
+        chave_fmt = usados["SALE_FORMAT"].chave if "SALE_FORMAT" in usados else ""
+        _definir_ou_substituir(
+            saida,
+            usados,
+            AtributoLigado("SALE_FORMAT", formato, _valor_id(por_id["SALE_FORMAT"], formato), chave_fmt),
+        )
 
-    if "UNITS_PER_PACK" in por_id and "UNITS_PER_PACK" not in usados:
-        valor_un = str(unidades)
-        ligado = AtributoLigado("UNITS_PER_PACK", valor_un, _valor_id(por_id["UNITS_PER_PACK"], valor_un))
-        saida.append(ligado)
-        usados["UNITS_PER_PACK"] = ligado
+    for id_qtd in IDS_QUANTIDADE_ML:
+        if id_qtd in por_id and (id_qtd == "UNITS_PER_PACK" or id_qtd in usados):
+            valor_un = str(unidades)
+            chave_qtd = usados[id_qtd].chave if id_qtd in usados else ""
+            _definir_ou_substituir(
+                saida,
+                usados,
+                AtributoLigado(id_qtd, valor_un, _valor_id(por_id[id_qtd], valor_un), chave_qtd),
+            )
 
     if "IS_SET" in por_id and "IS_SET" not in usados:
         valor_set = "Sim" if eh_kit else "Não"

@@ -1,8 +1,11 @@
 """Publicação montada no back: o item do Mercado Livre, as fotos, a descrição, a gestão e os erros."""
 
+import io
 import json
 import unittest
 from datetime import timedelta
+
+from PIL import Image
 
 from backend.application.casos_de_uso import ConectarMarketplace
 from backend.application.casos_de_uso.publicar_no_mercado_livre import PublicarNoMercadoLivre
@@ -16,7 +19,7 @@ from backend.domain.erros import (
     MercadoLivreDesconectado,
     PublicacaoRecusada,
 )
-from backend.domain.ia.atributos_ml import AtributoML, completar_para_publicacao
+from backend.domain.ia.atributos_ml import AtributoML, completar_para_publicacao, ligar_confirmados
 from backend.domain.plano import GRATIS
 from backend.domain.vendedor import Vendedor
 from backend.infrastructure.ia.preparador_pillow import PillowPreparador
@@ -30,10 +33,12 @@ ANUNCIO = {"titulo": "Tênis de corrida Nike azul usado", "descricao": "Tênis u
 
 
 class PublicadorFalso:
-    def __init__(self, erros_ao_publicar=(), erro_na_descricao=None, seller_id="1001"):
+    def __init__(self, erros_ao_publicar=(), erro_na_descricao=None, seller_id="1001", erros_ao_subir_imagem=()):
         self.imagens, self.itens, self.descricoes = [], [], []
+        self.conteudos_imagens = []
         self.atualizacoes, self.excluidos = [], []
         self._erros = list(erros_ao_publicar)
+        self._erros_imagem = list(erros_ao_subir_imagem)
         self._erro_na_descricao = erro_na_descricao
         self._armazenados = {
             "MLB123456": {
@@ -59,6 +64,11 @@ class PublicadorFalso:
         }
 
     def subir_imagem(self, token, conteudo, nome="foto.jpg"):
+        self.conteudos_imagens.append((nome, conteudo))
+        if self._erros_imagem:
+            erro = self._erros_imagem.pop(0)
+            if erro is not None:
+                raise erro
         self.imagens.append(nome)
         return f"IMG{len(self.imagens)}"
 
@@ -135,6 +145,27 @@ class TestPublicarNoMercadoLivre(unittest.TestCase):
         self.assertEqual({a["id"]: a["value_name"] for a in item["attributes"]}, {"BRAND": "Nike", "SIZE": "42"})
         self.assertEqual(publicador.descricoes, [("MLB123456", "Tênis usado em bom estado.")])
 
+    def test_reenvia_foto_ampliada_quando_mercado_livre_recusa_por_bordas_brancas(self):
+        erro_borda = FalhaNoMarketplace(
+            "400",
+            400,
+            {
+                "message": (
+                    "Asegúrate de que la imagen tenga como mínimo 500 píxeles en uno de los lados. "
+                    "La imagen subida, procesados los bordes blancos, tiene un tamaño de 447px x 447px"
+                )
+            },
+        )
+        publicador = PublicadorFalso(erros_ao_subir_imagem=[None, erro_borda, None])
+        publicar, _ = caso(publicador)
+        resultado = publicar.executar(1, ANUNCIO, fotos(2))
+        self.assertEqual(resultado["id"], "MLB123456")
+        self.assertEqual(publicador.imagens, ["foto1.jpg", "foto2.jpg"])
+        self.assertEqual(len(publicador.conteudos_imagens), 3)
+        with Image.open(io.BytesIO(publicador.conteudos_imagens[-1][1])) as reenviada:
+            self.assertGreaterEqual(min(reenviada.size), 1200)
+            self.assertGreaterEqual(max(reenviada.size), 1600)
+
     def test_analise_de_outro_vendedor_nao_empresta_a_categoria(self):
         publicar, publicador = caso(analises={"a1": {"vendedor_id": 2, "leitura": {"ml": {"categoria_id": "MLB999"}}}})
         publicar.executar(1, ANUNCIO, fotos(1))
@@ -166,7 +197,11 @@ class TestPublicarNoMercadoLivre(unittest.TestCase):
             AtributoML("EMPTY_GTIN_REASON", "Motivo de GTIN vazio", False,
                        (("17055160", "O produto não tem código cadastrado"),)),
         ]
-        ligados = completar_para_publicacao([], da_categoria, "Caneca Branca de Cerâmica 250ml Acabamento Brilhante")
+        ligados = completar_para_publicacao(
+            ligar_confirmados([("quantidade", "1 unidade")], da_categoria, {}),
+            da_categoria,
+            "Caneca Branca de Cerâmica 250ml Acabamento Brilhante",
+        )
         por_id = {l.id: l.para_api() for l in ligados}
         self.assertEqual(por_id["BRAND"], {"id": "BRAND", "value_name": "Genérica"})
         self.assertEqual(por_id["MANUFACTURER"], {"id": "MANUFACTURER", "value_name": "Genérica"})
@@ -178,6 +213,16 @@ class TestPublicarNoMercadoLivre(unittest.TestCase):
         self.assertEqual(por_id["IS_SET"], {"id": "IS_SET", "value_id": "242084"})
         self.assertEqual(por_id["VOLUME_CAPACITY"], {"id": "VOLUME_CAPACITY", "value_name": "250 mL"})
         self.assertEqual(por_id["EMPTY_GTIN_REASON"], {"id": "EMPTY_GTIN_REASON", "value_id": "17055160"})
+
+        ligados_kit = completar_para_publicacao(
+            ligar_confirmados([("quantidade", "2 unidades")], da_categoria, {}),
+            da_categoria,
+            "Caneca Branca de Cerâmica 250ml",
+        )
+        por_id_kit = {l.id: l.para_api() for l in ligados_kit}
+        self.assertEqual(por_id_kit["SALE_FORMAT"], {"id": "SALE_FORMAT", "value_id": "1359392"})
+        self.assertEqual(por_id_kit["UNITS_PER_PACK"], {"id": "UNITS_PER_PACK", "value_name": "2"})
+        self.assertEqual(por_id_kit["IS_SET"], {"id": "IS_SET", "value_id": "242085"})
 
     def test_pausar_reativar_atualizar_e_excluir_anuncio(self):
         publicar, publicador = caso()
