@@ -10,7 +10,7 @@ Título (até 60 caracteres)
 - Use os termos do comprador quando couberem. Sem pontuação no fim, sem caixa alta inteira, sem "promoção", "oferta" ou "frete grátis".
 
 Descrição
-- 2 ou 3 parágrafos curtos: o que é e para quem serve; estado e o que acompanha; cuidados ou detalhes úteis.
+- 2 ou 3 parágrafos curtos: o que é e para quem serve; formato de venda (se é venda de 1 unidade avulsa ou conjunto), estado e o que acompanha na embalagem; cuidados de uso, limpeza ou detalhes úteis dos atributos confirmados.
 - Depois, no máximo uma lista de até 5 especificações no formato "Rótulo: valor", uma por linha, sem marcador nenhum no começo da linha.
 - Produto usado: diga com clareza o estado, o desgaste e cada defeito informado. Nunca esconda nem suavize defeito.
 - Responda às objeções do comprador com fatos confirmados (nunca com promessa que não está nos dados).

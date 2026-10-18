@@ -1,5 +1,5 @@
 /**
- * Infraestrutura · IA do criar anúncio, pela API real (/api/ia e /api/anuncios)
+ * Infraestrutura · IA do criar anúncio e gestão de anúncios no Mercado Livre (/api/ia e /api/anuncios)
  *
  * Fotos vão em FormData (multipart). As respostas do back (em português) viram os objetos
  * do front (em inglês), como no resto da infraestrutura. Erros chegam como ApiError, com o
@@ -140,6 +140,20 @@ function photosForm(field, blobs) {
   return form;
 }
 
+function toAnuncioPayload(listing) {
+  return {
+    titulo: listing.title,
+    descricao: listing.description,
+    preco_centavos: listing.priceCents,
+    estoque: listing.stock,
+    condicao: listing.condition === 'used' ? 'usado' : 'novo',
+    atributos: (listing.attributes ?? []).map((a) => ({ chave: a.key ?? a.name ?? '', valor: a.value ?? '' })),
+    analise_id: listing.analysisId ?? null,
+    ml_categoria_id: listing.mlCategoryId ?? null,
+    fotos_mantidas: listing.keptPhotos ?? []
+  };
+}
+
 export async function fetchQuota() {
   return toQuota(await requestJson('/ia/cota'));
 }
@@ -183,28 +197,48 @@ export async function resumeAnalysis(id, readingBlobs = null) {
 /**
  * Publica no Mercado Livre com o anúncio montado no back.
  * listing: { title, description, priceCents, stock, condition ('new' ou 'used'), attributes: [{ key, value }],
- *            analysisId, mlCategoryId }
+ *            analysisId, mlCategoryId, keptPhotos }
  */
-export async function publishToMercadoLivre(listing, photoBlobs) {
+export async function publishToMercadoLivre(listing, photoBlobs = []) {
   const form = photosForm('fotos', photoBlobs);
-  form.append(
-    'anuncio',
-    JSON.stringify({
-      titulo: listing.title,
-      descricao: listing.description,
-      preco_centavos: listing.priceCents,
-      estoque: listing.stock,
-      condicao: listing.condition === 'used' ? 'usado' : 'novo',
-      atributos: (listing.attributes ?? []).map((a) => ({ chave: a.key, valor: a.value })),
-      analise_id: listing.analysisId ?? null,
-      ml_categoria_id: listing.mlCategoryId ?? null
-    })
-  );
+  form.append('anuncio', JSON.stringify(toAnuncioPayload(listing)));
   const data = await requestJson('/anuncios/publicar/mercado-livre', { method: 'POST', body: form });
   return {
     id: data.id,
     permalink: data.permalink ?? null,
     status: data.status ?? null,
+    categoryId: data.categoria_id ?? null,
     notices: (data.avisos ?? []).map((a) => ({ code: a.codigo, message: a.mensagem }))
   };
+}
+
+/** Obtém os dados mais recentes de um anúncio publicado no Mercado Livre. */
+export async function fetchMercadoLivreItem(itemId) {
+  return await requestJson(`/anuncios/mercado-livre/${encodeURIComponent(itemId)}`);
+}
+
+/** Pausa ('paused') ou reativa ('published') um anúncio diretamente no Mercado Livre. */
+export async function updateMercadoLivreStatus(itemId, nextStatus) {
+  const status = nextStatus === 'paused' ? 'pausado' : 'publicado';
+  return await requestJson(`/anuncios/mercado-livre/${encodeURIComponent(itemId)}/status`, {
+    method: 'PATCH',
+    body: { status }
+  });
+}
+
+/** Atualiza preço, estoque, fotos, atributos, título e descrição de um anúncio no Mercado Livre. */
+export async function updateMercadoLivreItem(itemId, listing, photoBlobs = []) {
+  const form = photosForm('fotos', photoBlobs);
+  form.append('anuncio', JSON.stringify(toAnuncioPayload(listing)));
+  return await requestJson(`/anuncios/mercado-livre/${encodeURIComponent(itemId)}`, {
+    method: 'PUT',
+    body: form
+  });
+}
+
+/** Fecha e exclui definitivamente o anúncio no Mercado Livre. */
+export async function deleteMercadoLivreItem(itemId) {
+  return await requestJson(`/anuncios/mercado-livre/${encodeURIComponent(itemId)}`, {
+    method: 'DELETE'
+  });
 }

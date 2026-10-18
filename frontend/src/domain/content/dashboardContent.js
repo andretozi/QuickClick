@@ -73,7 +73,10 @@ export const LISTINGS_PANEL = {
     label: (names) => `${names} chegam em breve`
   },
   actions: {
-    edit: 'Ver e editar',
+    view: 'Ver detalhes',
+    edit: 'Editar anúncio',
+    sync: 'Sincronizar com o Mercado Livre',
+    syncing: 'Sincronizando…',
     pause: 'Pausar',
     resume: 'Reativar',
     publish: 'Publicar no Mercado Livre',
@@ -101,18 +104,19 @@ export const LISTINGS_PANEL = {
   },
   confirmDelete: {
     title: 'Excluir este anúncio?',
-    text: (title) => `"${title}" sai do painel e do Mercado Livre. Não dá pra desfazer.`,
+    text: (title) => `"${title}" sai do painel e é encerrado e excluído no Mercado Livre. Não dá pra desfazer.`,
     confirm: 'Excluir anúncio',
     deleting: 'Excluindo…',
     cancel: 'Cancelar'
   },
   toasts: {
-    paused: { title: 'Anúncio pausado.', text: 'Ele sai do ar no Mercado Livre até você reativar.' },
+    paused: { title: 'Anúncio pausado.', text: 'Ele saiu do ar no Mercado Livre até você reativar.' },
     resumed: { title: 'Anúncio reativado.', text: 'Ele voltou a aparecer no Mercado Livre.' },
     published: { title: 'Anúncio publicado.', text: 'Ele já aparece no Mercado Livre.' },
     duplicated: { title: 'Anúncio duplicado.', text: 'A cópia ficou fora do ar, pronta pra você ajustar.' },
-    removed: { title: 'Anúncio excluído.', text: 'Ele saiu do painel e do Mercado Livre.' },
-    error: { title: 'Não deu pra salvar agora.', text: 'Tente de novo em instantes.' }
+    removed: { title: 'Anúncio excluído.', text: 'Ele saiu do painel e foi removido do Mercado Livre.' },
+    synced: { title: 'Painel sincronizado.', text: 'Os dados vieram direto do Mercado Livre.' },
+    error: { title: 'Não deu pra concluir agora.', text: 'Confira a conexão com o Mercado Livre e tente de novo.' }
   }
 };
 

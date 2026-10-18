@@ -40,7 +40,7 @@ export const LISTING_STATUS_LABELS = {
   unpublished: { label: 'Não publicado', tone: 'muted' }
 };
 
-/** Assistente "criar anúncio" (#/anuncios/novo) e a edição (#/anuncios/:id). */
+/** Assistente "criar anúncio" (#/anuncios/novo) e a edição (#/anuncios/:id/editar). */
 export const LISTING_WIZARD = {
   eyebrow: 'DA FOTO AO ANÚNCIO PRONTO',
   title: 'Criar anúncio',
@@ -88,6 +88,8 @@ export const LISTING_WIZARD = {
     removeLabel: (index) => `Remover a foto ${index}`,
     photoAlt: (index) => `Foto ${index} do produto`,
     count: (count, max) => `${count} de ${max} ${plural(max, 'foto', 'fotos')}`,
+    qualityTip:
+      'Dica de alcance: anúncios com 3 ou mais fotos em ângulos diferentes ganham destaque nas buscas do Mercado Livre.',
     full: (max) => `Você já tem ${max} fotos. Remova uma para trocar.`,
     invalid: 'Esse arquivo não é uma imagem. Tente JPG, PNG ou WEBP.',
     freeNotice:
@@ -291,10 +293,10 @@ export const LISTING_WIZARD = {
   }
 };
 
-/** Ver e editar um anúncio (#/anuncios/:id). */
+/** Editar um anúncio (#/anuncios/:id/editar). */
 export const LISTING_EDITOR = {
   eyebrow: 'SEU ANÚNCIO',
-  title: 'Ver e editar',
+  title: 'Editar anúncio',
   lead: 'Mexa em qualquer passo e salve. O anúncio no Mercado Livre se atualiza junto.',
   back: { label: 'Voltar ao painel', href: '#/painel' },
   loading: 'Carregando o anúncio…',
@@ -306,9 +308,61 @@ export const LISTING_EDITOR = {
   saved: { title: 'Alterações salvas.', text: 'O anúncio já está atualizado.' }
 };
 
+/** Visão geral das macroinformações de um anúncio (#/anuncios/:id). */
+export const LISTING_DETAIL = {
+  eyebrow: 'VISÃO GERAL DO ANÚNCIO',
+  back: { label: 'Voltar ao painel', href: '#/painel' },
+  loading: 'Carregando os dados do anúncio…',
+  syncing: 'Sincronizando com o Mercado Livre…',
+  actions: {
+    edit: 'Editar anúncio',
+    sync: 'Sincronizar agora',
+    viewOnMl: 'Abrir no Mercado Livre',
+    pause: 'Pausar anúncio',
+    resume: 'Reativar anúncio',
+    publish: 'Publicar no Mercado Livre',
+    duplicate: 'Duplicar',
+    remove: 'Excluir'
+  },
+  metrics: {
+    price: 'Preço de venda',
+    suggested: (value) => `Sugerido pela IA: ${value}`,
+    stock: 'Estoque disponível',
+    units: (count) => `${count} ${plural(count, 'unidade', 'unidades')}`,
+    sold: 'Unidades vendidas',
+    soldUnits: (count) => `${count} ${plural(count, 'venda', 'vendas')}`,
+    condition: 'Condição e categoria',
+    quality: 'Qualidade no Mercado Livre',
+    qualityScore: (pct) => `${pct}% de preenchimento`,
+    qualityEmpty: 'Aguardando publicação'
+  },
+  gallery: {
+    title: 'Fotos do produto',
+    count: (count) => `${count} ${plural(count, 'foto cadastrada', 'fotos cadastradas')}`,
+    empty: 'Nenhuma foto cadastrada neste anúncio.',
+    thumbLabel: (index) => `Ver foto ${index}`
+  },
+  specs: {
+    title: 'Ficha técnica e atributos',
+    empty: 'Nenhuma característica técnica cadastrada ainda.',
+    mlCode: 'Código no Mercado Livre',
+    mlCategory: 'Categoria no Mercado Livre',
+    updatedAt: 'Última atualização'
+  },
+  description: {
+    title: 'Descrição do anúncio',
+    empty: 'Este anúncio ainda não tem descrição cadastrada.'
+  },
+  toasts: {
+    synced: { title: 'Anúncio sincronizado.', text: 'As informações vieram direto do Mercado Livre.' },
+    syncError: { title: 'Não deu pra sincronizar agora.', text: 'Mostrando os últimos dados salvos no painel.' }
+  }
+};
+
 /** Nome de cada característica que a IA lê (a chave vem do back). */
 export const ATTRIBUTE_LABELS = {
   marca: 'Marca',
+  fabricante: 'Fabricante',
   modelo: 'Modelo',
   cor: 'Cor',
   material: 'Material',
@@ -322,7 +376,10 @@ export const ATTRIBUTE_LABELS = {
   estampa: 'Estampa',
   acabamento: 'Acabamento',
   potencia: 'Potência',
-  compatibilidade: 'Compatibilidade'
+  compatibilidade: 'Compatibilidade',
+  formato_de_venda: 'Formato de venda',
+  unidades_por_kit: 'Unidades por kit',
+  unidades_por_embalagem: 'Unidades por embalagem'
 };
 
 export function attributeLabel(key) {
@@ -370,8 +427,9 @@ export const AI_ERRORS = {
   fotos_necessarias: { title: 'Precisamos das fotos de novo.', text: 'Elas saíram da memória. Mande de novo para continuar.' },
   interrompida: { title: 'A análise parou no meio.', text: 'O servidor reiniciou. Toque em tentar de novo.' },
   mercado_livre_desconectado: { title: 'O Mercado Livre não está conectado.', text: 'Conecte a sua conta para publicar.' },
-  publicacao_recusada: { title: 'O Mercado Livre recusou o anúncio.', text: 'Confira os dados e tente de novo.' },
-  descricao_nao_gravada: { title: 'O anúncio foi criado, mas a descrição não entrou.', text: 'Confira no Mercado Livre.' },
+  publicacao_recusada: { title: 'O Mercado Livre recusou a operação.', text: 'Confira os dados do anúncio e tente de novo.' },
+  anuncio_nao_encontrado: { title: 'Anúncio não encontrado no Mercado Livre.', text: 'Ele pode já ter sido removido por lá.' },
+  descricao_nao_gravada: { title: 'O anúncio foi salvo, mas a descrição não entrou.', text: 'Confira no Mercado Livre.' },
   servico_indisponivel: { title: 'Esse serviço está fora do ar agora.', text: 'Tente de novo em instantes.' },
   sem_conexao: { title: 'Sem conexão com a Quick Click.', text: 'Confira a internet e tente de novo.' }
 };
@@ -379,4 +437,3 @@ export const AI_ERRORS = {
 export function aiErrorText(code, message) {
   return AI_ERRORS[code] ?? { title: 'Algo deu errado.', text: message || 'Tente de novo em instantes.' };
 }
-

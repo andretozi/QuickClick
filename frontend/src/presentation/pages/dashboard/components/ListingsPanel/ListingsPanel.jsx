@@ -14,8 +14,19 @@ import './ListingsPanel.css';
  * (carregando, erro, vazio e nenhum resultado). Tudo vem do useDashboard.
  */
 export default function ListingsPanel({ dashboard }) {
-  const { status, listings, visibleListings, filters, setFilter, clearFilters, busyId, mercadoLivreConnected } = dashboard;
-  const { title, count, search, filter, sort, listLabel, empty, noResults, loading, loadError } = LISTINGS_PANEL;
+  const {
+    status,
+    listings,
+    visibleListings,
+    filters,
+    setFilter,
+    clearFilters,
+    busyId,
+    syncing,
+    syncNow,
+    mercadoLivreConnected
+  } = dashboard;
+  const { title, count, search, filter, sort, listLabel, actions, empty, noResults, loading, loadError } = LISTINGS_PANEL;
 
   if (status === 'loading') return <StatusPanel text={loading} size="sm" />;
 
@@ -27,9 +38,25 @@ export default function ListingsPanel({ dashboard }) {
     return (
       <Panel tone="glass" data-enter="2">
         <EmptyState icon="camera" tone="glass" title={empty.title} text={empty.text}>
-          <Button href={empty.cta.href} icon="plus" iconPosition="start" iconSize={18}>
-            {empty.cta.label}
-          </Button>
+          <div className="listings-panel__empty-actions">
+            <Button href={empty.cta.href} icon="plus" iconPosition="start" iconSize={18}>
+              {empty.cta.label}
+            </Button>
+            {mercadoLivreConnected && (
+              <Button
+                variant="outline"
+                icon="sync"
+                iconPosition="start"
+                iconSize={16}
+                onClick={syncNow}
+                loading={syncing}
+                loadingText={actions.syncing}
+                disabled={syncing}
+              >
+                {actions.sync}
+              </Button>
+            )}
+          </div>
         </EmptyState>
       </Panel>
     );
@@ -38,12 +65,29 @@ export default function ListingsPanel({ dashboard }) {
   return (
     <Panel tone="paper" data-enter="2" className="listings-panel" aria-labelledby="anuncios-titulo">
       <div className="listings-panel__head">
-        <h2 id="anuncios-titulo" className="heading listings-panel__title">
-          {title}
-        </h2>
-        <p className="listings-panel__count" aria-live="polite">
-          {count(visibleListings.length, listings.length)}
-        </p>
+        <div className="listings-panel__head-main">
+          <h2 id="anuncios-titulo" className="heading listings-panel__title">
+            {title}
+          </h2>
+          <p className="listings-panel__count" aria-live="polite">
+            {count(visibleListings.length, listings.length)}
+          </p>
+        </div>
+        {mercadoLivreConnected && (
+          <Button
+            variant="outline"
+            size="sm"
+            icon="sync"
+            iconPosition="start"
+            iconSize={15}
+            onClick={syncNow}
+            loading={syncing}
+            loadingText={actions.syncing}
+            disabled={syncing}
+          >
+            {actions.sync}
+          </Button>
+        )}
       </div>
 
       <div className="listings-panel__toolbar">

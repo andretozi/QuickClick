@@ -98,7 +98,7 @@ class FalhaNoMarketplace(RuntimeError):
 
 
 class PublicadorMercadoLivre(Protocol):
-    """O que a publicação montada no back precisa do Mercado Livre (com o token do vendedor)."""
+    """O que a publicação e a gestão de anúncios precisam do Mercado Livre (com o token do vendedor)."""
 
     def subir_imagem(self, access_token: str, jpeg: bytes, nome: str = "foto.jpg") -> str: ...
 
@@ -106,3 +106,10 @@ class PublicadorMercadoLivre(Protocol):
 
     def gravar_descricao(self, access_token: str, item_id: str, texto: str) -> Any: ...
 
+    def obter_anuncio(self, access_token: str, item_id: str) -> dict[str, Any]: ...
+
+    def atualizar_anuncio(self, access_token: str, item_id: str, dados_produto: dict[str, Any]) -> dict[str, Any]: ...
+
+    def atualizar_descricao(self, access_token: str, item_id: str, texto: str) -> Any: ...
+
+    def excluir_anuncio(self, access_token: str, item_id: str) -> dict[str, Any]: ...

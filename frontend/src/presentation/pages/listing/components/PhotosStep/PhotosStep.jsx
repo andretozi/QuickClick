@@ -41,9 +41,17 @@ export default function PhotosStep({ editor }) {
 
       {draft.photos.length > 0 && (
         <>
-          <p className="photos-step__count" aria-live="polite">
-            {texts.count(draft.photos.length, max)}
-          </p>
+          <div className="photos-step__meta">
+            <p className="photos-step__count" aria-live="polite">
+              {texts.count(draft.photos.length, max)}
+            </p>
+            {draft.photos.length < 3 && (
+              <p className="photos-step__tip">
+                <Icon name="sparkles" size={15} />
+                <span>{texts.qualityTip}</span>
+              </p>
+            )}
+          </div>
           <ul className="photos-step__grid">
             {draft.photos.map((photo, index) => {
               const cover = index === draft.coverIndex;

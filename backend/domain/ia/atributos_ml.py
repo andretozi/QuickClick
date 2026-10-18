@@ -28,6 +28,9 @@ SINONIMOS_ML: dict[str, tuple[str, ...]] = {
 
 MARCA_GENERICA_ML = "Genérica"
 MODELO_PADRAO_ML = "Padrão"
+MOTIVO_SEM_GTIN_ML = "O produto não tem código cadastrado"
+TERMOS_DE_KIT = ("kit", "conjunto", "jogo", "pack")
+UNIDADES_CANONICAS = {"ml": "mL", "l": "L", "cc": "cc", "cm": "cm", "mm": "mm", "m": "m", "g": "g", "kg": "kg"}
 
 
 def _normalizar(texto: str) -> str:
@@ -47,6 +50,7 @@ class AtributoML:
     nome: str
     obrigatorio: bool
     valores: tuple[tuple[str, str], ...] = ()  # (id do valor, nome do valor), quando a lista é fechada
+    unidade_padrao: str = ""
 
     @staticmethod
     def de_api(bruto: dict[str, Any]) -> "AtributoML":
@@ -57,8 +61,9 @@ class AtributoML:
             for v in bruto.get("values") or []
             if isinstance(v, dict) and v.get("id") and v.get("name")
         )
+        unidade = str(bruto.get("default_unit") or "").strip()
         return AtributoML(id=str(bruto.get("id")), nome=str(bruto.get("name") or ""), obrigatorio=obrigatorio,
-                          valores=valores)
+                          valores=valores, unidade_padrao=unidade)
 
 
 @dataclass(frozen=True)
@@ -83,6 +88,22 @@ def _valor_id(atributo: AtributoML, valor: str) -> str | None:
     return next((vid for vid, nome in atributo.valores if _neutro(nome) == alvo_neutro), None)
 
 
+def _formatar_valor(atributo: AtributoML, valor: str) -> str:
+    """Normaliza medidas com unidade ('250ml' → '250 mL') quando a categoria usa number_unit."""
+    limpo = valor.strip()
+    casamento = re.fullmatch(r"(\d+(?:[.,]\d+)?)\s*([a-zA-Z]{1,4})?", limpo)
+    if not casamento:
+        return limpo
+    numero = casamento.group(1).replace(",", ".")
+    unidade_bruta = (casamento.group(2) or "").lower()
+    if atributo.unidade_padrao:
+        unidade = UNIDADES_CANONICAS.get(unidade_bruta, atributo.unidade_padrao)
+        return f"{numero} {unidade}"
+    if unidade_bruta in UNIDADES_CANONICAS and atributo.id in ("VOLUME_CAPACITY", "CAPACITY", "HEIGHT", "DIAMETER", "WEIGHT"):
+        return f"{numero} {UNIDADES_CANONICAS[unidade_bruta]}"
+    return limpo
+
+
 def ligar_por_regra(confirmados: list[tuple[str, str]], da_categoria: list[AtributoML]
                     ) -> tuple[list[AtributoLigado], list[tuple[str, str]]]:
     """(ligados, sobras). Um atributo do Mercado Livre recebe no máximo um valor."""
@@ -99,7 +120,8 @@ def ligar_por_regra(confirmados: list[tuple[str, str]], da_categoria: list[Atrib
         if candidato is None:
             sobras.append((chave, valor))
             continue
-        ligados[candidato.id] = AtributoLigado(candidato.id, valor, _valor_id(candidato, valor), chave)
+        formatado = _formatar_valor(candidato, valor)
+        ligados[candidato.id] = AtributoLigado(candidato.id, formatado, _valor_id(candidato, formatado), chave)
     return list(ligados.values()), sobras
 
 
@@ -115,7 +137,8 @@ def ligar_sugestoes_da_ia(sugestoes: list[dict[str, Any]], sobras: list[tuple[st
             continue
         chave, ml_id = str(sugestao.get("chave") or ""), str(sugestao.get("id_ml") or "")
         if chave in valores and ml_id in livres:
-            saida.append(AtributoLigado(ml_id, valores[chave], _valor_id(por_id[ml_id], valores[chave]), chave))
+            formatado = _formatar_valor(por_id[ml_id], valores[chave])
+            saida.append(AtributoLigado(ml_id, formatado, _valor_id(por_id[ml_id], formatado), chave))
             livres.discard(ml_id)
     return saida
 
@@ -159,15 +182,29 @@ def ligar_confirmados(confirmados: list[tuple[str, str]], da_categoria: list[Atr
     for chave, valor in sobras:
         ml_id = mapa.get(chave)
         if ml_id and ml_id in por_id and ml_id not in usados:
-            ligados.append(AtributoLigado(ml_id, valor, _valor_id(por_id[ml_id], valor), chave))
+            formatado = _formatar_valor(por_id[ml_id], valor)
+            ligados.append(AtributoLigado(ml_id, formatado, _valor_id(por_id[ml_id], formatado), chave))
             usados.add(ml_id)
     return ligados
 
 
+def _unidades_do_kit(titulo: str, usados: dict[str, AtributoLigado]) -> int:
+    for id_qtd in ("UNITS_PER_PACK", "UNITS_PER_PACKAGE", "PACKAGE_QUANTITY"):
+        if id_qtd in usados:
+            numeros = re.findall(r"\d+", usados[id_qtd].valor)
+            if numeros:
+                return max(1, int(numeros[0]))
+    casamento = re.search(r"\b(?:kit|conjunto|jogo|pack)\s+(?:com\s+|de\s+)?(\d+)\b", _normalizar(titulo))
+    if casamento:
+        return max(1, int(casamento.group(1)))
+    return 1
+
+
 def completar_para_publicacao(ligados: list[AtributoLigado], da_categoria: list[AtributoML],
                               titulo: str = "") -> list[AtributoLigado]:
-    """Preenche na hora de publicar o que o título já diz (valores fechados da categoria) e os padrões
-    do Mercado Livre para marca, fabricante e modelo quando a categoria exige e o produto não tem."""
+    """Preenche na hora de publicar o que o título já diz (valores fechados e medidas) e os atributos
+    estruturais do Mercado Livre (marca, fabricante, modelo, formato de venda, unidades por kit e motivo
+    de GTIN vazio) que elevam a pontuação de qualidade da ficha técnica."""
     saida = list(ligados)
     por_id = {a.id: a for a in da_categoria}
     usados = {l.id: l for l in saida}
@@ -176,6 +213,8 @@ def completar_para_publicacao(ligados: list[AtributoLigado], da_categoria: list[
     for atributo in da_categoria:
         if atributo.id in usados or not atributo.valores or not palavras_titulo:
             continue
+        if atributo.id in ("SALE_FORMAT", "IS_SET", "EMPTY_GTIN_REASON"):
+            continue
         for vid, nome in atributo.valores:
             termos = _neutro(nome).split()
             if termos and all(t in palavras_titulo for t in termos):
@@ -183,6 +222,15 @@ def completar_para_publicacao(ligados: list[AtributoLigado], da_categoria: list[
                 saida.append(ligado)
                 usados[atributo.id] = ligado
                 break
+
+    for id_cap in ("VOLUME_CAPACITY", "CAPACITY"):
+        if id_cap in por_id and id_cap not in usados and titulo:
+            achado = re.search(r"\b(\d+(?:[.,]\d+)?)\s*(ml|l|cc)\b", titulo, flags=re.IGNORECASE)
+            if achado:
+                valor_cap = _formatar_valor(por_id[id_cap], f"{achado.group(1)}{achado.group(2)}")
+                ligado = AtributoLigado(id_cap, valor_cap, _valor_id(por_id[id_cap], valor_cap))
+                saida.append(ligado)
+                usados[id_cap] = ligado
 
     marca = usados["BRAND"].valor if "BRAND" in usados else MARCA_GENERICA_ML
     if "BRAND" in por_id and "BRAND" not in usados:
@@ -200,5 +248,33 @@ def completar_para_publicacao(ligados: list[AtributoLigado], da_categoria: list[
         ligado = AtributoLigado("MODEL", modelo, _valor_id(por_id["MODEL"], modelo))
         saida.append(ligado)
         usados["MODEL"] = ligado
+
+    unidades = _unidades_do_kit(titulo, usados)
+    eh_kit = unidades > 1 or any(t in _normalizar(titulo).split() for t in TERMOS_DE_KIT)
+
+    if "SALE_FORMAT" in por_id and "SALE_FORMAT" not in usados:
+        formato = "Kit" if eh_kit else "Unidade"
+        ligado = AtributoLigado("SALE_FORMAT", formato, _valor_id(por_id["SALE_FORMAT"], formato))
+        saida.append(ligado)
+        usados["SALE_FORMAT"] = ligado
+
+    if "UNITS_PER_PACK" in por_id and "UNITS_PER_PACK" not in usados:
+        valor_un = str(unidades)
+        ligado = AtributoLigado("UNITS_PER_PACK", valor_un, _valor_id(por_id["UNITS_PER_PACK"], valor_un))
+        saida.append(ligado)
+        usados["UNITS_PER_PACK"] = ligado
+
+    if "IS_SET" in por_id and "IS_SET" not in usados:
+        valor_set = "Sim" if eh_kit else "Não"
+        ligado = AtributoLigado("IS_SET", valor_set, _valor_id(por_id["IS_SET"], valor_set))
+        saida.append(ligado)
+        usados["IS_SET"] = ligado
+
+    if "EMPTY_GTIN_REASON" in por_id and "EMPTY_GTIN_REASON" not in usados and "GTIN" not in usados:
+        vid = _valor_id(por_id["EMPTY_GTIN_REASON"], MOTIVO_SEM_GTIN_ML)
+        if vid is not None or not por_id["EMPTY_GTIN_REASON"].valores:
+            ligado = AtributoLigado("EMPTY_GTIN_REASON", MOTIVO_SEM_GTIN_ML, vid)
+            saida.append(ligado)
+            usados["EMPTY_GTIN_REASON"] = ligado
 
     return saida

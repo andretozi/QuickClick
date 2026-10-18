@@ -34,13 +34,16 @@ def _agora() -> datetime:
 
 def _resumo_do_atributo(bruto: dict[str, Any]) -> dict[str, Any]:
     """O que interessa guardar no cache (o atributo completo do ML é bem maior)."""
-    return {
+    resumo: dict[str, Any] = {
         "id": bruto.get("id"),
         "name": bruto.get("name"),
         "tags": {k: v for k, v in (bruto.get("tags") or {}).items() if k in ("required", "catalog_required")},
         "values": [{"id": v.get("id"), "name": v.get("name")} for v in (bruto.get("values") or [])[:200]
                    if isinstance(v, dict)],
     }
+    if bruto.get("default_unit"):
+        resumo["default_unit"] = bruto.get("default_unit")
+    return resumo
 
 
 class FontePrecosMercadoLivre:
@@ -52,18 +55,18 @@ class FontePrecosMercadoLivre:
         self._busca_pausada_ate: datetime | None = None
 
     def descobrir_categoria(self, termos: list[str], access_token: str) -> CategoriaSugerida | None:
-        if not termos:
-            return None
-        try:
-            achados = self._gateway.descobrir_dominio(termos[0], access_token)
-        except ErroDoMercadoLivre as erro:
-            log.warning("Mercado Livre: categoria não descoberta (%s).", erro.status or "sem resposta")
-            return None
-        primeiro = next((a for a in achados if isinstance(a, dict) and a.get("category_id")), None)
-        if primeiro is None:
-            return None
-        return CategoriaSugerida(str(primeiro["category_id"]), str(primeiro.get("category_name") or ""),
-                                 str(primeiro.get("domain_name") or ""))
+        candidatos = list(dict.fromkeys(t.strip() for t in (termos or []) if t and t.strip()))
+        for termo in candidatos:
+            try:
+                achados = self._gateway.descobrir_dominio(termo, access_token)
+            except ErroDoMercadoLivre as erro:
+                log.warning("Mercado Livre: categoria não descoberta (%s).", erro.status or "sem resposta")
+                return None
+            primeiro = next((a for a in achados if isinstance(a, dict) and a.get("category_id")), None)
+            if primeiro is not None:
+                return CategoriaSugerida(str(primeiro["category_id"]), str(primeiro.get("category_name") or ""),
+                                         str(primeiro.get("domain_name") or ""))
+        return None
 
     def atributos_da_categoria(self, categoria_id: str, access_token: str) -> list[AtributoML]:
         agora = self._relogio()

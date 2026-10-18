@@ -6,10 +6,21 @@ import { showToast, TOAST_TONES } from '@/application/feedback/toastStore.js';
 import {
   duplicateListing,
   listListings,
+  mergeMercadoLivreItem,
   removeListing,
+  syncListingsWithMercadoLivre,
   updateListing
 } from '@/infrastructure/storage/listingsRepository.js';
-import { fetchConnectedMarketplaces } from '@/infrastructure/marketplaces/marketplacesService.js';
+import {
+  fetchConnectedMarketplaces,
+  fetchMarketplaceProducts
+} from '@/infrastructure/marketplaces/marketplacesService.js';
+import {
+  deleteMercadoLivreItem,
+  publishToMercadoLivre,
+  updateMercadoLivreStatus
+} from '@/infrastructure/ai/iaService.js';
+import { dataUrlToBlob } from '@/infrastructure/media/imageResizer.js';
 import { currentHour } from '@/infrastructure/browser/events.js';
 import {
   LISTING_STATUS,
@@ -21,6 +32,7 @@ import {
   summarizeListings
 } from '@/domain/listings/listingRules.js';
 import { LISTINGS_PANEL } from '@/domain/content/dashboardContent.js';
+import { aiErrorText } from '@/domain/content/listingContent.js';
 
 export const DASHBOARD_TABS = { LISTINGS: 'listings', INSIGHTS: 'insights' };
 
@@ -29,9 +41,9 @@ const DEFAULT_FILTERS = { query: '', status: 'all', sort: 'recent' };
 /**
  * Aplicação · Caso de uso "painel do vendedor".
  *
- * Carrega os anúncios e as conexões da conta logada, calcula os números do topo,
- * filtra e ordena a lista e cuida das ações de cada anúncio (pausar, reativar,
- * publicar, duplicar e excluir com confirmação). A tela só desenha o que este hook devolve.
+ * Carrega os anúncios e as conexões da conta logada, sincroniza os dados reais
+ * com o Mercado Livre, calcula os números do topo, filtra e ordena a lista e cuida
+ * das ações de cada anúncio (pausar, reativar, publicar, duplicar e excluir com confirmação).
  */
 export default function useDashboard() {
   const { account, welcome } = useSession();
@@ -40,6 +52,7 @@ export default function useDashboard() {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [tab, setTab] = useState(DASHBOARD_TABS.LISTINGS);
   const [busyId, setBusyId] = useState(null);
+  const [syncing, setSyncing] = useState(false);
   const [pendingRemoval, setPendingRemoval] = useState(null);
   const [removing, setRemoving] = useState(false);
   const [hour] = useState(currentHour);
@@ -49,11 +62,28 @@ export default function useDashboard() {
     if (!accountId) return;
     setData((current) => ({ ...current, status: 'loading' }));
     try {
-      const [listings, connections] = await Promise.all([
+      const [localListings, connections] = await Promise.all([
         listListings(accountId),
         fetchConnectedMarketplaces().catch(() => [])
       ]);
-      if (mounted.current) setData({ status: 'ready', listings, connections });
+      if (!mounted.current) return;
+      setData({ status: 'ready', listings: localListings, connections });
+
+      const mlConnected = connections.some((connection) => connection.slug === PRIMARY_CHANNEL);
+      if (mlConnected) {
+        setSyncing(true);
+        try {
+          const mlProducts = await fetchMarketplaceProducts(PRIMARY_CHANNEL);
+          const synced = await syncListingsWithMercadoLivre(accountId, mlProducts);
+          if (mounted.current) {
+            setData((current) => ({ ...current, listings: synced }));
+          }
+        } catch {
+          // Sem internet ou token expirado: mantém os dados locais já carregados
+        } finally {
+          if (mounted.current) setSyncing(false);
+        }
+      }
     } catch {
       if (mounted.current) setData((current) => ({ ...current, status: 'error' }));
     }
@@ -84,7 +114,26 @@ export default function useDashboard() {
     }));
   }, []);
 
-  const failed = () => showToast({ tone: TOAST_TONES.ERROR, ...LISTINGS_PANEL.toasts.error });
+  const failed = useCallback((error) => {
+    const message = error?.code ? aiErrorText(error.code, error.userMessage) : LISTINGS_PANEL.toasts.error;
+    showToast({ tone: TOAST_TONES.ERROR, ...message });
+  }, []);
+
+  const syncNow = useCallback(async () => {
+    if (!accountId || !mercadoLivreConnected || syncing) return;
+    setSyncing(true);
+    try {
+      const mlProducts = await fetchMarketplaceProducts(PRIMARY_CHANNEL);
+      const synced = await syncListingsWithMercadoLivre(accountId, mlProducts);
+      if (!mounted.current) return;
+      setData((current) => ({ ...current, listings: synced }));
+      showToast({ tone: TOAST_TONES.SUCCESS, ...LISTINGS_PANEL.toasts.synced });
+    } catch (error) {
+      if (mounted.current) failed(error);
+    } finally {
+      if (mounted.current) setSyncing(false);
+    }
+  }, [accountId, failed, mercadoLivreConnected, mounted, syncing]);
 
   /** Pausar (publicado), reativar (pausado) ou publicar (fora do ar, com o Mercado Livre conectado). */
   const toggleStatus = useCallback(
@@ -96,23 +145,53 @@ export default function useDashboard() {
           : status === LISTING_STATUS.PAUSED
             ? { status: LISTING_STATUS.PUBLISHED, toast: LISTINGS_PANEL.toasts.resumed }
             : { status: LISTING_STATUS.PUBLISHED, toast: LISTINGS_PANEL.toasts.published };
-      // Voltar ao ar (publicar ou reativar) pede o Mercado Livre conectado.
-      if (next.status === LISTING_STATUS.PUBLISHED && !mercadoLivreConnected) return;
+      if (!mercadoLivreConnected) return;
       setBusyId(listing.id);
       try {
-        const updated = await updateListing(accountId, listing.id, {
-          channels: { ...listing.channels, [PRIMARY_CHANNEL]: next.status }
-        });
+        let updated;
+        if (listing.mlItemId) {
+          const mlItem = await updateMercadoLivreStatus(listing.mlItemId, next.status);
+          updated = await mergeMercadoLivreItem(accountId, listing.id, mlItem);
+        } else if (next.status === LISTING_STATUS.PUBLISHED) {
+          const orderedPhotos = listing.photos ?? [];
+          const keptPhotos = orderedPhotos.filter((p) => String(p).startsWith('https://'));
+          const photoBlobs = orderedPhotos
+            .filter((p) => String(p).startsWith('data:'))
+            .map((p) => dataUrlToBlob(p));
+          const published = await publishToMercadoLivre(
+            {
+              title: listing.title,
+              description: listing.description,
+              priceCents: listing.priceCents,
+              stock: Math.max(1, Number(listing.stock) || 1),
+              condition: listing.condition,
+              attributes: listing.attributes,
+              mlCategoryId: listing.mlCategoryId,
+              keptPhotos
+            },
+            photoBlobs
+          );
+          updated = await updateListing(accountId, listing.id, {
+            mlItemId: published.id,
+            permalink: published.permalink,
+            mlCategoryId: published.categoryId ?? listing.mlCategoryId,
+            channels: { ...listing.channels, [PRIMARY_CHANNEL]: next.status }
+          });
+        } else {
+          updated = await updateListing(accountId, listing.id, {
+            channels: { ...listing.channels, [PRIMARY_CHANNEL]: next.status }
+          });
+        }
         if (!mounted.current) return;
         replaceListing(updated);
         showToast({ tone: TOAST_TONES.SUCCESS, ...next.toast });
-      } catch {
-        if (mounted.current) failed();
+      } catch (error) {
+        if (mounted.current) failed(error);
       } finally {
         if (mounted.current) setBusyId(null);
       }
     },
-    [accountId, mercadoLivreConnected, replaceListing, mounted]
+    [accountId, failed, mercadoLivreConnected, replaceListing, mounted]
   );
 
   const duplicate = useCallback(
@@ -125,13 +204,13 @@ export default function useDashboard() {
         if (!mounted.current) return;
         setData((current) => ({ ...current, listings: [copy, ...current.listings] }));
         showToast({ tone: TOAST_TONES.SUCCESS, ...LISTINGS_PANEL.toasts.duplicated });
-      } catch {
-        if (mounted.current) failed();
+      } catch (error) {
+        if (mounted.current) failed(error);
       } finally {
         if (mounted.current) setBusyId(null);
       }
     },
-    [accountId, mounted]
+    [accountId, failed, mounted]
   );
 
   const requestRemoval = useCallback((listing) => setPendingRemoval(listing), []);
@@ -143,6 +222,13 @@ export default function useDashboard() {
     if (!pendingRemoval) return;
     setRemoving(true);
     try {
+      if (pendingRemoval.mlItemId) {
+        try {
+          await deleteMercadoLivreItem(pendingRemoval.mlItemId);
+        } catch (error) {
+          if (error?.code !== 'anuncio_nao_encontrado') throw error;
+        }
+      }
       await removeListing(accountId, pendingRemoval.id);
       if (!mounted.current) return;
       setData((current) => ({
@@ -151,12 +237,12 @@ export default function useDashboard() {
       }));
       setPendingRemoval(null);
       showToast({ tone: TOAST_TONES.SUCCESS, ...LISTINGS_PANEL.toasts.removed });
-    } catch {
-      if (mounted.current) failed();
+    } catch (error) {
+      if (mounted.current) failed(error);
     } finally {
       if (mounted.current) setRemoving(false);
     }
-  }, [accountId, pendingRemoval, mounted]);
+  }, [accountId, failed, pendingRemoval, mounted]);
 
   return {
     account,
@@ -173,6 +259,8 @@ export default function useDashboard() {
     tab,
     setTab,
     busyId,
+    syncing,
+    syncNow,
     toggleStatus,
     duplicate,
     pendingRemoval,

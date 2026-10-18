@@ -6,9 +6,19 @@ import useListingPhotos from '@/application/listings/useListingPhotos.js';
 import useAnaliseIA from '@/application/listings/useAnaliseIA.js';
 import useCotaIA from '@/application/listings/useCotaIA.js';
 import { showToast, TOAST_TONES } from '@/application/feedback/toastStore.js';
-import { createListing, getListing, updateListing } from '@/infrastructure/storage/listingsRepository.js';
+import {
+  createListing,
+  getListing,
+  mergeMercadoLivreItem,
+  updateListing
+} from '@/infrastructure/storage/listingsRepository.js';
 import { fetchConnectedMarketplaces } from '@/infrastructure/marketplaces/marketplacesService.js';
-import { publishToMercadoLivre } from '@/infrastructure/ai/iaService.js';
+import {
+  fetchMercadoLivreItem,
+  publishToMercadoLivre,
+  updateMercadoLivreItem,
+  updateMercadoLivreStatus
+} from '@/infrastructure/ai/iaService.js';
 import { clearDraft, getDraft, saveDraft } from '@/infrastructure/storage/draftsRepository.js';
 import { StorageFullError } from '@/infrastructure/storage/localStore.js';
 import { focusFirstInvalid } from '@/infrastructure/browser/focus.js';
@@ -51,8 +61,8 @@ const photosKey = (photos) => photos.map((photo) => photo.slice(-24)).join('|');
  *
  * Criar: fotos → análise da IA (no back, em etapas) → confirmar o que a IA viu → detalhes
  * (título e descrição escritos pela IA) → preço (faixa real) → canais → publicar (o back
- * monta o anúncio do Mercado Livre). Editar: só os passos do anúncio, sem IA.
- * O vendedor sempre consegue terminar à mão: IA fora do ar, cota esgotada ou erro abrem os campos.
+ * monta o anúncio do Mercado Livre). Editar: só os passos do anúncio, sem IA, sincronizando
+ * com o Mercado Livre quando o anúncio já está publicado.
  *
  * - listingId: com id, abre o anúncio para editar; sem id, é um anúncio novo
  * - celebrate(word): animação de publicar (cursor, clique e partículas); devolve uma Promise
@@ -88,9 +98,18 @@ export default function useListingEditor({ listingId, celebrate }) {
       try {
         const connections = await fetchConnectedMarketplaces().catch(() => []);
         if (!mounted.current) return;
-        setConnection(connections.find((item) => item.slug === PRIMARY_CHANNEL) ?? null);
+        const mlConn = connections.find((item) => item.slug === PRIMARY_CHANNEL) ?? null;
+        setConnection(mlConn);
         if (editing) {
-          const listing = await getListing(accountId, listingId);
+          let listing = await getListing(accountId, listingId);
+          if (mlConn && listing.mlItemId) {
+            try {
+              const mlFresh = await fetchMercadoLivreItem(listing.mlItemId);
+              listing = await mergeMercadoLivreItem(accountId, listingId, mlFresh);
+            } catch {
+              // Mantém os dados locais se a sincronização falhar
+            }
+          }
           if (!mounted.current) return;
           setOriginal(listing);
           setDraft({ ...EMPTY_DRAFT, ...toDraft(listing) });
@@ -302,6 +321,7 @@ export default function useListingEditor({ listingId, celebrate }) {
     async (data) => {
       const cover = data.photos[data.coverIndex] ?? data.photos[0];
       const ordered = [cover, ...data.photos.filter((photo) => photo !== cover)];
+      const keptPhotos = ordered.filter((p) => String(p).startsWith('https://'));
       return publishToMercadoLivre(
         {
           title: data.title,
@@ -311,12 +331,37 @@ export default function useListingEditor({ listingId, celebrate }) {
           condition: data.condition,
           attributes: draft.attributes,
           analysisId: draft.analysisId,
-          mlCategoryId: draft.mlCategoryId
+          mlCategoryId: draft.mlCategoryId,
+          keptPhotos
         },
         photos.readingBlobs(ordered)
       );
     },
     [draft.analysisId, draft.attributes, draft.mlCategoryId, photos]
+  );
+
+  const updateOnMl = useCallback(
+    async (itemId, data) => {
+      const cover = data.photos[data.coverIndex] ?? data.photos[0];
+      const ordered = [cover, ...data.photos.filter((photo) => photo !== cover)];
+      const keptPhotos = ordered.filter((p) => String(p).startsWith('https://'));
+      return updateMercadoLivreItem(
+        itemId,
+        {
+          title: data.title,
+          description: data.description,
+          priceCents: data.priceCents,
+          stock: data.stock,
+          condition: data.condition,
+          attributes: draft.attributes,
+          analysisId: draft.analysisId,
+          mlCategoryId: draft.mlCategoryId ?? original?.mlCategoryId,
+          keptPhotos
+        },
+        photos.readingBlobs(ordered)
+      );
+    },
+    [draft.analysisId, draft.attributes, draft.mlCategoryId, original?.mlCategoryId, photos]
   );
 
   const finish = useCallback(async () => {
@@ -334,18 +379,44 @@ export default function useListingEditor({ listingId, celebrate }) {
     const data = toListingData(draft, range.status === 'ready' ? range : null);
     try {
       if (editing) {
+        const previousStatus = listingStatus(original);
         const nextStatus = statusAfterSave({
-          previous: listingStatus(original),
+          previous: previousStatus,
           publish: draft.publishMl,
           canPublish: canPublishMl
         });
-        if (nextStatus === LISTING_STATUS.PUBLISHED && listingStatus(original) === LISTING_STATUS.UNPUBLISHED) {
-          await publishOnMl(data);
+        let mlPatch = {};
+        if (original.mlItemId && canPublishMl) {
+          const mlUpdated = await updateOnMl(original.mlItemId, data);
+          if (!draft.publishMl && previousStatus === LISTING_STATUS.PUBLISHED) {
+            await updateMercadoLivreStatus(original.mlItemId, LISTING_STATUS.PAUSED);
+          } else if (draft.publishMl && previousStatus !== LISTING_STATUS.PUBLISHED) {
+            await updateMercadoLivreStatus(original.mlItemId, LISTING_STATUS.PUBLISHED);
+          }
+          mlPatch = {
+            mlItemId: mlUpdated.id ?? original.mlItemId,
+            permalink: mlUpdated.permalink ?? original.permalink,
+            mlCategoryId: mlUpdated.category_id ?? original.mlCategoryId,
+            health: mlUpdated.health ?? original.health,
+            soldQuantity: mlUpdated.sold_quantity ?? original.soldQuantity,
+            photos: Array.isArray(mlUpdated.pictures) && mlUpdated.pictures.length ? mlUpdated.pictures : data.photos,
+            coverIndex: 0
+          };
+        } else if (nextStatus === LISTING_STATUS.PUBLISHED && previousStatus === LISTING_STATUS.UNPUBLISHED) {
+          const published = await publishOnMl(data);
+          mlPatch = {
+            mlItemId: published.id,
+            permalink: published.permalink,
+            mlCategoryId: published.categoryId ?? data.mlCategoryId
+          };
         }
+        const finalChannelStatus =
+          original.mlItemId && !draft.publishMl ? LISTING_STATUS.PAUSED : nextStatus;
         const updated = await updateListing(accountId, listingId, {
           ...data,
+          ...mlPatch,
           suggestedPriceCents: data.suggestedPriceCents ?? original.suggestedPriceCents,
-          channels: { ...original.channels, [PRIMARY_CHANNEL]: nextStatus }
+          channels: { ...original.channels, [PRIMARY_CHANNEL]: finalChannelStatus }
         });
         finishing.current = false;
         if (!mounted.current) return;
@@ -362,6 +433,9 @@ export default function useListingEditor({ listingId, celebrate }) {
       try {
         created = await createListing(accountId, {
           ...data,
+          mlItemId: published?.id ?? null,
+          permalink: published?.permalink ?? null,
+          mlCategoryId: published?.categoryId ?? data.mlCategoryId ?? null,
           channels: { [PRIMARY_CHANNEL]: published ? LISTING_STATUS.PUBLISHED : LISTING_STATUS.UNPUBLISHED }
         });
       } catch (error) {
@@ -399,6 +473,7 @@ export default function useListingEditor({ listingId, celebrate }) {
     showErrors,
     stepIndex,
     steps,
+    updateOnMl,
     validateStep,
     willPublish,
     mounted
