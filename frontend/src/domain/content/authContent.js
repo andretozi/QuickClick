@@ -23,6 +23,9 @@ export const SIGNUP_FORM = {
     hint: 'Use 8 caracteres ou mais, misturando letras e números.'
   },
   confirmation: { label: 'Confirme a senha', placeholder: 'Digite a senha de novo' },
+  adult: { label: 'Tenho 18 anos ou mais' },
+  freeData:
+    'No plano Grátis, as fotos analisadas pela IA passam pela camada grátis do Google, que pode usar o que é enviado para melhorar os produtos dela.',
   submit: { label: 'Criar conta grátis', loading: 'Criando sua conta…' },
   login: { text: 'Já tem conta?', link: 'Entrar', href: '#/login' },
   terms: {

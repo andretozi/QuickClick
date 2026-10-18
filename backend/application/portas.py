@@ -33,13 +33,16 @@ class RepositorioUsuarios(Protocol):
 
     def obter_por_email(self, email: str) -> tuple[Usuario, str] | None: ...
 
-    def salvar(self, email: str, password_hash: str, nome: str, loja: str, plano: str = "gratis") -> Usuario: ...
+    def salvar(self, email: str, password_hash: str, nome: str, loja: str, plano: str = "gratis",
+               confirmou_maioridade_em: str | None = None) -> Usuario: ...
 
 
 class ServicoToken(Protocol):
-    def gerar_token(self, user_id: int, email: str) -> str: ...
+    """Tokens com finalidade: "acesso" (login na API) ou "estado_oauth" (volta do marketplace)."""
 
-    def validar_token(self, token: str) -> dict[str, Any]: ...
+    def gerar_token(self, user_id: int, email: str, finalidade: str = "acesso") -> str: ...
+
+    def validar_token(self, token: str, finalidade: str = "acesso") -> dict[str, Any]: ...
 
 
 class ServicoHashSenha(Protocol):
@@ -83,3 +86,23 @@ class GatewayMarketplace(Protocol):
     def publicar_anuncio(self, access_token: str, dados_produto: dict[str, Any]) -> dict[str, Any]:
         """Publica um novo produto no marketplace."""
         self._nao_implementado()
+
+
+class FalhaNoMarketplace(RuntimeError):
+    """Resposta de erro da API de um marketplace, com o status HTTP (0 quando nem respondeu) e o corpo."""
+
+    def __init__(self, mensagem: str, status: int = 0, corpo: Any = None):
+        super().__init__(mensagem)
+        self.status = status
+        self.corpo = corpo
+
+
+class PublicadorMercadoLivre(Protocol):
+    """O que a publicação montada no back precisa do Mercado Livre (com o token do vendedor)."""
+
+    def subir_imagem(self, access_token: str, jpeg: bytes, nome: str = "foto.jpg") -> str: ...
+
+    def publicar_anuncio(self, access_token: str, dados_produto: dict[str, Any]) -> dict[str, Any]: ...
+
+    def gravar_descricao(self, access_token: str, item_id: str, texto: str) -> Any: ...
+

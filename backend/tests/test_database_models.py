@@ -3,6 +3,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from backend.infrastructure.banco.models import User, MarketplaceToken, AiUsage, VendedorModel, ContaVinculadaModel
+from backend.domain.erros import ServicoIndisponivel
 from backend.infrastructure.database import Base, get_db
 
 
@@ -98,16 +99,10 @@ class TestDatabaseModels(unittest.TestCase):
         self.assertIsNotNone(c_cons)
         self.assertEqual(c_cons.marketplace, "mercado-livre")
 
-    def test_get_db_generator(self):
-        generator = get_db()
-        db = next(generator)
-        self.assertIsNotNone(db)
-        try:
-            next(generator)
-        except StopIteration:
-            pass
-        finally:
-            generator.close()
+    def test_get_db_sem_database_url_avisa_que_o_banco_nao_esta_configurado(self):
+        # O leitor dos testes não tem DATABASE_URL: o engine preguiçoso não nasce e explica o motivo
+        with self.assertRaises(ServicoIndisponivel):
+            next(get_db())
 
 
 if __name__ == "__main__":

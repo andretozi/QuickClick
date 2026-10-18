@@ -56,10 +56,25 @@ export const SECURITY_SECTION = {
 
 export const PLAN_SECTION = {
   title: 'Seu plano',
-  lead: 'Nenhum plano cobra comissão sobre as suas vendas. A troca de plano chega junto com o pagamento.',
+  lead: 'Nenhum plano cobra comissão sobre as suas vendas. Troque quando quiser.',
   current: 'Seu plano',
   recommended: 'Recomendado',
-  soon: 'Troca de plano em breve'
+  change: 'Mudar para este plano',
+  changeLabel: (name) => `Mudar para o plano ${name}`,
+  soon: 'Em breve',
+  soonReason: 'A troca de plano vai chegar junto com o pagamento, na versão final.',
+  modal: {
+    title: 'Confirmar troca de plano',
+    text: 'Agora a troca é instantânea e grátis, só para teste. O pagamento vai entrar na versão final. Continuar?',
+    confirm: (name) => `Trocar para ${name}`,
+    confirming: 'Trocando…',
+    cancel: 'Cancelar'
+  },
+  done: (name) => ({
+    title: `Plano trocado para ${name}`,
+    text: 'O limite de marketplaces e as análises da IA já seguem o plano novo.'
+  }),
+  failed: { title: 'Não deu pra trocar o plano agora.', text: 'Tente de novo em instantes.' }
 };
 
 export const CONNECTIONS_SECTION = {

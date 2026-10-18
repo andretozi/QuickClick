@@ -8,12 +8,12 @@ HTTP para um caso de uso e o resultado de volta para JSON: a regra mora no domí
 from collections.abc import Callable
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse
 
 from backend.application.casos_de_uso import CasosDeUso
 from backend.application.portas import ServicoToken
-from backend.domain.erros import NaoAutenticado
+from backend.presentation.http.autenticacao import dependencia_do_vendedor
 from backend.presentation.http.esquemas import (
     ListaDeMarketplaces,
     ListaDePlanos,
@@ -21,6 +21,7 @@ from backend.presentation.http.esquemas import (
     RequisicaoCadastro,
     RequisicaoConectar,
     RequisicaoLogin,
+    RequisicaoTrocarPlano,
     RespostaAutenticacao,
     RespostaDeErro,
     Saude,
@@ -32,6 +33,8 @@ from backend.presentation.http.esquemas import (
     usuario_saida,
     vendedor_saida,
 )
+
+FINALIDADE_ESTADO_OAUTH = "estado_oauth"  # o state do OAuth não serve como token de login
 
 ERRO_401 = {401: {"model": RespostaDeErro, "description": "Token inválido, expirado ou ausente"}}
 ERRO_404 = {404: {"model": RespostaDeErro, "description": "Marketplace ou vendedor não encontrado"}}
@@ -57,19 +60,7 @@ def criar_rotas(
     servico_token: ServicoToken | None = None,
 ) -> APIRouter:
     rotas = APIRouter()
-
-    def obter_vendedor_autenticado(request: Request) -> int:
-        header = request.headers.get("Authorization")
-        if header and header.startswith("Bearer "):
-            token = header.split(" ", 1)[1].strip()
-            if servico_token is not None:
-                payload = servico_token.validar_token(token)
-                return int(payload["sub"])
-        if identificar_vendedor is not None:
-            return identificar_vendedor()
-        raise NaoAutenticado("Autenticação obrigatória. Envie o cabeçalho Authorization: Bearer <token>.")
-
-    VendedorAtual = Annotated[int, Depends(obter_vendedor_autenticado)]
+    VendedorAtual = Annotated[int, Depends(dependencia_do_vendedor(servico_token, identificar_vendedor))]
 
     # -----------------------------------------------------------------------
     # Sistema
@@ -81,7 +72,9 @@ def criar_rotas(
 
     @rotas.get("/plans", tags=["planos"], summary="Planos de assinatura, do Grátis ao Business", response_model=ListaDePlanos)
     def listar_planos() -> ListaDePlanos:
-        return ListaDePlanos(planos=[plano_saida(plano) for plano in casos.listar_planos.executar()])
+        livre = casos.trocar_plano.livre if casos.trocar_plano is not None else False
+        return ListaDePlanos(planos=[plano_saida(plano) for plano in casos.listar_planos.executar()],
+                             troca_de_plano_livre=livre)
 
     # -----------------------------------------------------------------------
     # Autenticação (JWT)
@@ -103,6 +96,7 @@ def criar_rotas(
             email=dados.email,
             loja=dados.loja,
             senha=dados.senha,
+            maior_de_idade=dados.maior_de_idade,
         )
         return RespostaAutenticacao(
             token=resultado.token,
@@ -155,6 +149,23 @@ def criar_rotas(
     def vendedor_atual(vendedor_id: VendedorAtual) -> VendedorSaida:
         return vendedor_saida(casos.obter_vendedor_atual.executar(vendedor_id))
 
+    @rotas.put(
+        "/me/plano",
+        tags=["vendedor"],
+        summary="O vendedor do token troca o próprio plano (MVP: na hora e sem pagamento)",
+        response_model=UsuarioSaida,
+        responses={
+            **ERRO_401,
+            **ERRO_404,
+            400: {"model": RespostaDeErro, "description": "Plano que não existe"},
+            402: {"model": RespostaDeErro, "description": "Troca livre desligada (TROCA_DE_PLANO_LIVRE=false)"},
+        },
+    )
+    def trocar_plano(dados: RequisicaoTrocarPlano, vendedor_id: VendedorAtual) -> UsuarioSaida:
+        if casos.trocar_plano is None:
+            raise HTTPException(status_code=501, detail="Serviço indisponível.")
+        return usuario_saida(casos.trocar_plano.executar(vendedor_id, dados.plano))
+
     @rotas.get(
         "/marketplaces",
         tags=["marketplaces"],
@@ -175,7 +186,7 @@ def criar_rotas(
     )
     def obter_url_autorizacao(slug: str, vendedor_id: VendedorAtual) -> UrlAutorizacaoSaida:
         estado = (
-            servico_token.gerar_token(user_id=vendedor_id, email=f"oauth:{slug}")
+            servico_token.gerar_token(user_id=vendedor_id, email=f"oauth:{slug}", finalidade=FINALIDADE_ESTADO_OAUTH)
             if servico_token is not None
             else str(vendedor_id)
         )
@@ -203,7 +214,7 @@ def criar_rotas(
         vendedor_id = None
         if servico_token is not None:
             try:
-                payload = servico_token.validar_token(state)
+                payload = servico_token.validar_token(state, finalidade=FINALIDADE_ESTADO_OAUTH)
                 vendedor_id = int(payload["sub"])
             except Exception:
                 return RedirectResponse(url="/#/marketplaces?erro=state_invalido", status_code=302)
@@ -255,13 +266,7 @@ def criar_rotas(
     def listar_produtos(slug: str, vendedor_id: VendedorAtual) -> list[dict[str, Any]]:
         return casos.conectar_marketplace.listar_produtos(vendedor_id, slug)
 
-    @rotas.post(
-        "/marketplaces/{slug}/products",
-        tags=["marketplaces"],
-        summary="Publica um novo produto na conta do vendedor no marketplace",
-        responses={**ERRO_401, **ERRO_404},
-    )
-    def publicar_produto(slug: str, dados_produto: dict[str, Any], vendedor_id: VendedorAtual) -> dict[str, Any]:
-        return casos.conectar_marketplace.publicar_produto(vendedor_id, slug, dados_produto)
+    # POST /marketplaces/{slug}/products (publicava um dict qualquer) foi desativada: a publicação agora
+    # é montada no back, em POST /api/anuncios/publicar/mercado-livre (rotas_anuncios.py).
 
     return rotas

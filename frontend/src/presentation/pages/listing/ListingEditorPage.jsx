@@ -7,7 +7,10 @@ import Panel from '@/presentation/components/Panel/Panel.jsx';
 import ParticleBurst from '@/presentation/components/ParticleBurst/ParticleBurst.jsx';
 import Stepper from '@/presentation/components/Stepper/Stepper.jsx';
 import StatusPanel from '@/presentation/components/StatusPanel/StatusPanel.jsx';
+import AiQuota from '@/presentation/components/AiQuota/AiQuota.jsx';
 import PhotosStep from './components/PhotosStep/PhotosStep.jsx';
+import AnalysisStep from './components/AnalysisStep/AnalysisStep.jsx';
+import ConfirmStep from './components/ConfirmStep/ConfirmStep.jsx';
 import DetailsStep from './components/DetailsStep/DetailsStep.jsx';
 import PriceStep from './components/PriceStep/PriceStep.jsx';
 import ChannelsStep from './components/ChannelsStep/ChannelsStep.jsx';
@@ -23,6 +26,8 @@ import './ListingEditorPage.css';
 
 const STEP_VIEWS = {
   photos: PhotosStep,
+  analysis: AnalysisStep,
+  confirm: ConfirmStep,
   details: DetailsStep,
   price: PriceStep,
   channels: ChannelsStep,
@@ -30,8 +35,9 @@ const STEP_VIEWS = {
 };
 
 /**
- * Criar anúncio (#/anuncios/novo) e ver e editar (#/anuncios/:id): o assistente em
- * cinco passos com o trilho animado, o rascunho salvo sozinho e a comemoração ao publicar.
+ * Criar anúncio (#/anuncios/novo) e ver e editar (#/anuncios/:id): o assistente com o trilho
+ * animado (fotos, análise da IA, confirmar, detalhes, preço, canais e publicar), o rascunho
+ * salvo sozinho, o selo do plano com as análises restantes e a comemoração ao publicar.
  */
 export default function ListingEditorPage({ params }) {
   const rootRef = useRef(null);
@@ -42,6 +48,16 @@ export default function ListingEditorPage({ params }) {
   const { nav } = LISTING_WIZARD;
   const StepView = STEP_VIEWS[step];
   const last = stepIndex === steps.length - 1;
+  const { quota } = editor;
+  const quotaTexts = LISTING_WIZARD.quota;
+
+  // O botão de seguir de cada passo: no Confirmar, confirma; na Análise, só quando a leitura terminou
+  let forward = { label: nav.next, onClick: editor.next };
+  if (step === 'confirm') {
+    forward = { label: LISTING_WIZARD.confirm.button, onClick: editor.confirm, loading: editor.ai.sending, loadingText: LISTING_WIZARD.confirm.sending };
+  } else if (step === 'analysis') {
+    forward = ['waiting', 'ready'].includes(editor.ai.phase) ? { label: LISTING_WIZARD.analysis.toConfirm, onClick: editor.next } : null;
+  }
 
   return (
     <div ref={rootRef} className="listing-editor">
@@ -60,12 +76,22 @@ export default function ListingEditorPage({ params }) {
               {LISTING_EDITOR.back.label}
             </Button>
           ) : (
-            editor.savedAt &&
             !result && (
-              <p className="listing-editor__saved" aria-live="polite">
-                <Icon name="check-circle" size={16} />
-                {LISTING_WIZARD.draftSaved(editor.savedAt)}
-              </p>
+              <div className="listing-editor__status">
+                {quota && (
+                  <AiQuota
+                    plan={quotaTexts.badge(quotaTexts.plans[quota.plan] ?? quota.plan)}
+                    remaining={quota.remaining > 0 ? quotaTexts.remaining(quota.remaining, quota.perMonth) : quotaTexts.none}
+                    empty={quota.remaining <= 0}
+                  />
+                )}
+                {editor.savedAt && (
+                  <p className="listing-editor__saved" aria-live="polite">
+                    <Icon name="check-circle" size={16} />
+                    {LISTING_WIZARD.draftSaved(editor.savedAt)}
+                  </p>
+                )}
+              </div>
             )
           )
         }
@@ -84,6 +110,7 @@ export default function ListingEditorPage({ params }) {
       {status === 'ready' && result && (
         <PublishSuccess
           published={result.published}
+          permalink={result.permalink}
           photo={coverPhoto(editor.draft)}
           onAnother={editor.restart}
         />
@@ -146,9 +173,17 @@ export default function ListingEditorPage({ params }) {
                     {nav.save}
                   </Button>
                 )}
-                {!last && (
-                  <Button icon="arrow-right" iconSize={16} variant={editing ? 'light' : 'primary'} onClick={editor.next}>
-                    {nav.next}
+                {!last && forward && (
+                  <Button
+                    icon="arrow-right"
+                    iconSize={16}
+                    variant={editing ? 'light' : 'primary'}
+                    onClick={forward.onClick}
+                    loading={forward.loading}
+                    loadingText={forward.loadingText}
+                    disabled={forward.loading}
+                  >
+                    {forward.label}
                   </Button>
                 )}
                 {last && !editing && (

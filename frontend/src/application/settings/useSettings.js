@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import useMountedRef from '@/application/ui/useMountedRef.js';
 import useForm from '@/application/ui/useForm.js';
 import useSession from '@/application/session/useSession.js';
+import usePlanChange from '@/application/settings/usePlanChange.js';
 import { forgetSession, setSessionAccount } from '@/application/session/sessionStore.js';
 import { showToast, TOAST_TONES } from '@/application/feedback/toastStore.js';
 import {
@@ -44,8 +45,9 @@ const EMPTY_SECURITY = { current: '', next: '', confirmation: '' };
 
 /**
  * Aplicação · Caso de uso "configurações da conta".
- * Perfil (a navbar se atualiza na hora), troca de senha, preferências com interruptores
- * e a exclusão da conta (apaga tudo dela deste navegador). A tela só desenha o que volta daqui.
+ * Perfil (a navbar se atualiza na hora), troca de senha, troca de plano (usePlanChange),
+ * preferências com interruptores e a exclusão da conta (apaga tudo dela deste navegador).
+ * A tela só desenha o que volta daqui.
  */
 export default function useSettings() {
   const { account } = useSession();
@@ -167,6 +169,9 @@ export default function useSettings() {
     [accountId, preferences, mounted]
   );
 
+  // ---------- Plano (troca na hora, sem pagamento, no MVP) ----------
+  const plan = usePlanChange({ mounted });
+
   // ---------- Zona de risco ----------
   const [deleting, setDeleting] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -210,6 +215,7 @@ export default function useSettings() {
     security: { ...security, save: savePassword, saving: savingPassword },
     preferences,
     togglePreference,
+    plan,
     danger: { ...danger, open: openDelete, cancel: cancelDelete, confirm: confirmDelete, confirming: confirmingDelete, deleting }
   };
 }

@@ -7,6 +7,7 @@ pelo código oficial de autorização. A mesma instância gerencia a geração d
 a vinculação da conta, a renovação automática de token e a listagem/publicação de anúncios.
 """
 
+import logging
 from collections.abc import Callable, Mapping
 from datetime import datetime
 from typing import Any
@@ -16,6 +17,8 @@ from backend.application.portas import GatewayMarketplace, RepositorioContasVinc
 from backend.domain.conta_vinculada import ContaVinculada, CredenciaisOAuth
 from backend.domain.erros import MarketplaceNaoEncontrado
 from backend.domain.marketplace import Marketplace, obter_marketplace_disponivel
+
+log = logging.getLogger("quickclick.marketplaces")
 
 
 class ConectarMarketplace:
@@ -85,10 +88,17 @@ class ConectarMarketplace:
         self._contas.salvar(conta)
         return MarketplaceDoVendedor(marketplace, conta)
 
+    def token_ativo(self, vendedor_id: int, slug: str) -> str | None:
+        """O access token em dia (renova se venceu), ou None se a conta não está conectada ou não renovou."""
+        if self._contas.buscar(vendedor_id, slug) is None:
+            return None
+        try:
+            credenciais, _ = self._obter_conta_e_gateway_ativo(vendedor_id, slug)
+        except (RuntimeError, ValueError) as erro:
+            log.warning("Token do %s não renovou (%s).", slug, type(erro).__name__)
+            return None
+        return credenciais.access_token
+
     def listar_produtos(self, vendedor_id: int, slug: str) -> list[dict[str, Any]]:
         credenciais, gateway = self._obter_conta_e_gateway_ativo(vendedor_id, slug)
         return gateway.listar_anuncios(credenciais.access_token, credenciais.conta_externa_id)
-
-    def publicar_produto(self, vendedor_id: int, slug: str, dados_produto: dict[str, Any]) -> dict[str, Any]:
-        credenciais, gateway = self._obter_conta_e_gateway_ativo(vendedor_id, slug)
-        return gateway.publicar_anuncio(credenciais.access_token, dados_produto)

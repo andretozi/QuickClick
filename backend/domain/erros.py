@@ -97,3 +97,123 @@ class TokenInvalido(ErroDeDominio):
 
     def __init__(self, mensagem: str = "Token de autenticação inválido ou expirado."):
         super().__init__(mensagem)
+
+
+class CotaEsgotada(ErroDeDominio):
+    codigo = "cota_esgotada"
+
+    def __init__(self, limite: int):
+        super().__init__(
+            f"Você já usou as {limite} análises de IA do mês. Dá pra terminar o anúncio à mão, "
+            "ou mudar de plano para ter mais."
+        )
+        self.limite = limite
+
+
+class LimitePorHora(ErroDeDominio):
+    codigo = "limite_por_hora"
+
+    def __init__(self, limite: int):
+        super().__init__(f"Você fez {limite} análises na última hora. Espera um pouco e tenta de novo.")
+
+
+class AnaliseEmAndamento(ErroDeDominio):
+    codigo = "analise_em_andamento"
+
+    def __init__(self):
+        super().__init__("Já tem uma análise rodando. Espera ela terminar para começar outra.")
+
+
+class IAIndisponivel(ErroDeDominio):
+    codigo = "ia_indisponivel"
+
+    def __init__(self, mensagem: str = "A IA está fora do ar agora. Você pode preencher o anúncio à mão."):
+        super().__init__(mensagem)
+
+
+class FotoInvalida(ErroDeDominio):
+    codigo = "foto_invalida"
+
+    def __init__(self, mensagem: str = "Não deu pra abrir essa foto. Use JPEG, PNG ou WEBP de até 10 MB."):
+        super().__init__(mensagem)
+
+
+class FotosNecessarias(ErroDeDominio):
+    codigo = "fotos_necessarias"
+
+    def __init__(self, mensagem: str = "Manda as fotos de novo para continuar a análise."):
+        super().__init__(mensagem)
+
+
+class ProdutoNaoReconhecido(ErroDeDominio):
+    codigo = "produto_nao_reconhecido"
+
+    def __init__(self):
+        super().__init__("Não consegui reconhecer o produto nessa foto. Preencha os campos à mão.")
+
+
+class MercadoLivreDesconectado(ErroDeDominio):
+    codigo = "mercado_livre_desconectado"
+
+    def __init__(self):
+        super().__init__("Conecte sua conta do Mercado Livre para publicar e ver os preços da concorrência.")
+
+
+class AnaliseNaoEncontrada(ErroDeDominio):
+    codigo = "analise_nao_encontrada"
+
+    def __init__(self):
+        super().__init__("Não encontramos essa análise. Comece uma nova.")
+
+
+class EstadoDaAnaliseInvalido(ErroDeDominio):
+    codigo = "estado_da_analise_invalido"
+
+    def __init__(self, mensagem: str = "Essa análise não está esperando esse passo agora."):
+        super().__init__(mensagem)
+
+
+class PublicacaoRecusada(ErroDeDominio):
+    """O marketplace recusou o anúncio. `detalhes` traz as causas que ele mandou (texto dele, não nosso)."""
+
+    codigo = "publicacao_recusada"
+
+    def __init__(self, detalhes: Sequence[str] = ()):
+        super().__init__("O Mercado Livre recusou o anúncio. Confira os dados e tente de novo.")
+        self.detalhes = list(detalhes)
+
+    @property
+    def extras(self) -> dict:
+        return {"detalhes": self.detalhes} if self.detalhes else {}
+
+
+class PlanoInvalido(ErroDeDominio):
+    codigo = "plano_invalido"
+
+    def __init__(self):
+        super().__init__("Esse plano não existe. Escolha Grátis, Essencial, Pro ou Business.")
+
+
+class TrocaDePlanoIndisponivel(ErroDeDominio):
+    """A troca livre (sem pagamento) está desligada: ela volta junto com o pagamento, na versão final."""
+
+    codigo = "troca_de_plano_indisponivel"
+
+    def __init__(self):
+        super().__init__("A troca de plano vai chegar junto com o pagamento. Por enquanto, fica o plano atual.")
+
+
+class MaioridadeNaoConfirmada(ErroDeDominio):
+    codigo = "maioridade_obrigatoria"
+
+    def __init__(self):
+        super().__init__("Para criar a conta, confirme que você tem 18 anos ou mais.")
+
+
+class ServicoIndisponivel(ErroDeDominio):
+    """Uma peça de fora (banco, chave, marketplace) não está configurada ou não responde."""
+
+    codigo = "servico_indisponivel"
+
+    def __init__(self, mensagem: str = "Esse serviço está fora do ar agora. Tente de novo em instantes."):
+        super().__init__(mensagem)

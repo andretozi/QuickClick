@@ -8,11 +8,16 @@ import './Stepper.css';
  * - steps: [{ id, label, hint }]; current: índice; visited: maior índice já aberto
  * - onSelect(index); label: nome da lista para o leitor de tela
  */
-export default function Stepper({ steps, current, visited, onSelect, label, className, ...rest }) {
+export default function Stepper({ steps, current, visited, onSelect, label, className, style, ...rest }) {
   const progress = steps.length > 1 ? current / (steps.length - 1) : 0;
 
   return (
-    <nav className={cx('stepper', className)} aria-label={label} {...rest}>
+    <nav
+      className={cx('stepper', className)}
+      aria-label={label}
+      style={{ '--stepper-count': steps.length, ...style }}
+      {...rest}
+    >
       <span className="stepper__rail" aria-hidden="true">
         <span className="stepper__fill" style={{ transform: `scaleX(${progress})` }} />
       </span>

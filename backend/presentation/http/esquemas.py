@@ -31,6 +31,12 @@ class PlanoSaida(BaseModel):
 
 class ListaDePlanos(BaseModel):
     planos: list[PlanoSaida]
+    troca_de_plano_livre: bool = Field(default=True, description="false: a troca de plano espera o pagamento "
+                                       "(PUT /api/me/plano responde 402)")
+
+
+class RequisicaoTrocarPlano(BaseModel):
+    plano: str = Field(examples=["pro"], description="gratis, essencial, pro ou business")
 
 
 class VendedorSaida(BaseModel):
@@ -82,6 +88,7 @@ class RequisicaoCadastro(BaseModel):
     senha: str = Field(min_length=6, description="Senha com no mínimo 6 caracteres")
     nome: str = Field(default="", examples=["André Tozi"])
     loja: str = Field(default="", examples=["Minha Loja Oficial"])
+    maior_de_idade: bool = Field(default=False, description="Confirma que tem 18 anos ou mais (obrigatório)")
 
 
 class RequisicaoLogin(BaseModel):

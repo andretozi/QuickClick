@@ -109,3 +109,18 @@
     opacity: 1;
   }
 }
+
+/* Aviso do plano Grátis sobre o uso de dados na camada grátis do Google */
+.photos-step__notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: rgb(var(--rgb-honey) / 0.14);
+  color: rgb(var(--rgb-ink) / 0.8);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+

@@ -14,7 +14,9 @@ export const FIELD_ERROR = {
   PHONE: 'phone',
   TOO_LONG: 'too-long',
   PRICE: 'price',
-  STOCK: 'stock'
+  STOCK: 'stock',
+  WRITING: 'writing',
+  AGE: 'age'
 };
 
 const PASSWORD_MIN_LENGTH = 8;

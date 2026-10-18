@@ -1,0 +1,86 @@
+/* ==================================================================
+   Bloco: analysis-step (passo da análise da IA)
+   ================================================================== */
+.analysis-step {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.analysis-step__title {
+  margin: 0;
+  font-size: clamp(22px, 2.6vw, 30px);
+}
+
+.analysis-step__lead {
+  margin: 6px 0 0;
+  color: rgb(var(--rgb-ink) / 0.65);
+  font-weight: 600;
+}
+
+.analysis-step__stop {
+  display: grid;
+  gap: 14px;
+  justify-items: start;
+}
+
+.analysis-step__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.analysis-step__ready {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: var(--radius-lg);
+  background: rgb(var(--rgb-green-light) / 0.16);
+  color: var(--color-green-dark);
+  font-weight: 800;
+}
+
+.analysis-step__notice {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: rgb(var(--rgb-honey) / 0.16);
+  color: var(--color-ink);
+  font-weight: 700;
+}
+
+.analysis-step__tips {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.analysis-step__tip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: rgb(var(--rgb-coral) / 0.08);
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.analysis-step__skip {
+  align-self: flex-start;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-coral-deep);
+  font: inherit;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}

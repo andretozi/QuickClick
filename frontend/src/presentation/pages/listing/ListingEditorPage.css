@@ -112,3 +112,13 @@
     flex: 1;
   }
 }
+
+/* Selo do plano e o "rascunho salvo", lado a lado no topo */
+.listing-editor__status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px 14px;
+}
+

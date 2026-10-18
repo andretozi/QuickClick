@@ -8,17 +8,33 @@ A mensagem já vem pronta para aparecer na tela do vendedor.
 
 from fastapi import FastAPI, Request
 from fastapi.exception_handlers import http_exception_handler
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
 
 from backend.domain.erros import (
+    AnaliseEmAndamento,
+    AnaliseNaoEncontrada,
+    CotaEsgotada,
     CredenciaisInvalidas,
+    EstadoDaAnaliseInvalido,
+    FotoInvalida,
+    FotosNecessarias,
+    IAIndisponivel,
+    LimitePorHora,
+    MaioridadeNaoConfirmada,
+    PlanoInvalido,
+    TrocaDePlanoIndisponivel,
+    MercadoLivreDesconectado,
+    ProdutoNaoReconhecido,
+    PublicacaoRecusada,
     EmailJaCadastrado,
     ErroDeDominio,
     LimiteDoPlanoAtingido,
     MarketplaceEmBreve,
     MarketplaceNaoEncontrado,
     NaoAutenticado,
+    ServicoIndisponivel,
     TokenInvalido,
     VendedorNaoEncontrado,
 )
@@ -32,6 +48,21 @@ STATUS_POR_ERRO: tuple[tuple[type[ErroDeDominio], int], ...] = (
     (CredenciaisInvalidas, 401),
     (TokenInvalido, 401),
     (EmailJaCadastrado, 409),
+    (ServicoIndisponivel, 503),
+    (CotaEsgotada, 403),
+    (LimitePorHora, 429),
+    (AnaliseEmAndamento, 409),
+    (IAIndisponivel, 503),
+    (FotoInvalida, 400),
+    (FotosNecessarias, 409),
+    (ProdutoNaoReconhecido, 422),
+    (MercadoLivreDesconectado, 409),
+    (AnaliseNaoEncontrada, 404),
+    (EstadoDaAnaliseInvalido, 409),
+    (PublicacaoRecusada, 422),
+    (MaioridadeNaoConfirmada, 400),
+    (PlanoInvalido, 400),
+    (TrocaDePlanoIndisponivel, 402),
 )
 
 ERROS_HTTP = {
@@ -39,10 +70,12 @@ ERROS_HTTP = {
     401: ("nao_autenticado", "Autenticação necessária para acessar este recurso."),
     404: ("nao_encontrado", "Esse endereço não existe na API."),
     405: ("metodo_nao_permitido", "Esse endereço não aceita esse tipo de pedido."),
+    413: ("pedido_grande_demais", "O pedido passou do tamanho máximo."),
+    422: ("parametro_invalido", "Faltou ou veio errado algum dado do pedido."),
 }
 
 
-def _resposta(status: int, codigo: str, mensagem: str, **extras: str) -> JSONResponse:
+def _resposta(status: int, codigo: str, mensagem: str, **extras) -> JSONResponse:
     return JSONResponse(status_code=status, content={"erro": {"codigo": codigo, "mensagem": mensagem, **extras}})
 
 
@@ -53,11 +86,17 @@ def registrar_tratamento_de_erros(app: FastAPI) -> None:
         extras = {}
         if isinstance(erro, LimiteDoPlanoAtingido) and erro.plano_sugerido is not None:
             extras["plano_sugerido"] = erro.plano_sugerido.slug
+        extras.update(getattr(erro, "extras", None) or {})
         return _resposta(status, erro.codigo, erro.mensagem, **extras)
 
     @app.exception_handler(ValueError)
     async def erro_valor(request: Request, erro: ValueError) -> JSONResponse:
         return _resposta(400, "parametro_invalido", str(erro))
+
+    @app.exception_handler(RequestValidationError)
+    async def erro_de_validacao(request: Request, erro: RequestValidationError) -> JSONResponse:
+        codigo, mensagem = ERROS_HTTP[422]
+        return _resposta(422, codigo, mensagem)
 
     @app.exception_handler(HTTPException)
     async def erro_http(request: Request, erro: HTTPException):

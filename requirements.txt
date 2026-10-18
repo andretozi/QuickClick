@@ -15,11 +15,9 @@
 
 -r backend/requirements.txt
 
-# O que entra com esse comando: as três do backend/requirements.txt (fastapi,
-# uvicorn e httpx) e, trazidas pelo pip automaticamente, as dependências delas
-# (hoje 14 pacotes): annotated-doc, annotated-types, anyio, certifi, click,
-# h11, httpcore, idna, opentelemetry-api, pydantic, pydantic-core, starlette,
-# typing-extensions e typing-inspection.
+# O que entra com esse comando: tudo do backend/requirements.txt (API, banco, Alembic,
+# JWT, criptografia, keyring, Azure Key Vault, SDKs da Anthropic e do Google, Pillow) e,
+# trazidas pelo pip automaticamente, as dependências de cada um.
 #
 # O front não entra aqui (é Node, não Python): as dependências dele estão em
 # frontend/package.json e o main.py as instala com `npm ci`.

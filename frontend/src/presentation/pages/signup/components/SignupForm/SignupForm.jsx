@@ -10,7 +10,7 @@ import './SignupForm.css';
 /** Formulário de cadastro. Validação, envio e erros ficam no hook useSignupForm. */
 export default function SignupForm() {
   const { values, errors, formRef, handleChange, handleSubmit, loading, formError, announceTermsSoon } = useSignupForm();
-  const { title, lead, name, email, store, password, confirmation, submit, login, terms } = SIGNUP_FORM;
+  const { title, lead, name, email, store, password, confirmation, adult, freeData, submit, login, terms } = SIGNUP_FORM;
   const errorOf = (field) => FIELD_ERRORS[errors[field]];
 
   return (
@@ -78,6 +78,25 @@ export default function SignupForm() {
           />
         </div>
         <p className="signup-form__hint">{password.hint}</p>
+        <div className="signup-form__adult">
+          <label className="signup-form__check">
+            <input
+              type="checkbox"
+              name="adult"
+              checked={values.adult}
+              onChange={(event) => handleChange({ target: { name: 'adult', value: event.target.checked } })}
+              aria-invalid={Boolean(errors.adult)}
+              aria-describedby={errors.adult ? 'signup-adult-erro' : undefined}
+            />
+            <span>{adult.label}</span>
+          </label>
+          {errors.adult && (
+            <p id="signup-adult-erro" className="signup-form__error" role="alert">
+              {errorOf('adult')}
+            </p>
+          )}
+          <p className="signup-form__hint">{freeData}</p>
+        </div>
         <Button
           type="submit"
           size="block"

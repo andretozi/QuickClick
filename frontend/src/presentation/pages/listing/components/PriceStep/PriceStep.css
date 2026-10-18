@@ -102,3 +102,56 @@
     margin-top: 0;
   }
 }
+
+/* ---------- Números reais do mercado ---------- */
+.price-step__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 4px 0 0;
+  padding: 0;
+  color: rgb(var(--rgb-ink) / 0.7);
+  font-size: 13.5px;
+  font-weight: 700;
+  list-style: none;
+}
+
+.price-step__facts strong {
+  color: var(--color-ink);
+}
+
+.price-step__net strong {
+  color: var(--color-green-dark);
+}
+
+/* ---------- Estratégia e justificativa (plano pago) ---------- */
+.price-step__advice {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  padding: 14px 16px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, rgb(var(--rgb-green-light) / 0.14), rgb(var(--rgb-honey) / 0.1));
+}
+
+.price-step__justification {
+  margin: 0;
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.price-step__alerts {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--color-coral-deep);
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+.price-step__nodata {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}

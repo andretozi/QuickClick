@@ -25,3 +25,31 @@
 .signup-form__submit {
   margin-top: 4px;
 }
+
+/* Caixa obrigatória "Tenho 18 anos ou mais" e o aviso do plano Grátis */
+.signup-form__adult {
+  display: grid;
+  gap: 6px;
+}
+
+.signup-form__check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.signup-form__check input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-coral);
+}
+
+.signup-form__error {
+  margin: 0;
+  color: var(--color-coral-deep);
+  font-size: 13px;
+  font-weight: 700;
+}
+

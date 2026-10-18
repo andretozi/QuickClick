@@ -5,20 +5,22 @@ import { announceTermsSoon, formErrorFor } from '@/application/auth/authForm.js'
 import { signUp } from '@/application/session/sessionStore.js';
 import { ACCOUNT_ERRORS, describeAuthError } from '@/infrastructure/auth/authService.js';
 import {
+  FIELD_ERROR,
   validateEmail,
   validateName,
   validateNewPassword,
   validatePasswordConfirmation
 } from '@/domain/validation/validators.js';
 
-const EMPTY = { name: '', email: '', store: '', password: '', confirmation: '' };
+const EMPTY = { name: '', email: '', store: '', password: '', confirmation: '', adult: false };
 
 const validateSignup = (values) => ({
   name: validateName(values.name),
   email: validateEmail(values.email),
   store: validateName(values.store),
   password: validateNewPassword(values.password),
-  confirmation: validatePasswordConfirmation(values.password, values.confirmation)
+  confirmation: validatePasswordConfirmation(values.password, values.confirmation),
+  adult: values.adult ? null : FIELD_ERROR.AGE
 });
 
 /**
@@ -41,7 +43,13 @@ export default function useSignupForm() {
       setFormError(null);
       setLoading(true);
       try {
-        await signUp({ name: values.name, email: values.email, store: values.store, password: values.password });
+        await signUp({
+          name: values.name,
+          email: values.email,
+          store: values.store,
+          password: values.password,
+          adult: values.adult
+        });
       } catch (error) {
         if (!mounted.current) return;
         setLoading(false);

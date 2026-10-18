@@ -1,20 +1,36 @@
+import AiProgress from '@/presentation/components/AiProgress/AiProgress.jsx';
 import Button from '@/presentation/components/Button/Button.jsx';
 import Icon from '@/presentation/components/Icon/Icon.jsx';
 import SegmentedControl from '@/presentation/components/SegmentedControl/SegmentedControl.jsx';
 import SelectField from '@/presentation/components/Field/SelectField.jsx';
 import TextAreaField from '@/presentation/components/Field/TextAreaField.jsx';
 import TextField from '@/presentation/components/Field/TextField.jsx';
+import UpgradeInvite from '@/presentation/components/UpgradeInvite/UpgradeInvite.jsx';
 import { cx } from '@/presentation/utils/cx.js';
-import { LISTING_LIMITS, coverPhoto } from '@/domain/listings/listingRules.js';
+import { LISTING_LIMITS } from '@/domain/listings/listingRules.js';
+import { WRITING_STAGES, stagesProgress } from '@/domain/listings/aiAnalysis.js';
 import { LISTING_CATEGORIES, LISTING_CONDITIONS, LISTING_WIZARD } from '@/domain/content/listingContent.js';
 import { FIELD_ERRORS } from '@/domain/content/commonContent.js';
 import './DetailsStep.css';
 
-/** Passo 2: título (com contador), descrição, categoria, condição e estoque, ou a sugestão da IA. */
+/** Só o nome do site (a fonte pode vir num formato estranho). */
+function siteOf(address) {
+  try {
+    return new URL(address).hostname.replace(/^www\./, '');
+  } catch {
+    return address;
+  }
+}
+
+/** Passo 4: título (com contador) e descrição escritos pela IA, editáveis, mais categoria, condição e estoque. */
 export default function DetailsStep({ editor }) {
-  const { draft, errors, setField, update, ai, suggest } = editor;
-  const { title, lead, ai: aiTexts, fields } = LISTING_WIZARD.details;
-  const working = ai.status === 'working';
+  const { draft, errors, setField, update, ai, quota, resume, editing } = editor;
+  const { title, lead, fields, why } = LISTING_WIZARD.details;
+  const texts = LISTING_WIZARD.details;
+  const { analysis, phase } = ai;
+  const writing = !editing && phase === 'running' && Boolean(analysis?.confirmed);
+  const failed = !editing && phase === 'failed' && Boolean(analysis?.confirmed);
+  const research = analysis?.research;
   const titleLength = draft.title.length;
 
   return (
@@ -24,50 +40,26 @@ export default function DetailsStep({ editor }) {
           <h2 className="heading details-step__title">{title}</h2>
           <p className="details-step__lead">{lead}</p>
         </div>
-        <Button
-          variant="dark"
-          icon="sparkles"
-          iconPosition="start"
-          iconSize={18}
-          onClick={suggest}
-          loading={working}
-          loadingText={aiTexts.working}
-          disabled={working}
-          className="details-step__ai"
-        >
-          {aiTexts.button}
-        </Button>
       </header>
 
-      {/* "Analisando a foto": a capa com um feixe de luz passando e os passos da IA */}
-      {working && (
-        <div className="details-step__scan" role="status" aria-live="polite">
-          <span className="details-step__scan-photo" aria-hidden="true">
-            {coverPhoto(draft) && <img src={coverPhoto(draft)} alt="" />}
-            <span data-shimmer className="details-step__scan-beam" />
-          </span>
-          <ol className="details-step__scan-steps">
-            {aiTexts.steps.map((text, index) => (
-              <li
-                key={text}
-                className={cx(
-                  'details-step__scan-step',
-                  index < ai.step && 'details-step__scan-step--done',
-                  index === ai.step && 'details-step__scan-step--active'
-                )}
-              >
-                <Icon name={index < ai.step ? 'check' : 'sparkle'} size={15} />
-                {text}
-              </li>
-            ))}
-          </ol>
+      {writing && (
+        <AiProgress
+          title={texts.writing}
+          stages={stagesProgress(WRITING_STAGES, analysis).map((stage) => ({
+            ...stage,
+            label: LISTING_WIZARD.analysis.stages[stage.id]
+          }))}
+        />
+      )}
+      {failed && (
+        <div className="details-step__notice details-step__notice--row" role="alert">
+          <span>{analysis.error?.message || texts.failed}</span>
+          <Button size="sm" variant="dark" icon="sync" iconPosition="start" iconSize={15} loading={ai.sending} onClick={resume}>
+            {texts.retry}
+          </Button>
         </div>
       )}
-      {ai.status === 'needs-photo' && (
-        <p className="details-step__notice" role="alert">
-          {aiTexts.needsPhoto}
-        </p>
-      )}
+      {phase === 'ready' && analysis?.text?.corrected && <p className="details-step__hint">{texts.corrected}</p>}
 
       <div className="details-step__grid">
         <TextField
@@ -84,7 +76,7 @@ export default function DetailsStep({ editor }) {
             </span>
           }
           error={FIELD_ERRORS[errors.title]}
-          className="details-step__wide"
+          className={cx('details-step__wide', draft.aiFilled?.title && 'details-step__filled')}
         />
         <TextAreaField
           id="anuncio-descricao"
@@ -94,8 +86,14 @@ export default function DetailsStep({ editor }) {
           value={draft.description}
           onChange={setField}
           maxLength={LISTING_LIMITS.DESCRIPTION_MAX}
+          rows={8}
+          aside={
+            <span className="details-step__counter">
+              {fields.title.counter(draft.description.length, LISTING_LIMITS.DESCRIPTION_MAX)}
+            </span>
+          }
           error={FIELD_ERRORS[errors.description]}
-          className="details-step__wide"
+          className={cx('details-step__wide', draft.aiFilled?.description && 'details-step__filled')}
         />
         <SelectField
           id="anuncio-categoria"
@@ -134,6 +132,57 @@ export default function DetailsStep({ editor }) {
           />
         </div>
       </div>
+
+      {research && (
+        <details className="details-step__why">
+          <summary className="details-step__why-summary">
+            <Icon name="info" size={16} />
+            {why.title}
+          </summary>
+          <dl className="details-step__why-list">
+            {research.buyerProfile && (
+              <>
+                <dt>{why.profile}</dt>
+                <dd>{research.buyerProfile}</dd>
+              </>
+            )}
+            {research.values.length > 0 && (
+              <>
+                <dt>{why.values}</dt>
+                <dd>{research.values.join(', ')}</dd>
+              </>
+            )}
+            {research.objections.length > 0 && (
+              <>
+                <dt>{why.objections}</dt>
+                <dd>{research.objections.join(', ')}</dd>
+              </>
+            )}
+            {research.terms.length > 0 && (
+              <>
+                <dt>{why.terms}</dt>
+                <dd>{research.terms.join(', ')}</dd>
+              </>
+            )}
+            {research.sources.length > 0 && (
+              <>
+                <dt>{why.sources}</dt>
+                <dd className="details-step__sources">
+                  {research.sources.map((source) => (
+                    <a key={source} href={source} target="_blank" rel="noopener noreferrer">
+                      {siteOf(source)}
+                    </a>
+                  ))}
+                </dd>
+              </>
+            )}
+          </dl>
+        </details>
+      )}
+
+      {!editing && quota?.plan === 'gratis' && (
+        <UpgradeInvite {...LISTING_WIZARD.invites.research} action={LISTING_WIZARD.invites.action} />
+      )}
     </div>
   );
 }
