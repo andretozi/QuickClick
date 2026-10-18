@@ -187,6 +187,22 @@ class PublicacaoRecusada(ErroDeDominio):
         return {"detalhes": self.detalhes} if self.detalhes else {}
 
 
+class PlanoInvalido(ErroDeDominio):
+    codigo = "plano_invalido"
+
+    def __init__(self):
+        super().__init__("Esse plano não existe. Escolha Grátis, Essencial, Pro ou Business.")
+
+
+class TrocaDePlanoIndisponivel(ErroDeDominio):
+    """A troca livre (sem pagamento) está desligada: ela volta junto com o pagamento, na versão final."""
+
+    codigo = "troca_de_plano_indisponivel"
+
+    def __init__(self):
+        super().__init__("A troca de plano vai chegar junto com o pagamento. Por enquanto, fica o plano atual.")
+
+
 class MaioridadeNaoConfirmada(ErroDeDominio):
     codigo = "maioridade_obrigatoria"
 

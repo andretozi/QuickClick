@@ -108,6 +108,16 @@
   font-weight: 700;
 }
 
+/* O nome já está no topo do cartão: o rótulo do campo fica só para o leitor de tela */
+.attribute-card__field--quiet .field__header {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .attribute-card__photo {
   justify-self: start;
 }

@@ -31,6 +31,12 @@ class PlanoSaida(BaseModel):
 
 class ListaDePlanos(BaseModel):
     planos: list[PlanoSaida]
+    troca_de_plano_livre: bool = Field(default=True, description="false: a troca de plano espera o pagamento "
+                                       "(PUT /api/me/plano responde 402)")
+
+
+class RequisicaoTrocarPlano(BaseModel):
+    plano: str = Field(examples=["pro"], description="gratis, essencial, pro ou business")
 
 
 class VendedorSaida(BaseModel):

@@ -26,5 +26,5 @@ Campos
 - termos_busca: 2 a 4 termos que um comprador digitaria na busca do marketplace.
 - texto_legivel: até 8 textos que você conseguiu ler nas fotos, copiados como estão.
 - etiqueta_ilegivel: etiquetas que existem mas não dão para ler nessa resolução. Informe a foto e a caixa [x0, y0, x1, y1] em coordenadas de 0 a 1000 (0,0 no canto superior esquerdo da foto). Elas serão relidas com mais resolução.
-- perguntas: uma por atributo desconhecido que importa para a venda, com a foto que ajudaria (etiqueta, verso, detalhe ou nenhuma).
+- perguntas: uma por atributo desconhecido que importa para a venda, com a mesma chave do atributo e a foto que ajudaria (etiqueta, verso, detalhe ou nenhuma). Dúvida sobre defeito ou estado não vira pergunta: escreva a dúvida na própria frase do defeito.
 - Textos em português do Brasil, sem emojis.

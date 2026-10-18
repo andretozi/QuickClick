@@ -1,10 +1,11 @@
 /* ==================================================================
-   Bloco: plan-section (comparação dos planos)
+   Bloco: plan-section (comparação dos planos, com a troca de plano)
    Cartão: --current (o plano da conta), --featured (o recomendado)
    ================================================================== */
 .plan-section__grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* 2 por linha: o painel das configurações não passa de uns 700 px, e cada cartão leva o botão de troca */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   margin: 0;
   padding: 0;
@@ -96,6 +97,11 @@
   color: var(--color-green);
 }
 
+.plan-section__change {
+  align-self: flex-start;
+  margin-top: auto;
+}
+
 .plan-section__soon {
   display: flex;
   align-items: center;
@@ -104,12 +110,6 @@
   color: rgb(var(--rgb-ink) / 0.6);
   font-size: 13.5px;
   font-weight: 700;
-}
-
-@media (max-width: 1080px) {
-  .plan-section__grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 480px) {

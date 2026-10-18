@@ -8,8 +8,9 @@ Uso (da raiz):  python -m scripts.verificar_config            # tudo
    Gerenciador de Credenciais, Key Vault ou .env).
 2. Testa a conexao com o banco (select 1).
 3. Faz uma chamada minima e barata a cada provedor de IA: Haiku com 1 token de saida em
-   cada workspace da Anthropic e o Gemini Flash da camada gratis. Chave recusada (401 ou 403)
-   quer dizer chave vencida, revogada ou sem permissao: troque no Claude Console.
+   cada workspace da Anthropic e o Gemini Flash da camada gratis (pelo mesmo cliente que o site
+   usa). Chave recusada (401 ou 403) quer dizer chave vencida, revogada ou sem permissao: troque
+   no Claude Console (ou no Google AI Studio).
 """
 
 import argparse
@@ -116,31 +117,40 @@ def testar_anthropic(leitor, nome: str) -> str:
         return f"{FALHOU} (sem conexao com a Anthropic)"
 
 
+class _UsoDescartado:
+    """O teste nao grava nada em ia_uso."""
+
+    def registrar(self, uso) -> None:
+        pass
+
+
 def testar_gemini(leitor, nome: str) -> str:
+    """Mesma chamada do site: o ClienteGemini do plano Gratis (saida em JSON pelo esquema, thinking baixo,
+    timeout), com um esquema minimo. Se o site nao conseguir chamar o Gemini, este teste tambem falha."""
     chave = leitor.texto(nome)
     if not chave:
         return "pulado (ausente)"
-    from google import genai
-    from google.genai import errors, types
+    from backend.application.ia.modelos import ContextoDaChamada, FalhaDoProvedor
+    from backend.infrastructure.ia.cliente_gemini import ClienteGemini
 
     modelo = leitor.texto("MODELO_GEMINI_TEXTO")
+    esquema = {"type": "object", "properties": {"ok": {"type": "boolean"}}, "required": ["ok"],
+               "additionalProperties": False}
     try:
-        genai.Client(api_key=chave).models.generate_content(
-            model=modelo,
-            contents="ok",
-            config=types.GenerateContentConfig(max_output_tokens=1),
+        ClienteGemini(nome, chave, _UsoDescartado()).gerar_json(
+            modelo=modelo, partes=["Responda ok true."], sistema="Responda so o JSON pedido.", esquema=esquema,
+            contexto=ContextoDaChamada(vendedor_id=None, analise_id=None, etapa="verificar_config"),
+            versao_prompt=None, timeout_s=30, max_tokens=256,
         )
         return f"{OK} ({modelo})"
-    except errors.APIError as erro:
-        if erro.code in (401, 403) or (erro.code == 400 and "api key" in str(erro).lower()):
-            return f"{FALHOU} ({erro.code}: {nome} recusada, confira no Google AI Studio)"
-        if erro.code == 429:
+    except FalhaDoProvedor as falha:
+        if falha.chave_recusada:
+            return f"{FALHOU} ({falha.motivo}: {nome} recusada, confira no Google AI Studio)"
+        if "429" in falha.motivo:
             return f"{FALHOU} (429: limite da camada gratis atingido; tente mais tarde)"
-        if erro.code == 404:
+        if falha.motivo.startswith("404"):
             return f"{FALHOU} (404: modelo {modelo} nao encontrado; confira MODELO_GEMINI_TEXTO)"
-        return f"{FALHOU} ({erro.code}: {type(erro).__name__})"
-    except Exception as erro:
-        return f"{FALHOU} ({type(erro).__name__})"
+        return f"{FALHOU} ({falha.motivo})"
 
 
 def main() -> int:

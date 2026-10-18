@@ -57,6 +57,8 @@ ITENS: tuple[ItemDeConfiguracao, ...] = (
                        padrao="false"),
     ItemDeConfiguracao("IA_ORCAMENTO_DIARIO_USD", False, "teto de gasto diário da IA paga", "em dólar", padrao="0.30"),
     ItemDeConfiguracao("IA_CACHE_TTL", False, "tempo do cache de prompt (5m ou 1h)", "5m ou 1h", padrao="5m"),
+    ItemDeConfiguracao("TROCA_DE_PLANO_LIVRE", False, "troca de plano sem pagamento (MVP; false quando o "
+                       "pagamento entrar)", "interruptor", padrao="true"),
     ItemDeConfiguracao("TRATAMENTO_FOTO_ATIVO", False, "tratamento de foto (versão final)", "interruptor",
                        usada_no_mvp=False, padrao="false"),
     ItemDeConfiguracao("MODELO_VISAO", False, "leitura da foto e preço (pago)", "ID do modelo", padrao="claude-opus-5-5"),

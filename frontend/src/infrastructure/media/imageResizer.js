@@ -4,13 +4,14 @@
  * De cada arquivo escolhido saem duas versões, as duas desenhadas a partir do original:
  * - a de guardar: JPEG de até 800 px no lado maior, em data URL, que fica no rascunho e no
  *   anúncio (localStorage; um anúncio com 6 fotos ocupa algumas centenas de KB);
- * - a de leitura: JPEG de até 1568 px, qualidade 0,9, em Blob, que vai na hora para a análise
- *   da IA e fica só na memória (é descartada depois).
+ * - a de leitura: JPEG de até 3000 px, qualidade 0,9, em Blob, que vai na hora para a análise
+ *   da IA e fica só na memória (é descartada depois). O back tira dela a versão que a IA lê
+ *   (1568 px) e guarda na memória a de detalhe (até 2576 px) para reler etiquetas pequenas.
  * O back também apaga os metadados (EXIF e localização) antes de mandar qualquer foto para a IA.
  */
 const STORED_SIDE = 800;
 const STORED_QUALITY = 0.8;
-const READING_SIDE = 1568;
+const READING_SIDE = 3000; // o back reduz para 1568 (IA) e 2576 (etiqueta)
 const READING_QUALITY = 0.9;
 
 class InvalidImageError extends Error {
@@ -66,7 +67,7 @@ export async function resizeImage(file) {
   return withImage(file, (image) => drawScaled(image, STORED_SIDE).toDataURL('image/jpeg', STORED_QUALITY));
 }
 
-/** File → as duas versões de uma vez: { stored: data URL de 800 px, reading: Blob de 1568 px }. */
+/** File → as duas versões de uma vez: { stored: data URL de 800 px, reading: Blob de até 3000 px }. */
 export async function preparePhotoVersions(file) {
   return withImage(file, async (image) => ({
     stored: drawScaled(image, STORED_SIDE).toDataURL('image/jpeg', STORED_QUALITY),

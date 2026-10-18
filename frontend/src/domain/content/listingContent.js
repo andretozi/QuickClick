@@ -103,6 +103,8 @@ export const LISTING_WIZARD = {
   analysis: {
     title: 'A IA está olhando as fotos',
     lead: 'Leva alguns segundos. Pode ficar por aqui que a gente avisa quando terminar.',
+    doneTitle: 'A IA já olhou as fotos',
+    doneLead: 'No próximo passo você confere o que ela viu. Só entra no anúncio o que você confirmar.',
     stages: {
       preparando_fotos: 'Preparando as fotos',
       lendo_produto: 'Lendo o produto',
@@ -233,6 +235,7 @@ export const LISTING_WIZARD = {
     title: 'Onde você quer vender?',
     lead: 'Por enquanto, a Quick Click publica no Mercado Livre. Os outros estão chegando.',
     yours: 'Suas contas',
+    publishHere: 'Publicar pela Quick Click',
     worthOpening: 'Vale abrir conta',
     openAccount: 'Abrir conta',
     publishesSoon: 'Publicação pela Quick Click em breve',

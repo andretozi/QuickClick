@@ -9,7 +9,7 @@ import './AnalysisStep.css';
 
 /** Passo 2: a IA lê as fotos no back. Progresso real, dicas de foto e, sem IA, os campos manuais. */
 export default function AnalysisStep({ editor }) {
-  const { draft, ai, quota, resume, fillByHand, goTo, steps } = editor;
+  const { draft, ai, quota, resume, fillByHand } = editor;
   const texts = LISTING_WIZARD.analysis;
   const { analysis, phase } = ai;
   const unavailable = !analysis && quota && (!quota.available || quota.remaining <= 0);
@@ -21,12 +21,13 @@ export default function AnalysisStep({ editor }) {
   }));
   const tips = photoQualityTips(analysis);
   const budget = analysis?.notices?.some((notice) => notice.code === 'orcamento_do_dia');
+  const done = phase === 'waiting' || phase === 'ready';
 
   return (
     <div className="analysis-step">
       <header>
-        <h2 className="heading analysis-step__title">{texts.title}</h2>
-        <p className="analysis-step__lead">{texts.lead}</p>
+        <h2 className="heading analysis-step__title">{done ? texts.doneTitle : texts.title}</h2>
+        <p className="analysis-step__lead">{done ? texts.doneLead : texts.lead}</p>
       </header>
 
       {unavailable && (
@@ -48,13 +49,11 @@ export default function AnalysisStep({ editor }) {
         </Button>
       )}
 
-      {(phase === 'waiting' || phase === 'ready') && (
+      {/* O botão de seguir para o Confirmar fica no rodapé, como nos outros passos */}
+      {done && (
         <p className="analysis-step__ready" data-enter="3">
           <Icon name="check-circle" size={20} />
           {texts.ready}
-          <Button size="sm" icon="arrow-right" iconSize={15} onClick={() => goTo(steps.indexOf('confirm'))}>
-            {texts.toConfirm}
-          </Button>
         </p>
       )}
 

@@ -486,5 +486,61 @@ class TestApiPlanoPro(BaseApi):
         self.assertIsNone(eu["plano_para_mais_marketplaces"])
 
 
+class TestApiTrocarPlano(BaseApi):
+    def trocar(self, plano, **kwargs):
+        return self.cliente.put("/api/me/plano", json={"plano": plano}, **kwargs)
+
+    def test_gratis_pro_business_gratis_muda_selo_limite_e_cota(self):
+        self.conectar("mercado-livre")
+        esperado = {"pro": (True, 120), "business": (True, 400), "gratis": (False, 5)}
+        for plano in ("pro", "business", "gratis"):
+            resposta = self.trocar(plano)
+            self.assertEqual((resposta.status_code, resposta.json()["plano"]), (200, plano))
+            self.assertEqual(resposta.json()["email"], "teste@quickclick.com.br")
+            self.assertEqual(self.cliente.get("/api/auth/me").json()["plano"], plano)
+            eu = self.cliente.get("/api/me").json()
+            cota = self.cliente.get("/api/ia/cota").json()
+            self.assertEqual((eu["plano"]["slug"], eu["pode_conectar_mais"], cota["plano"], cota["analises_por_mes"]),
+                             (plano, *esperado[plano][:1], plano, esperado[plano][1]))
+        with self.Session() as session:
+            self.assertEqual(session.query(models.VendedorModel).filter_by(id=1).one().plano, "gratis")
+
+    def test_plano_que_nao_existe_e_400_sem_mudar_nada(self):
+        resposta = self.trocar("ouro")
+        self.assertEqual((resposta.status_code, resposta.json()["erro"]["codigo"]), (400, "plano_invalido"))
+        self.assertEqual(self.cliente.get("/api/auth/me").json()["plano"], "gratis")
+
+    def test_sem_token_e_401(self):
+        resposta = self.trocar("pro", headers={"Authorization": ""})
+        self.assertEqual((resposta.status_code, resposta.json()["erro"]["codigo"]), (401, "nao_autenticado"))
+
+    def test_cada_um_troca_so_o_proprio_plano(self):
+        outro = self.cliente.post("/api/auth/register", json={"nome": "Bia", "email": "bia@exemplo.com",
+                                                              "loja": "Loja", "senha": "senha_forte_789",
+                                                              "maior_de_idade": True}).json()["token"]
+        self.trocar("business", headers={"Authorization": f"Bearer {outro}"})
+        self.assertEqual(self.cliente.get("/api/auth/me").json()["plano"], "gratis")
+
+    def test_plans_avisa_que_a_troca_e_livre(self):
+        self.assertTrue(self.cliente.get("/api/plans").json()["troca_de_plano_livre"])
+
+
+class TestApiTrocaDePlanoDesligada(BaseApi):
+    def setUp(self):
+        super().setUp()
+        self.leitor = leitor_de_teste(QUICKCLICK_JWT_SECRET=SEGREDO_JWT_TESTE, TOKENS_CHAVE_CRIPTO=CHAVE_CRIPTO_TESTE,
+                                      TROCA_DE_PLANO_LIVRE="false")
+        self.cliente.close()
+        self.cliente = TestClient(criar_app(self.config, session_factory=self.Session, leitor=self.leitor,
+                                            provedores=ProvedoresDeIA()))
+        self.cliente.headers["Authorization"] = f"Bearer {self.token}"
+
+    def test_responde_402_e_o_plano_fica(self):
+        resposta = self.cliente.put("/api/me/plano", json={"plano": "pro"})
+        self.assertEqual((resposta.status_code, resposta.json()["erro"]["codigo"]), (402, "troca_de_plano_indisponivel"))
+        self.assertEqual(self.cliente.get("/api/auth/me").json()["plano"], "gratis")
+        self.assertFalse(self.cliente.get("/api/plans").json()["troca_de_plano_livre"])
+
+
 if __name__ == "__main__":
     unittest.main()

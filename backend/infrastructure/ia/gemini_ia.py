@@ -33,10 +33,11 @@ class _BaseGemini:
         return self._cliente.disponivel()
 
     def _gerar(self, etapa_prompt: str, partes: list[Any], esquema: dict, contexto: ContextoDaChamada,
-               timeout_s: float, max_tokens: int = 8000) -> RespostaDaIA:
+               timeout_s: float, max_tokens: int = 8000, instrucao_extra: str | None = None) -> RespostaDaIA:
         p = prompt(etapa_prompt)
+        versao = f"{p.versao}+{instrucao_extra}" if instrucao_extra else p.versao
         dados = self._cliente.gerar_json(modelo=self._modelo, partes=partes, sistema=p.texto, esquema=esquema,
-                                         contexto=contexto, versao_prompt=p.versao, timeout_s=timeout_s,
+                                         contexto=contexto, versao_prompt=versao, timeout_s=timeout_s,
                                          max_tokens=max_tokens)
         return RespostaDaIA(dados, "gemini", self._modelo)
 
@@ -55,7 +56,8 @@ class GeminiLeitor(_BaseGemini):
         instrucao = prompt("releitura")
         partes = [parte_de_imagem(entrada.imagem_jpeg),
                   f"{instrucao.texto}\n\nTipo da imagem: {entrada.tipo}\nLeitura atual: {em_json(entrada.leitura_atual)}"]
-        return self._gerar("leitura", partes, esquemas.RELEITURA, contexto, timeout_s=90, max_tokens=4000)
+        return self._gerar("leitura", partes, esquemas.RELEITURA, contexto, timeout_s=90, max_tokens=4000,
+                           instrucao_extra=instrucao.versao)
 
 
 class GeminiRedator(_BaseGemini):

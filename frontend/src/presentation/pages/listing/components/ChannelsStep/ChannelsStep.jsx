@@ -34,7 +34,8 @@ export default function ChannelsStep({ editor }) {
 
       <div className="channels-step__layout">
         <div className="channels-step__list">
-          <h3 className="channels-step__group">{texts.yours}</h3>
+          {/* Sem nenhuma conta conectada, o Mercado Livre aparece como onde publicar (e não como conta sua) */}
+          <h3 className="channels-step__group">{canPublishMl || yours.length ? texts.yours : texts.publishHere}</h3>
           <section className="channels-step__main" aria-labelledby="canal-ml">
             <div className="channels-step__main-head">
               <span className="channels-step__logo">

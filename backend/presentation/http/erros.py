@@ -23,6 +23,8 @@ from backend.domain.erros import (
     IAIndisponivel,
     LimitePorHora,
     MaioridadeNaoConfirmada,
+    PlanoInvalido,
+    TrocaDePlanoIndisponivel,
     MercadoLivreDesconectado,
     ProdutoNaoReconhecido,
     PublicacaoRecusada,
@@ -59,6 +61,8 @@ STATUS_POR_ERRO: tuple[tuple[type[ErroDeDominio], int], ...] = (
     (EstadoDaAnaliseInvalido, 409),
     (PublicacaoRecusada, 422),
     (MaioridadeNaoConfirmada, 400),
+    (PlanoInvalido, 400),
+    (TrocaDePlanoIndisponivel, 402),
 )
 
 ERROS_HTTP = {

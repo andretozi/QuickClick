@@ -5,7 +5,8 @@ Infraestrutura · IA · Cliente da Anthropic, um por chave (ANTHROPIC_API_KEY_PA
     - 401 ou 403 (chave vencida, revogada ou sem permissão): não tenta de novo, desliga a chave por
       10 minutos, avisa no log com o NOME da variável (nunca o valor) e a análise usa a reserva;
     - recusa (stop_reason "refusal") e resposta cortada (max_tokens) também viram FalhaDoProvedor;
-    - registra o uso de toda chamada (tokens, cache, buscas, custo estimado, tempo) e loga só isso.
+    - registra o uso de toda chamada (tokens, cache, buscas, custo estimado, tempo) e loga só isso; o custo do
+      orientador (usage.iterations, no preço do modelo dele) entra no custo da chamada.
 """
 
 import json
@@ -14,6 +15,7 @@ import threading
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from typing import Any
 
 import anthropic
@@ -119,20 +121,39 @@ class ClienteAnthropic:
         lido = int(uso.cache_read_input_tokens or 0)
         gravado = int(uso.cache_creation_input_tokens or 0)
         modelo = resposta.model
+        orientador = _custo_do_orientador(uso, self.ttl_cache)
         registro = UsoDeIA(
             vendedor_id=contexto.vendedor_id, analise_id=contexto.analise_id, etapa=contexto.etapa,
             provedor="anthropic", modelo=modelo, versao_prompt=versao_prompt,
             tokens_entrada=entrada, tokens_saida=saida, cache_lido=lido, cache_gravado=gravado, buscas_web=buscas,
-            custo_estimado_usd=custo_anthropic(modelo, entrada, saida, lido, gravado, buscas, self.ttl_cache),
+            custo_estimado_usd=custo_anthropic(modelo, entrada, saida, lido, gravado, buscas, self.ttl_cache) + orientador,
             duracao_ms=duracao_ms, criado_em=self._relogio(),
         )
         log.info("IA uso: etapa=%s modelo=%s entrada=%d saida=%d cache_lido=%d cache_gravado=%d buscas=%d "
-                 "custo_usd=%s tempo_ms=%d", registro.etapa, modelo, entrada, saida, lido, gravado, buscas,
-                 registro.custo_estimado_usd, duracao_ms)
+                 "orientador_usd=%s custo_usd=%s tempo_ms=%d", registro.etapa, modelo, entrada, saida, lido, gravado,
+                 buscas, orientador, registro.custo_estimado_usd, duracao_ms)
         try:
             self._registro.registrar(registro)
         except Exception as erro:  # registrar o uso nunca derruba a análise
             log.warning("Não deu para gravar o uso da IA (%s).", type(erro).__name__)
+
+
+def _campo(objeto: Any, nome: str) -> Any:
+    return objeto.get(nome) if isinstance(objeto, dict) else getattr(objeto, nome, None)
+
+
+def _custo_do_orientador(uso: Any, ttl_cache: str) -> Decimal:
+    """O orientador (advisor) roda como sub-inferência cobrada no preço do modelo dele: os tokens dele vêm só em
+    usage.iterations (tipo advisor_message), fora dos totais de cima, que são só do executor."""
+    total = Decimal("0")
+    for iteracao in _campo(uso, "iterations") or []:
+        if _campo(iteracao, "type") != "advisor_message":
+            continue
+        total += custo_anthropic(str(_campo(iteracao, "model") or ""), int(_campo(iteracao, "input_tokens") or 0),
+                                 int(_campo(iteracao, "output_tokens") or 0),
+                                 int(_campo(iteracao, "cache_read_input_tokens") or 0),
+                                 int(_campo(iteracao, "cache_creation_input_tokens") or 0), 0, ttl_cache)
+    return total
 
 
 def texto_da_resposta(resposta: Any) -> str:

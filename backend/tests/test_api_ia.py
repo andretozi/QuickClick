@@ -3,6 +3,7 @@
 import copy
 import tempfile
 import unittest
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -12,14 +13,25 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from backend.app.bootstrap import criar_app
+from backend.app.bootstrap import configuracao_da_ia, criar_app
 from backend.application.ia.escolha import ProvedoresDeIA
-from backend.application.ia.modelos import CategoriaSugerida, FalhaDoProvedor, PrecoObservado, RespostaDaIA
+from backend.application.ia.etapas import DependenciasDaAnalise, ProcessoDaAnalise
+from backend.application.ia.modelos import (
+    ArquivoDeFoto,
+    CategoriaSugerida,
+    ConfiguracaoDaIA,
+    FalhaDoProvedor,
+    Fidelidade,
+    PrecoObservado,
+    RespostaDaIA,
+)
 from backend.domain.ia.atributos_ml import AtributoML
 from backend.domain.ia.escrita import problemas_de_escrita
 from backend.infrastructure.banco import models
 from backend.infrastructure.configuracao import Config
 from backend.infrastructure.database import Base
+from backend.infrastructure.ia.preparador_pillow import PillowPreparador
+from backend.infrastructure.ia.sem_tratamento import SemTratamento, SemVerificacaoDeFidelidade
 from backend.tests import leitor_de_teste
 from backend.tests.test_api import CHAVE_CRIPTO_TESTE, SEGREDO_JWT_TESTE
 from backend.tests.test_provedores_ia import foto_com_detalhes, jpeg
@@ -405,3 +417,89 @@ class TestIADesligada(BaseIA):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RepositorioDeAnalisesEmMemoria:
+    """Guarda a análise e a ordem dos estados por onde ela passou."""
+
+    def __init__(self, analise):
+        self.analise = dict(analise)
+        self.estados = []
+
+    def obter(self, analise_id):
+        return dict(self.analise)
+
+    def atualizar(self, analise_id, campos):
+        self.analise.update(campos)
+        if "status" in campos:
+            self.estados.append(campos["status"])
+
+
+class TratadorQueAnota:
+    def __init__(self, ordem):
+        self.ordem = ordem
+
+    def tratar(self, foto, contexto):
+        self.ordem.append(("tratar", foto.indice))
+        return replace(foto, leitura_jpeg=b"tratada")
+
+
+class GuardiaoQueAnota:
+    def __init__(self, ordem, resultado):
+        self.ordem, self.resultado = ordem, resultado
+
+    def verificar(self, original, tratada, contexto):
+        self.ordem.append(("verificar", original.indice))
+        return self.resultado
+
+
+class LeitorQueAnota(Falso):
+    def __init__(self, ordem):
+        super().__init__("leitor", leitores())
+        self.ordem = ordem
+        self.fotos_lidas = []
+
+    def ler(self, entrada, contexto):
+        self.ordem.append(("ler", len(entrada.fotos)))
+        self.fotos_lidas = [f.leitura_jpeg for f in entrada.fotos]
+        return super().ler(entrada, contexto)
+
+
+class TestEncaixeDaVersaoFinal(unittest.TestCase):
+    """Parte 9: tratar, depois verificar, depois ler; no MVP (interruptor desligado) a foto passa igual."""
+
+    def processar(self, ativo, ordem=None, tratador=None, guardiao=None):
+        self.repo = RepositorioDeAnalisesEmMemoria({"id": "a1", "vendedor_id": 1, "nivel": "gratis", "avisos": []})
+        self.leitor = LeitorQueAnota([] if ordem is None else ordem)
+        fotos = PillowPreparador().preparar([ArquivoDeFoto(f"{i}.jpg", jpeg(foto_com_detalhes())) for i in range(2)])
+        self.originais = [f.leitura_jpeg for f in fotos]
+        dependencias = DependenciasDaAnalise(
+            analises=self.repo, preparador=PillowPreparador(), tratador=tratador or SemTratamento(),
+            guardiao=guardiao or SemVerificacaoDeFidelidade(),
+            provedores=ProvedoresDeIA(leitor_gemini_gratis=self.leitor), fonte_ml=None, contas=None, pesquisas=None,
+            config=ConfiguracaoDaIA(tratamento_foto_ativo=ativo), relogio=lambda: datetime(2026, 10, 18, tzinfo=UTC))
+        ProcessoDaAnalise(dependencias).ler("a1", fotos)
+
+    def test_mvp_sem_tratamento_le_a_foto_original_e_pula_os_estados_novos(self):
+        self.processar(ativo=False)
+        self.assertEqual(self.repo.estados, ["preparando_fotos", "lendo_produto", "aguardando_confirmacao"])
+        self.assertEqual(self.leitor.fotos_lidas, self.originais)
+        self.assertEqual(self.repo.analise["avisos"], [])
+
+    def test_ligado_trata_verifica_e_so_depois_le_a_foto_tratada(self):
+        ordem = []
+        self.processar(ativo=True, ordem=ordem, tratador=TratadorQueAnota(ordem),
+                       guardiao=GuardiaoQueAnota(ordem, Fidelidade.FIEL))
+        self.assertEqual(ordem, [("tratar", 0), ("tratar", 1), ("verificar", 0), ("verificar", 1), ("ler", 2)])
+        self.assertEqual(self.repo.estados, ["preparando_fotos", "tratando_fotos", "verificando_fotos", "lendo_produto",
+                                             "aguardando_confirmacao"])
+        self.assertEqual(self.leitor.fotos_lidas, [b"tratada", b"tratada"])
+
+    def test_fidelidade_grave_le_a_original_e_avisa(self):
+        self.processar(ativo=True, tratador=TratadorQueAnota([]), guardiao=GuardiaoQueAnota([], Fidelidade.GRAVE))
+        self.assertEqual(self.leitor.fotos_lidas, self.originais)
+        self.assertEqual([a["codigo"] for a in self.repo.analise["avisos"]], ["tratamento_descartado"])
+
+    def test_interruptor_vem_desligado_e_liga_pela_configuracao(self):
+        self.assertFalse(configuracao_da_ia(leitor_de_teste()).tratamento_foto_ativo)
+        self.assertTrue(configuracao_da_ia(leitor_de_teste(TRATAMENTO_FOTO_ATIVO="true")).tratamento_foto_ativo)

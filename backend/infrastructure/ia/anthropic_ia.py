@@ -69,8 +69,12 @@ class _BaseAnthropic:
         return [{"type": "text", "text": p.texto, "cache_control": self._cliente.cache()}], p.versao
 
     def _json(self, *, etapa_prompt: str, contexto: ContextoDaChamada, conteudo: list[dict[str, Any]],
-              esquema: dict, effort: str, max_tokens: int, timeout_s: float) -> RespostaDaIA:
+              esquema: dict, effort: str, max_tokens: int, timeout_s: float,
+              instrucao_extra: str | None = None) -> RespostaDaIA:
+        """`instrucao_extra`: versão do prompt que vai na mensagem do usuário (a releitura): entra junto em ia_uso."""
         sistema, versao = self._sistema(etapa_prompt)
+        if instrucao_extra:
+            versao = f"{versao}+{instrucao_extra}"
         resposta = self._cliente.criar(
             contexto=contexto, versao_prompt=versao, timeout_s=timeout_s,
             model=self._modelo, max_tokens=max_tokens, system=sistema,
@@ -124,7 +128,8 @@ class AnthropicLeitor(_BaseAnthropic):
                                      f"Leitura atual: {em_json(entrada.leitura_atual)}"},
         ]
         return self._json(etapa_prompt="leitura", contexto=contexto, conteudo=conteudo, esquema=esquemas.RELEITURA,
-                          effort=self._effort_releitura, max_tokens=4000, timeout_s=120)
+                          effort=self._effort_releitura, max_tokens=4000, timeout_s=120,
+                          instrucao_extra=instrucao.versao)
 
 
 class AnthropicPesquisador(_BaseAnthropic):

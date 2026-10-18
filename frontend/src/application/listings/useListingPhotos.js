@@ -5,7 +5,7 @@ import { withoutPhoto } from '@/domain/listings/listingDraft.js';
 
 /**
  * Aplicação · Fotos do anúncio no editor: de cada arquivo saem a versão de guardar (800 px,
- * no rascunho) e a de leitura (1568 px, só na memória, para a IA). Junta até 6, tira uma
+ * no rascunho) e a de leitura (até 3000 px, só na memória, para a IA). Junta até 6, tira uma
  * foto e escolhe a capa. O rascunho mora no useListingEditor (setDraft e update).
  * Devolve { add, remove, setCover, readingBlobs, release, busy, error }; error é 'full' ou 'invalid'.
  */

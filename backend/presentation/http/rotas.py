@@ -21,6 +21,7 @@ from backend.presentation.http.esquemas import (
     RequisicaoCadastro,
     RequisicaoConectar,
     RequisicaoLogin,
+    RequisicaoTrocarPlano,
     RespostaAutenticacao,
     RespostaDeErro,
     Saude,
@@ -71,7 +72,9 @@ def criar_rotas(
 
     @rotas.get("/plans", tags=["planos"], summary="Planos de assinatura, do Grátis ao Business", response_model=ListaDePlanos)
     def listar_planos() -> ListaDePlanos:
-        return ListaDePlanos(planos=[plano_saida(plano) for plano in casos.listar_planos.executar()])
+        livre = casos.trocar_plano.livre if casos.trocar_plano is not None else False
+        return ListaDePlanos(planos=[plano_saida(plano) for plano in casos.listar_planos.executar()],
+                             troca_de_plano_livre=livre)
 
     # -----------------------------------------------------------------------
     # Autenticação (JWT)
@@ -145,6 +148,23 @@ def criar_rotas(
     )
     def vendedor_atual(vendedor_id: VendedorAtual) -> VendedorSaida:
         return vendedor_saida(casos.obter_vendedor_atual.executar(vendedor_id))
+
+    @rotas.put(
+        "/me/plano",
+        tags=["vendedor"],
+        summary="O vendedor do token troca o próprio plano (MVP: na hora e sem pagamento)",
+        response_model=UsuarioSaida,
+        responses={
+            **ERRO_401,
+            **ERRO_404,
+            400: {"model": RespostaDeErro, "description": "Plano que não existe"},
+            402: {"model": RespostaDeErro, "description": "Troca livre desligada (TROCA_DE_PLANO_LIVRE=false)"},
+        },
+    )
+    def trocar_plano(dados: RequisicaoTrocarPlano, vendedor_id: VendedorAtual) -> UsuarioSaida:
+        if casos.trocar_plano is None:
+            raise HTTPException(status_code=501, detail="Serviço indisponível.")
+        return usuario_saida(casos.trocar_plano.executar(vendedor_id, dados.plano))
 
     @rotas.get(
         "/marketplaces",

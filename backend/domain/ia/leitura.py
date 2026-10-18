@@ -59,6 +59,8 @@ CHAVES_COMUNS: tuple[str, ...] = (
     "dimensoes", "capacidade", "genero", "estampa", "acabamento", "potencia", "compatibilidade",
 )
 CHAVES_SO_COM_ETIQUETA = frozenset({"tamanho", "voltagem"})
+# A condição tem campo próprio (novo, usado...): não vira atributo nem pergunta de atributo
+CHAVES_FORA_DOS_ATRIBUTOS = frozenset({"condicao", "estado", "estado_de_conservacao"})
 CHAVES_SO_COM_LOGO_OU_ETIQUETA = frozenset({"marca"})
 
 MAX_PRODUTO = 80
@@ -194,7 +196,7 @@ def _sugestao_padrao(chave: str) -> SugestaoDeFoto:
 
 def _atributo(bruto: dict[str, Any]) -> Atributo | None:
     chave = normalizar_chave(bruto.get("chave"))
-    if not chave:
+    if not chave or chave in CHAVES_FORA_DOS_ATRIBUTOS:
         return None
     valor = _texto(bruto.get("valor"), MAX_VALOR)
     origem = _enum(OrigemAtributo, bruto.get("origem"), OrigemAtributo.DESCONHECIDO)
@@ -232,7 +234,7 @@ def _perguntas(brutas: Any, atributos: tuple[Atributo, ...]) -> tuple[Pergunta, 
             continue
         chave = normalizar_chave(bruta.get("chave"))
         texto = _texto(bruta.get("pergunta"))
-        if chave and texto and chave not in perguntas:
+        if chave and texto and chave not in perguntas and chave not in CHAVES_FORA_DOS_ATRIBUTOS:
             perguntas[chave] = Pergunta(chave, texto, _enum(SugestaoDeFoto, bruta.get("sugerir_foto"),
                                                             SugestaoDeFoto.NENHUMA))
     # Todo atributo sem valor vira pergunta; atributo já respondido pela foto não precisa de pergunta

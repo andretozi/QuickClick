@@ -174,6 +174,15 @@ class TestLeitura(unittest.TestCase):
         leitura = normalizar_leitura({**LEITURA_BRUTA, "reconhecido": False, "motivo_nao_reconhecido": "paisagem"}, 3)
         self.assertEqual((leitura.atributos, leitura.motivo_nao_reconhecido), ((), "paisagem"))
 
+    def test_condicao_tem_campo_proprio_e_nao_vira_atributo_nem_pergunta(self):
+        bruto = {**LEITURA_BRUTA,
+                 "atributos": [*LEITURA_BRUTA["atributos"], {"chave": "condicao", "valor": "usado", "origem": "foto",
+                                                             "evidencia": "", "confianca": "alta"}],
+                 "perguntas": [{"chave": "condicao", "pergunta": "Está novo?", "sugerir_foto": "nenhuma"}]}
+        leitura = normalizar_leitura(bruto, 3)
+        self.assertIsNone(leitura.atributo("condicao"))
+        self.assertNotIn("condicao", [p.chave for p in leitura.perguntas])
+
     def test_categoria_fora_da_lista_vira_outros(self):
         self.assertEqual(normalizar_leitura({**LEITURA_BRUTA, "categoria": "carros"}, 1).categoria, "outros")
 

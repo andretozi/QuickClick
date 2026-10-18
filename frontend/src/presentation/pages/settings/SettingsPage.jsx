@@ -34,7 +34,7 @@ export default function SettingsPage() {
   const views = {
     profile: <ProfileSection profile={settings.profile} />,
     security: <SecuritySection security={settings.security} />,
-    plan: <PlanSection planId={settings.account?.plan} />,
+    plan: <PlanSection planId={settings.account?.plan} plan={settings.plan} />,
     connections: <ConnectionsSection />,
     preferences: <PreferencesSection preferences={settings.preferences} onToggle={settings.togglePreference} />,
     danger: <DangerSection danger={settings.danger} />

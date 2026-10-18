@@ -12,11 +12,19 @@ import httpx
 from PIL import Image, ImageDraw, ImageFilter
 
 from backend.application.ia import escolha
-from backend.application.ia.modelos import ArquivoDeFoto, ContextoDaChamada, FalhaDoProvedor, RespostaDaIA
+from backend.application.ia.modelos import (
+    ArquivoDeFoto,
+    ContextoDaChamada,
+    EntradaDaReleitura,
+    FalhaDoProvedor,
+    RespostaDaIA,
+)
 from backend.domain.erros import FotoInvalida
 from backend.domain.ia.analise import Nivel
 from backend.domain.ia.fotos import QualidadeFoto
 from backend.infrastructure.ia import esquemas
+from backend.infrastructure.ia.anthropic_ia import AnthropicLeitor
+from backend.infrastructure.ia.carregador_de_prompts import PASTA_DE_PROMPTS, carregar_prompts
 from backend.infrastructure.ia.cliente_anthropic import ClienteAnthropic, json_da_resposta
 from backend.infrastructure.ia.cliente_gemini import ClienteGemini, esquema_para_gemini
 from backend.infrastructure.ia.fabrica import criar_provedores
@@ -90,6 +98,19 @@ class TestClienteAnthropic(unittest.TestCase):
                          (1000, 200, 3000, "leitura_v1"))
         # 1000 × 4 + 200 × 20 + 3000 × 0,20 por milhão
         self.assertEqual(uso.custo_estimado_usd, Decimal("0.008600"))
+
+    def test_custo_do_orientador_vem_das_iteracoes_no_preco_do_opus(self):
+        resposta = resposta_anthropic(modelo="claude-sonnet-5-5")
+        resposta.usage.iterations = [
+            SimpleNamespace(type="message", input_tokens=1000, output_tokens=200, cache_read_input_tokens=3000,
+                            cache_creation_input_tokens=0),
+            SimpleNamespace(type="advisor_message", model="claude-opus-5-5", input_tokens=800, output_tokens=1500,
+                            cache_read_input_tokens=0, cache_creation_input_tokens=0),
+        ]
+        cliente, _, registro, _ = cliente_anthropic(resposta)
+        chamar(cliente)
+        # executor (Sonnet): 1000 × 2 + 200 × 10 + 3000 × 0,10 = 4300; orientador (Opus): 800 × 4 + 1500 × 20 = 33200
+        self.assertEqual(registro.usos[0].custo_estimado_usd, Decimal("0.037500"))
 
     def test_chave_recusada_desliga_por_10_minutos_e_avisa_pelo_nome(self):
         cliente, sdk, _, relogio = cliente_anthropic(erro_da_api(anthropic.AuthenticationError, 401))
@@ -362,6 +383,32 @@ class TestEsquemas(unittest.TestCase):
                      "ATRIBUTOS_ML", "PRECOS_NA_WEB"):
             with self.subTest(nome):
                 self._conferir(getattr(esquemas, nome), nome)
+
+
+class TestPrompts(unittest.TestCase):
+    ETAPAS = ("leitura", "releitura", "perfil", "pesquisa", "preco", "precos_web", "texto", "correcao", "atributos_ml")
+
+    def test_um_txt_por_etapa_com_a_versao_no_nome_e_nada_de_md(self):
+        arquivos = sorted(p.name for p in PASTA_DE_PROMPTS.iterdir() if p.is_file())
+        self.assertFalse([a for a in arquivos if not a.endswith(".txt")], arquivos)
+        prompts = carregar_prompts()
+        self.assertEqual(set(prompts), set(self.ETAPAS))
+        for etapa, achado in prompts.items():
+            self.assertRegex(achado.versao, rf"^{etapa}_v\d+$")
+
+    def test_todo_prompt_diz_que_texto_de_foto_ou_pagina_e_dado_e_nao_instrucao(self):
+        for etapa, achado in carregar_prompts().items():
+            with self.subTest(etapa):
+                texto = achado.texto.lower()
+                self.assertIn("dado", texto)
+                self.assertIn("nunca instrução", texto)
+
+    def test_releitura_grava_as_duas_versoes_em_ia_uso(self):
+        cliente, _, registro, _ = cliente_anthropic(resposta_anthropic('{"texto_legivel": [], "atributos": [], '
+                                                                       '"defeitos_visiveis": []}'))
+        AnthropicLeitor(cliente, "claude-opus-5-5").reler(EntradaDaReleitura((), {}, b"jpeg"), CONTEXTO)
+        prompts = carregar_prompts()
+        self.assertEqual(registro.usos[0].versao_prompt, f"{prompts['leitura'].versao}+{prompts['releitura'].versao}")
 
 
 class GatewayMLFalso:

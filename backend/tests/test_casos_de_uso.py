@@ -1,6 +1,7 @@
 """Casos de uso de conectar e desconectar marketplaces, com repositórios e gateways falsos em memória."""
 
 import unittest
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
@@ -9,16 +10,20 @@ from backend.application.casos_de_uso import (
     DesconectarMarketplace,
     ListarMarketplaces,
     ObterVendedorAtual,
+    TrocarPlano,
 )
 from backend.domain.conta_vinculada import CredenciaisOAuth
 from backend.domain.erros import (
     LimiteDoPlanoAtingido,
     MarketplaceEmBreve,
     MarketplaceNaoEncontrado,
+    PlanoInvalido,
+    TrocaDePlanoIndisponivel,
     VendedorNaoEncontrado,
 )
 from backend.domain.marketplace import Marketplace, StatusMarketplace
 from backend.domain.plano import BUSINESS, ESSENCIAL, GRATIS, PRO
+from backend.domain.usuario import Usuario
 from backend.domain.vendedor import Vendedor
 
 AGORA = datetime(2026, 10, 7, 12, 0, tzinfo=UTC)
@@ -235,3 +240,48 @@ class TestConsultas(BaseCasosDeUso):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RepositorioUsuariosEmMemoria:
+    """Lê o plano do repositório de vendedores, como o SQL faz (sem linha em vendedores: "gratis")."""
+
+    def __init__(self, vendedores, *usuarios):
+        self._vendedores = vendedores
+        self._dados = {usuario.id: usuario for usuario in usuarios}
+
+    def obter_por_id(self, user_id):
+        usuario = self._dados.get(user_id)
+        if usuario is None:
+            return None
+        vendedor = self._vendedores.obter(user_id)
+        return replace(usuario, plano=vendedor.plano.slug if vendedor else "gratis"), "hash"
+
+
+class TestTrocarPlano(unittest.TestCase):
+    def setUp(self):
+        self.vendedores = RepositorioVendedoresEmMemoria(Vendedor(VENDEDOR_ID, "Ana", GRATIS))
+        self.usuarios = RepositorioUsuariosEmMemoria(
+            self.vendedores, Usuario(VENDEDOR_ID, "ana@exemplo.com", "Ana", "Bazar", "gratis"),
+            Usuario(2, "leo@exemplo.com", "Leo", "Loja", "gratis"))
+
+    def test_troca_e_devolve_o_usuario_atualizado(self):
+        usuario = TrocarPlano(self.vendedores, self.usuarios).executar(VENDEDOR_ID, " PRO ")
+        self.assertEqual((usuario.plano, self.vendedores.obter(VENDEDOR_ID).plano), ("pro", PRO))
+
+    def test_conta_antiga_sem_linha_em_vendedores_ganha_a_linha(self):
+        usuario = TrocarPlano(self.vendedores, self.usuarios).executar(2, "business")
+        self.assertEqual((usuario.plano, self.vendedores.obter(2).nome), ("business", "Leo"))
+
+    def test_plano_que_nao_existe(self):
+        with self.assertRaises(PlanoInvalido):
+            TrocarPlano(self.vendedores, self.usuarios).executar(VENDEDOR_ID, "ouro")
+        self.assertEqual(self.vendedores.obter(VENDEDOR_ID).plano, GRATIS)
+
+    def test_troca_desligada_nao_mexe_no_plano(self):
+        with self.assertRaises(TrocaDePlanoIndisponivel):
+            TrocarPlano(self.vendedores, self.usuarios, livre=False).executar(VENDEDOR_ID, "pro")
+        self.assertEqual(self.vendedores.obter(VENDEDOR_ID).plano, GRATIS)
+
+    def test_usuario_que_nao_existe(self):
+        with self.assertRaises(VendedorNaoEncontrado):
+            TrocarPlano(self.vendedores, self.usuarios).executar(99, "pro")
