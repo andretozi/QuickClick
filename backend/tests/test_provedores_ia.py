@@ -259,6 +259,15 @@ class TestPillowPreparador(unittest.TestCase):
         with Image.open(io.BytesIO(foto.detalhe_jpeg)) as detalhe:
             self.assertEqual(max(detalhe.size), 2576)
 
+    def test_amplia_foto_com_borda_branca_para_minimo_1200_do_ml(self):
+        fundo = Image.new("RGB", (800, 800), (255, 255, 255))
+        produto = foto_com_detalhes(400, 400)
+        fundo.paste(produto, (200, 200))
+        foto = self.preparador.preparar([ArquivoDeFoto("borda.jpg", jpeg(fundo))])[0]
+        with Image.open(io.BytesIO(foto.leitura_jpeg)) as leitura:
+            self.assertGreaterEqual(max(leitura.size), 1200)
+            self.assertGreaterEqual(min(leitura.size), 600)
+
     def test_qualidade_escura_tremida_e_pequena(self):
         escura = foto_com_detalhes(brilho=25).point(lambda v: v // 4)
         tremida = foto_com_detalhes().filter(ImageFilter.GaussianBlur(14))
@@ -308,6 +317,9 @@ class TestPillowPreparador(unittest.TestCase):
 class ProvedorFalso:
     def __init__(self, nome, disponivel=True, falha=False):
         self.nome, self._disponivel, self._falha, self.chamado = nome, disponivel, falha, False
+
+    def disponivel():
+        pass
 
     def disponivel(self):
         return self._disponivel
