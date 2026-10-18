@@ -18,7 +18,7 @@ from backend.domain.erros import TokenInvalido
 
 FINALIDADE_ACESSO = "acesso"
 FINALIDADE_ESTADO_OAUTH = "estado_oauth"
-DURACAO_PADRAO = timedelta(days=7)
+DURACAO_PADRAO = timedelta(hours=24)
 DURACAO_ESTADO_OAUTH = timedelta(minutes=15)
 
 

@@ -1,5 +1,6 @@
-"""Segurança: JWT com finalidade e sem segredo padrão, criptografia dos tokens e a trava do banco nos testes."""
+"""Segurança: JWT com finalidade e validade de 24h, criptografia dos tokens e a trava do banco nos testes."""
 
+from datetime import timedelta
 import unittest
 
 import jwt
@@ -8,7 +9,7 @@ from backend.domain.erros import ServicoIndisponivel, TokenInvalido
 from backend.infrastructure.database import criar_engine
 from backend.infrastructure.seguranca import token_jwt
 from backend.infrastructure.seguranca.cripto_tokens import CifradorDeTokens
-from backend.infrastructure.seguranca.token_jwt import FINALIDADE_ESTADO_OAUTH, ServicoJWT
+from backend.infrastructure.seguranca.token_jwt import DURACAO_PADRAO, FINALIDADE_ESTADO_OAUTH, ServicoJWT
 
 SEGREDO = "segredo-jwt-so-dos-testes-com-mais-de-32-caracteres"
 CHAVE = "nN1Yc8pK0wVQx3vT1o6m2f9W1u0Hq2c5e7Kx8Zl4bD0="
@@ -19,6 +20,12 @@ class TestJWT(unittest.TestCase):
         self.assertFalse(hasattr(token_jwt, "SEGREDO_PADRAO"))
         with self.assertRaises(ValueError):
             ServicoJWT("")
+
+    def test_duracao_padrao_de_24_horas(self):
+        self.assertEqual(DURACAO_PADRAO, timedelta(hours=24))
+        servico = ServicoJWT(SEGREDO)
+        payload = servico.validar_token(servico.gerar_token(7, "A@B.com"))
+        self.assertEqual(payload["exp"] - payload["iat"], int(timedelta(hours=24).total_seconds()))
 
     def test_token_de_acesso_vale_como_acesso(self):
         servico = ServicoJWT(SEGREDO)

@@ -5,14 +5,20 @@ Todas ficam debaixo de /api (o prefixo é aplicado em api.py). Cada rota só tra
 HTTP para um caso de uso e o resultado de volta para JSON: a regra mora no domínio.
 """
 
+import logging
+import re
+import threading
+import time
 from collections.abc import Callable
 from typing import Annotated, Any
+from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
 from backend.application.casos_de_uso import CasosDeUso
 from backend.application.portas import ServicoToken
+from backend.domain.erros import CredenciaisInvalidas, ErroDeDominio, MuitasTentativas
 from backend.presentation.http.autenticacao import dependencia_do_vendedor
 from backend.presentation.http.esquemas import (
     ListaDeMarketplaces,
@@ -34,10 +40,17 @@ from backend.presentation.http.esquemas import (
     vendedor_saida,
 )
 
+log = logging.getLogger("quickclick.http")
+
 FINALIDADE_ESTADO_OAUTH = "estado_oauth"  # o state do OAuth não serve como token de login
+LIMITE_FALHAS_LOGIN = 8
+JANELA_LOGIN_S = 300.0
+LIMITE_CADASTROS_IP = 10
+JANELA_CADASTRO_S = 600.0
 
 ERRO_401 = {401: {"model": RespostaDeErro, "description": "Token inválido, expirado ou ausente"}}
 ERRO_404 = {404: {"model": RespostaDeErro, "description": "Marketplace ou vendedor não encontrado"}}
+ERRO_429 = {429: {"model": RespostaDeErro, "description": "Muitas tentativas seguidas"}}
 ERROS_AO_CONECTAR = {
     **ERRO_401,
     **ERRO_404,
@@ -48,18 +61,65 @@ ERROS_AO_CONECTAR = {
 ERROS_CADASTRO = {
     400: {"model": RespostaDeErro, "description": "Dados de cadastro inválidos"},
     409: {"model": RespostaDeErro, "description": "Email já cadastrado"},
+    **ERRO_429,
 }
 ERROS_LOGIN = {
     401: {"model": RespostaDeErro, "description": "Email ou senha incorretos"},
+    **ERRO_429,
 }
+
+
+class LimitadorDeTentativas:
+    """Controle em memória por janela deslizante para mitigar força bruta e criação massiva de contas."""
+
+    def __init__(self, relogio: Callable[[], float] = time.monotonic):
+        self._relogio = relogio
+        self._eventos: dict[str, list[float]] = {}
+        self._trava = threading.Lock()
+
+    def _recentes(self, chave: str, janela_s: float, agora: float) -> list[float]:
+        tempos = [t for t in self._eventos.get(chave, ()) if agora - t < janela_s]
+        if tempos:
+            self._eventos[chave] = tempos
+        else:
+            self._eventos.pop(chave, None)
+        return tempos
+
+    def conferir(self, chave: str, limite: int, janela_s: float) -> None:
+        agora = self._relogio()
+        with self._trava:
+            if len(self._recentes(chave, janela_s, agora)) >= limite:
+                raise MuitasTentativas()
+
+    def registrar(self, chave: str, janela_s: float) -> None:
+        agora = self._relogio()
+        with self._trava:
+            tempos = self._recentes(chave, janela_s, agora)
+            tempos.append(agora)
+            self._eventos[chave] = tempos
+
+    def limpar(self, chave: str) -> None:
+        with self._trava:
+            self._eventos.pop(chave, None)
+
+
+def _ip_do_cliente(request: Request) -> str:
+    return (request.client.host if request.client and request.client.host else "desconhecido").strip()
+
+
+def _codigo_oauth_seguro(valor: str) -> str:
+    limpo = re.sub(r"[^a-zA-Z0-9_.-]", "", valor or "")[:60]
+    return limpo or "acesso_negado"
 
 
 def criar_rotas(
     casos: CasosDeUso,
     identificar_vendedor: Callable[..., int] | None = None,
     servico_token: ServicoToken | None = None,
+    limitador: LimitadorDeTentativas | None = None,
 ) -> APIRouter:
     rotas = APIRouter()
+    limitador = limitador or LimitadorDeTentativas()
     VendedorAtual = Annotated[int, Depends(dependencia_do_vendedor(servico_token, identificar_vendedor))]
 
     # -----------------------------------------------------------------------
@@ -88,9 +148,12 @@ def criar_rotas(
         responses=ERROS_CADASTRO,
     )
     @rotas.post("/contas", include_in_schema=False)
-    def cadastrar(dados: RequisicaoCadastro) -> RespostaAutenticacao:
+    def cadastrar(dados: RequisicaoCadastro, request: Request) -> RespostaAutenticacao:
         if casos.registrar_usuario is None:
             raise HTTPException(status_code=501, detail="Serviço de cadastro não disponível.")
+        chave_ip = f"cadastro:ip:{_ip_do_cliente(request)}"
+        limitador.conferir(chave_ip, LIMITE_CADASTROS_IP, JANELA_CADASTRO_S)
+        limitador.registrar(chave_ip, JANELA_CADASTRO_S)
         resultado = casos.registrar_usuario.executar(
             nome=dados.nome,
             email=dados.email,
@@ -111,13 +174,23 @@ def criar_rotas(
         responses=ERROS_LOGIN,
     )
     @rotas.post("/sessao", include_in_schema=False)
-    def login(dados: RequisicaoLogin) -> RespostaAutenticacao:
+    def login(dados: RequisicaoLogin, request: Request) -> RespostaAutenticacao:
         if casos.autenticar_usuario is None:
             raise HTTPException(status_code=501, detail="Serviço de autenticação não disponível.")
-        resultado = casos.autenticar_usuario.executar(
-            email=dados.email,
-            senha=dados.senha,
-        )
+        chave_ip = f"login:ip:{_ip_do_cliente(request)}"
+        chave_email = f"login:email:{dados.email.strip().lower()}"
+        limitador.conferir(chave_ip, LIMITE_FALHAS_LOGIN, JANELA_LOGIN_S)
+        limitador.conferir(chave_email, LIMITE_FALHAS_LOGIN, JANELA_LOGIN_S)
+        try:
+            resultado = casos.autenticar_usuario.executar(
+                email=dados.email,
+                senha=dados.senha,
+            )
+        except CredenciaisInvalidas:
+            limitador.registrar(chave_ip, JANELA_LOGIN_S)
+            limitador.registrar(chave_email, JANELA_LOGIN_S)
+            raise
+        limitador.limpar(chave_email)
         return RespostaAutenticacao(
             token=resultado.token,
             usuario=usuario_saida(resultado.usuario),
@@ -206,7 +279,7 @@ def criar_rotas(
         error_description: str | None = None,
     ) -> RedirectResponse:
         if error:
-            return RedirectResponse(url=f"/#/marketplaces?erro={error}", status_code=302)
+            return RedirectResponse(url=f"/#/marketplaces?erro={_codigo_oauth_seguro(error)}", status_code=302)
 
         if not code or not state:
             return RedirectResponse(url="/#/marketplaces?erro=parametros_invalidos", status_code=302)
@@ -224,11 +297,18 @@ def criar_rotas(
         if vendedor_id is None:
             return RedirectResponse(url="/#/marketplaces?erro=nao_autenticado", status_code=302)
 
+        slug_seguro = _codigo_oauth_seguro(slug)
         try:
             casos.conectar_marketplace.executar(vendedor_id, slug, codigo_autorizacao=code)
-            return RedirectResponse(url=f"/#/marketplaces?conectado={slug}", status_code=302)
+            return RedirectResponse(url=f"/#/marketplaces?conectado={quote(slug_seguro, safe='')}", status_code=302)
+        except ErroDeDominio as erro:
+            return RedirectResponse(
+                url=f"/#/marketplaces?erro={quote(_codigo_oauth_seguro(erro.codigo), safe='')}",
+                status_code=302,
+            )
         except Exception as erro:
-            return RedirectResponse(url=f"/#/marketplaces?erro={str(erro)}", status_code=302)
+            log.warning("Falha ao concluir callback OAuth de %s (%s).", slug_seguro, type(erro).__name__)
+            return RedirectResponse(url="/#/marketplaces?erro=falha_ao_conectar", status_code=302)
 
     @rotas.post(
         "/marketplaces/{slug}/connection",

@@ -51,6 +51,8 @@ ITENS: tuple[ItemDeConfiguracao, ...] = (
                        "só no .env do PC: QUICKCLICK_AMBIENTE=local"),
     ItemDeConfiguracao("QUICKCLICK_KEYVAULT", False, "leitura do Azure Key Vault",
                        "nome do cofre, quando ele existir"),
+    ItemDeConfiguracao("DOCUMENTACAO_API_ATIVA", False, "exibição de /docs, /redoc e /openapi.json",
+                       "interruptor (desligado por padrão para segurança)", padrao="false"),
     ItemDeConfiguracao("IA_ATIVA", False, "liga e desliga toda a IA", "interruptor", padrao="true"),
     ItemDeConfiguracao("PESQUISA_WEB_ATIVA", False, "busca na web da pesquisa de mercado", "interruptor", padrao="true"),
     ItemDeConfiguracao("ADVISOR_ATIVO", False, "orientador (Opus) na pesquisa de mercado", "interruptor",
