@@ -6,7 +6,8 @@ Infraestrutura · IA · Preparar as fotos com o Pillow (sem IA, em memória)
     2. corrige a orientação pelo EXIF e APAGA os metadados (EXIF e localização): a imagem é refeita
        só com os pixels, em RGB;
     3. mede a qualidade de graça: nitidez (variância das bordas), brilho médio e resolução;
-    4. gera a versão de leitura (lado maior 1568, JPEG 90) e a de detalhe (até 2576) para recortar etiqueta.
+    4. gera a versão de leitura (lado maior até 1568, garantindo pelo menos 1200 px de área útil após
+       recorte de bordas brancas para o zoom do Mercado Livre, JPEG 90) e a de detalhe (até 2576).
 Nada vai para disco, banco ou log.
 """
 
@@ -35,6 +36,8 @@ log = logging.getLogger("quickclick.ia")
 
 Image.MAX_IMAGE_PIXELS = MAX_PIXELS  # acima disso o Pillow recusa (bomba de descompressão)
 LADO_DA_MEDIDA = 512
+LADO_MINIMO_ML = 1200  # Mercado Livre exige >= 500 px após cortar bordas brancas e recomenda 1200 px para zoom
+LADO_UTIL_MINIMO_ML = 1000
 
 try:  # HEIC do iPhone, se a biblioteca abrir
     from pillow_heif import register_heif_opener
@@ -55,6 +58,36 @@ def _redimensionada(imagem: Image.Image, lado_maior: int) -> Image.Image:
     if tamanho == imagem.size:
         return imagem
     return imagem.resize(tamanho, Image.Resampling.LANCZOS)
+
+
+def _garantir_minimo_mercado_livre(imagem: Image.Image) -> Image.Image:
+    """Garante que a imagem e a área útil (sem bordas brancas) tenham pelo menos 1200 px no lado maior,
+    evitando a recusa do Mercado Livre quando o produto tem fundo branco amplo (< 500 px após corte)."""
+    invertida = ImageOps.invert(imagem.convert("L")).point(lambda p: 255 if p > 12 else 0)
+    caixa = invertida.getbbox()
+    if caixa is not None:
+        x0, y0, x1, y1 = caixa
+        largura_util, altura_util = x1 - x0, y1 - y0
+        if max(largura_util, altura_util) < LADO_UTIL_MINIMO_ML:
+            margem_x = max(12, round(largura_util * 0.08))
+            margem_y = max(12, round(altura_util * 0.08))
+            recorte = imagem.crop((
+                max(0, x0 - margem_x),
+                max(0, y0 - margem_y),
+                min(imagem.width, x1 + margem_x),
+                min(imagem.height, y1 + margem_y),
+            ))
+            escala = LADO_MINIMO_ML / max(1, max(recorte.width, recorte.height))
+            nova_largura = max(600, round(recorte.width * escala))
+            nova_altura = max(600, round(recorte.height * escala))
+            return recorte.resize((nova_largura, nova_altura), Image.Resampling.LANCZOS)
+    if max(imagem.size) < LADO_MINIMO_ML:
+        escala = LADO_MINIMO_ML / max(1, max(imagem.size))
+        return imagem.resize(
+            (max(600, round(imagem.width * escala)), max(600, round(imagem.height * escala))),
+            Image.Resampling.LANCZOS,
+        )
+    return imagem
 
 
 def _em_rgb_com_fundo_branco(imagem: Image.Image) -> Image.Image:
@@ -118,9 +151,10 @@ class PillowPreparador:
         # Refeita só com os pixels: EXIF, GPS, XMP e perfis ficam para trás
         limpa = Image.new("RGB", rgb.size)
         limpa.paste(rgb)
+        leitura_pronta = _garantir_minimo_mercado_livre(_redimensionada(limpa, LADO_MAIOR_LEITURA))
         return FotoPreparada(
             indice=indice,
-            leitura_jpeg=_jpeg(_redimensionada(limpa, LADO_MAIOR_LEITURA), QUALIDADE_JPEG_LEITURA),
+            leitura_jpeg=_jpeg(leitura_pronta, QUALIDADE_JPEG_LEITURA),
             detalhe_jpeg=_jpeg(_redimensionada(limpa, LADO_MAIOR_RECORTE_ETIQUETA), 92),
             largura=limpa.width,
             altura=limpa.height,

@@ -226,8 +226,7 @@ export default function useListingEditor({ listingId, celebrate }) {
     const cover = draft.photos[draft.coverIndex] ?? draft.photos[0];
     const ordered = [cover, ...draft.photos.filter((photo) => photo !== cover)];
     setDraft((current) => ({ ...current, analysisPhotos: key, cards: [], defects: [], product: '' }));
-    const id = await ai.start(photos.readingBlobs(ordered));
-    if (id) photos.release();
+    await ai.start(photos.readingBlobs(ordered));
   }, [ai, cota.quota, draft.analysisId, draft.analysisPhotos, draft.coverIndex, draft.photos, photos]);
 
   // ---------- Navegação entre os passos ----------
@@ -418,6 +417,7 @@ export default function useListingEditor({ listingId, celebrate }) {
           suggestedPriceCents: data.suggestedPriceCents ?? original.suggestedPriceCents,
           channels: { ...original.channels, [PRIMARY_CHANNEL]: finalChannelStatus }
         });
+        photos.release();
         finishing.current = false;
         if (!mounted.current) return;
         setOriginal(updated);
@@ -443,6 +443,7 @@ export default function useListingEditor({ listingId, celebrate }) {
         await saveDraft(accountId, { step: stepIndex, data: draft }).catch(() => {});
         throw error;
       }
+      photos.release();
       // A comemoração só depois de gravar de verdade.
       const word = published ? LISTING_WIZARD.publish.word : LISTING_WIZARD.publish.wordSaved;
       if (celebrate) await celebrate(word).catch(() => {});
@@ -467,6 +468,7 @@ export default function useListingEditor({ listingId, celebrate }) {
     editing,
     listingId,
     original,
+    photos,
     publishOnMl,
     publishing,
     range,

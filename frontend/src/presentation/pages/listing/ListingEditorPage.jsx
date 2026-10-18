@@ -18,6 +18,7 @@ import PublishStep from './components/PublishStep/PublishStep.jsx';
 import PublishSuccess from './components/PublishSuccess/PublishSuccess.jsx';
 import useListingEditor from '@/application/listings/useListingEditor.js';
 import useCelebration from '@/application/animation/useCelebration.js';
+import { hrefForListing } from '@/application/navigation/routes.js';
 import { cx } from '@/presentation/utils/cx.js';
 import { LISTING_EDITOR, LISTING_WIZARD } from '@/domain/content/listingContent.js';
 import { STORAGE_ERRORS } from '@/domain/content/commonContent.js';
@@ -35,7 +36,7 @@ const STEP_VIEWS = {
 };
 
 /**
- * Criar anúncio (#/anuncios/novo) e ver e editar (#/anuncios/:id): o assistente com o trilho
+ * Criar anúncio (#/anuncios/novo) e editar (#/anuncios/:id/editar): o assistente com o trilho
  * animado (fotos, análise da IA, confirmar, detalhes, preço, canais e publicar), o rascunho
  * salvo sozinho, o selo do plano com as análises restantes e a comemoração ao publicar.
  */
@@ -72,7 +73,14 @@ export default function ListingEditorPage({ params }) {
         lead={header.lead}
         actions={
           editing ? (
-            <Button href={LISTING_EDITOR.back.href} variant="light" size="sm" icon="arrow-left" iconPosition="start" iconSize={16}>
+            <Button
+              href={params?.id ? hrefForListing(params.id) : LISTING_EDITOR.back.href}
+              variant="light"
+              size="sm"
+              icon="arrow-left"
+              iconPosition="start"
+              iconSize={16}
+            >
               {LISTING_EDITOR.back.label}
             </Button>
           ) : (
