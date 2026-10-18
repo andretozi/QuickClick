@@ -1,4 +1,4 @@
-"""Publicação montada no back: o item do Mercado Livre, as fotos, a descrição e os erros."""
+"""Publicação montada no back: o item do Mercado Livre, as fotos, a descrição, a gestão e os erros."""
 
 import json
 import unittest
@@ -10,7 +10,12 @@ from backend.application.ia.escolha import ProvedoresDeIA
 from backend.application.ia.modelos import ArquivoDeFoto
 from backend.application.portas import FalhaNoMarketplace
 from backend.domain.conta_vinculada import ContaVinculada, CredenciaisOAuth
-from backend.domain.erros import FotoInvalida, MercadoLivreDesconectado, PublicacaoRecusada
+from backend.domain.erros import (
+    AnuncioNaoEncontrado,
+    FotoInvalida,
+    MercadoLivreDesconectado,
+    PublicacaoRecusada,
+)
 from backend.domain.ia.atributos_ml import AtributoML, completar_para_publicacao
 from backend.domain.plano import GRATIS
 from backend.domain.vendedor import Vendedor
@@ -25,10 +30,33 @@ ANUNCIO = {"titulo": "Tênis de corrida Nike azul usado", "descricao": "Tênis u
 
 
 class PublicadorFalso:
-    def __init__(self, erros_ao_publicar=(), erro_na_descricao=None):
+    def __init__(self, erros_ao_publicar=(), erro_na_descricao=None, seller_id="1001"):
         self.imagens, self.itens, self.descricoes = [], [], []
+        self.atualizacoes, self.excluidos = [], []
         self._erros = list(erros_ao_publicar)
         self._erro_na_descricao = erro_na_descricao
+        self._armazenados = {
+            "MLB123456": {
+                "id": "MLB123456",
+                "title": "Tênis de corrida Nike azul usado",
+                "family_name": None,
+                "description": "Tênis usado em bom estado.",
+                "price": 159.9,
+                "status": "active",
+                "condition": "used",
+                "available_quantity": 1,
+                "sold_quantity": 0,
+                "category_id": "MLB23262",
+                "permalink": "https://produto.mercadolivre.com.br/MLB123456",
+                "thumbnail": "https://http2.mlstatic.com/D_1.jpg",
+                "pictures": ["https://http2.mlstatic.com/D_1.jpg"],
+                "attributes": [{"id": "BRAND", "name": "Marca", "value": "Nike"}],
+                "health": 0.85,
+                "seller_id": seller_id,
+                "tags": ["good_quality_thumbnail"],
+                "last_updated": None,
+            }
+        }
 
     def subir_imagem(self, token, conteudo, nome="foto.jpg"):
         self.imagens.append(nome)
@@ -38,12 +66,33 @@ class PublicadorFalso:
         self.itens.append(dados)
         if self._erros:
             raise self._erros.pop(0)
-        return {"id": "MLB123", "permalink": "https://produto.mercadolivre.com.br/MLB123", "status": "active"}
+        return {"id": "MLB123456", "permalink": "https://produto.mercadolivre.com.br/MLB123456", "status": "active"}
 
     def gravar_descricao(self, token, item_id, texto):
         if self._erro_na_descricao:
             raise self._erro_na_descricao
         self.descricoes.append((item_id, texto))
+
+    def obter_anuncio(self, token, item_id):
+        if item_id not in self._armazenados:
+            raise FalhaNoMarketplace("404", 404, {"message": "not_found"})
+        return dict(self._armazenados[item_id])
+
+    def atualizar_anuncio(self, token, item_id, campos):
+        self.atualizacoes.append((item_id, dict(campos)))
+        atual = self._armazenados[item_id]
+        atual.update(campos)
+        return dict(atual)
+
+    def atualizar_descricao(self, token, item_id, texto):
+        if self._erro_na_descricao:
+            raise self._erro_na_descricao
+        self.descricoes.append((item_id, texto))
+        self._armazenados[item_id]["description"] = texto
+
+    def excluir_anuncio(self, token, item_id):
+        self.excluidos.append(item_id)
+        self._armazenados.pop(item_id, None)
 
 
 class AnalisesFalsas:
@@ -54,10 +103,13 @@ class AnalisesFalsas:
         return self._analises.get(analise_id)
 
 
-def caso(publicador=None, conectado=True, analises=None):
+def caso(publicador=None, conectado=True, analises=None, conta_externa="1001"):
     contas = RepositorioContasEmMemoria()
     if conectado:
-        contas.salvar(ContaVinculada(1, "mercado-livre", AGORA, CredenciaisOAuth("tok", "ref", AGORA + timedelta(days=3650))))
+        contas.salvar(ContaVinculada(
+            1, "mercado-livre", AGORA,
+            CredenciaisOAuth("tok", "ref", AGORA + timedelta(days=3650), conta_externa_id=conta_externa),
+        ))
     conectar = ConectarMarketplace(RepositorioVendedoresEmMemoria(Vendedor(1, "Loja", GRATIS)), contas,
                                    {"mercado-livre": GatewayFalso()})
     analises = analises if analises is not None else {"a1": {"vendedor_id": 1, "leitura": {"ml": {
@@ -74,14 +126,14 @@ class TestPublicarNoMercadoLivre(unittest.TestCase):
     def test_monta_o_item_sobe_as_fotos_e_grava_a_descricao(self):
         publicar, publicador = caso()
         resultado = publicar.executar(1, ANUNCIO, fotos())
-        self.assertEqual(resultado["id"], "MLB123")
+        self.assertEqual(resultado["id"], "MLB123456")
         item = publicador.itens[0]
         self.assertEqual((item["category_id"], item["currency_id"], item["listing_type_id"], item["condition"]),
                          ("MLB23262", "BRL", "gold_special", "used"))
         self.assertEqual((item["price"], item["available_quantity"], item["buying_mode"]), (159.9, 1, "buy_it_now"))
         self.assertEqual(item["pictures"], [{"id": "IMG1"}, {"id": "IMG2"}])
         self.assertEqual({a["id"]: a["value_name"] for a in item["attributes"]}, {"BRAND": "Nike", "SIZE": "42"})
-        self.assertEqual(publicador.descricoes, [("MLB123", "Tênis usado em bom estado.")])
+        self.assertEqual(publicador.descricoes, [("MLB123456", "Tênis usado em bom estado.")])
 
     def test_analise_de_outro_vendedor_nao_empresta_a_categoria(self):
         publicar, publicador = caso(analises={"a1": {"vendedor_id": 2, "leitura": {"ml": {"categoria_id": "MLB999"}}}})
@@ -100,13 +152,19 @@ class TestPublicarNoMercadoLivre(unittest.TestCase):
         self.assertEqual(publicador.itens[1]["family_name"], ANUNCIO["titulo"])
         self.assertNotIn("title", publicador.itens[1])
 
-    def test_completa_atributos_obrigatorios_e_do_titulo_na_publicacao(self):
+    def test_completa_atributos_obrigatorios_de_qualidade_e_do_titulo_na_publicacao(self):
         da_categoria = [
             AtributoML("BRAND", "Marca", False),
             AtributoML("MANUFACTURER", "Fabricante", True),
             AtributoML("MODEL", "Modelo", True),
             AtributoML("MATERIAL", "Material", True, (("2282603", "Cerâmica"), ("2431731", "Vidro"))),
             AtributoML("COLOR", "Cor", False, (("52055", "Branco"), ("52049", "Preto"))),
+            AtributoML("SALE_FORMAT", "Formato de venda", False, (("1359391", "Unidade"), ("1359392", "Kit"))),
+            AtributoML("UNITS_PER_PACK", "Unidades por embalagem", False),
+            AtributoML("IS_SET", "É kit", False, (("242084", "Não"), ("242085", "Sim"))),
+            AtributoML("VOLUME_CAPACITY", "Capacidade em volume", False, (), "mL"),
+            AtributoML("EMPTY_GTIN_REASON", "Motivo de GTIN vazio", False,
+                       (("17055160", "O produto não tem código cadastrado"),)),
         ]
         ligados = completar_para_publicacao([], da_categoria, "Caneca Branca de Cerâmica 250ml Acabamento Brilhante")
         por_id = {l.id: l.para_api() for l in ligados}
@@ -115,6 +173,52 @@ class TestPublicarNoMercadoLivre(unittest.TestCase):
         self.assertEqual(por_id["MODEL"], {"id": "MODEL", "value_name": "Caneca"})
         self.assertEqual(por_id["MATERIAL"], {"id": "MATERIAL", "value_id": "2282603"})
         self.assertEqual(por_id["COLOR"], {"id": "COLOR", "value_id": "52055"})
+        self.assertEqual(por_id["SALE_FORMAT"], {"id": "SALE_FORMAT", "value_id": "1359391"})
+        self.assertEqual(por_id["UNITS_PER_PACK"], {"id": "UNITS_PER_PACK", "value_name": "1"})
+        self.assertEqual(por_id["IS_SET"], {"id": "IS_SET", "value_id": "242084"})
+        self.assertEqual(por_id["VOLUME_CAPACITY"], {"id": "VOLUME_CAPACITY", "value_name": "250 mL"})
+        self.assertEqual(por_id["EMPTY_GTIN_REASON"], {"id": "EMPTY_GTIN_REASON", "value_id": "17055160"})
+
+    def test_pausar_reativar_atualizar_e_excluir_anuncio(self):
+        publicar, publicador = caso()
+        pausado = publicar.alterar_status(1, "MLB123456", "pausado")
+        self.assertEqual(pausado["status"], "paused")
+        reativado = publicar.alterar_status(1, "MLB123456", "publicado")
+        self.assertEqual(reativado["status"], "active")
+
+        editado = publicar.atualizar(
+            1,
+            "MLB123456",
+            {
+                **ANUNCIO,
+                "preco_centavos": 19990,
+                "estoque": 4,
+                "descricao": "Descrição atualizada.",
+                "fotos_mantidas": ["https://http2.mlstatic.com/D_1.jpg", "http://malicioso.local/x.jpg"],
+            },
+            fotos(1),
+        )
+        self.assertEqual(editado["price"], 199.9)
+        self.assertEqual(editado["available_quantity"], 4)
+        self.assertEqual(editado["description"], "Descrição atualizada.")
+        ultima_atualizacao = publicador.atualizacoes[-1][1]
+        self.assertEqual(ultima_atualizacao["pictures"], [
+            {"source": "https://http2.mlstatic.com/D_1.jpg"},
+            {"id": "IMG1"},
+        ])
+
+        excluido = publicar.excluir(1, "MLB123456")
+        self.assertTrue(excluido["excluido"])
+        self.assertEqual(publicador.excluidos, ["MLB123456"])
+
+    def test_impede_acesso_a_anuncio_de_outro_vendedor_ou_id_invalido(self):
+        publicar, _ = caso(PublicadorFalso(seller_id="9999"), conta_externa="1001")
+        with self.assertRaises(AnuncioNaoEncontrado):
+            publicar.obter(1, "MLB123456")
+        with self.assertRaises(AnuncioNaoEncontrado):
+            publicar.excluir(1, "MLB123456")
+        with self.assertRaises(ValueError):
+            publicar.obter(1, "../../etc/passwd")
 
     def test_recusa_do_mercado_livre_traz_as_causas(self):
         erro = FalhaNoMarketplace("400", 400, {"message": "validation", "cause": [{"message": "Price too low"}]})

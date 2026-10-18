@@ -2,6 +2,7 @@ import LandingPage from '@/presentation/pages/landing/LandingPage.jsx';
 import LoginPage from '@/presentation/pages/login/LoginPage.jsx';
 import SignupPage from '@/presentation/pages/signup/SignupPage.jsx';
 import DashboardPage from '@/presentation/pages/dashboard/DashboardPage.jsx';
+import ListingDetailPage from '@/presentation/pages/listing/ListingDetailPage.jsx';
 import ListingEditorPage from '@/presentation/pages/listing/ListingEditorPage.jsx';
 import MarketplacesPage from '@/presentation/pages/marketplaces/MarketplacesPage.jsx';
 import SettingsPage from '@/presentation/pages/settings/SettingsPage.jsx';
@@ -26,7 +27,8 @@ const PAGES = {
 const APP_PAGES = {
   [ROUTES.DASHBOARD]: DashboardPage,
   [ROUTES.NEW_LISTING]: ListingEditorPage,
-  [ROUTES.LISTING]: ListingEditorPage,
+  [ROUTES.LISTING]: ListingDetailPage,
+  [ROUTES.EDIT_LISTING]: ListingEditorPage,
   [ROUTES.MARKETPLACES]: MarketplacesPage,
   [ROUTES.SETTINGS]: SettingsPage
 };

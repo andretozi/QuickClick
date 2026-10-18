@@ -61,9 +61,12 @@ export default function useListingPhotos({ photoCount, setDraft, setErrors, upda
 
   const setCover = useCallback((index) => update({ coverIndex: index }), [update]);
 
-  /** As fotos para mandar ao back: a de leitura quando ainda está na memória, senão a guardada. */
+  /** As fotos locais para mandar ao back: a de leitura quando ainda está na memória, senão a guardada. */
   const readingBlobs = useCallback(
-    (photos) => photos.map((photo) => reading.current.get(photo) ?? dataUrlToBlob(photo)),
+    (photos) =>
+      photos
+        .filter((photo) => reading.current.has(photo) || String(photo).startsWith('data:'))
+        .map((photo) => reading.current.get(photo) ?? dataUrlToBlob(photo)),
     []
   );
 

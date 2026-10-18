@@ -42,7 +42,12 @@ export function toListingData(draft, range) {
     stock: Number(draft.stock),
     photos: draft.photos,
     coverIndex: Math.min(draft.coverIndex, Math.max(0, draft.photos.length - 1)),
-    attributes: (draft.attributes ?? []).map((attribute) => ({ name: attribute.key, value: attribute.value }))
+    attributes: (draft.attributes ?? []).map((attribute) => ({
+      id: attribute.id ?? null,
+      name: attribute.key ?? attribute.name,
+      value: attribute.value
+    })),
+    mlCategoryId: draft.mlCategoryId ?? null
   };
 }
 
@@ -58,7 +63,12 @@ export function toDraft(listing) {
     stock: String(listing.stock),
     priceInput: centsToInput(listing.priceCents),
     publishMl: listingStatus(listing) !== LISTING_STATUS.UNPUBLISHED,
-    attributes: (listing.attributes ?? []).map((attribute) => ({ key: attribute.name, value: attribute.value }))
+    mlCategoryId: listing.mlCategoryId ?? null,
+    attributes: (listing.attributes ?? []).map((attribute) => ({
+      id: attribute.id ?? null,
+      key: attribute.name,
+      value: attribute.value
+    }))
   };
 }
 

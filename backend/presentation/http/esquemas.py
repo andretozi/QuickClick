@@ -1,14 +1,14 @@
 """
-Apresentação · Formatos das respostas da API
+Apresentação · Formatos das respostas e entradas da API
 
-Modelos pydantic usados só na fronteira HTTP: validam a saída e documentam a API em /docs.
+Modelos pydantic usados só na fronteira HTTP: validam a entrada e a saída.
 As funções de conversão traduzem os resultados dos casos de uso para JSON.
 """
 
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 
 from backend.application.casos_de_uso.comum import MarketplaceDoVendedor
 from backend.application.casos_de_uso.obter_vendedor_atual import ResumoDoVendedor
@@ -36,7 +36,7 @@ class ListaDePlanos(BaseModel):
 
 
 class RequisicaoTrocarPlano(BaseModel):
-    plano: str = Field(examples=["pro"], description="gratis, essencial, pro ou business")
+    plano: str = Field(max_length=40, examples=["pro"], description="gratis, essencial, pro ou business")
 
 
 class VendedorSaida(BaseModel):
@@ -67,7 +67,7 @@ class UrlAutorizacaoSaida(BaseModel):
 
 
 class RequisicaoConectar(BaseModel):
-    codigo_autorizacao: str | None = Field(default=None, description="Código retornado pelo fluxo OAuth oficial")
+    codigo_autorizacao: str | None = Field(default=None, max_length=512, description="Código retornado pelo fluxo OAuth oficial")
 
 
 class UsuarioSaida(BaseModel):
@@ -84,16 +84,45 @@ class RespostaAutenticacao(BaseModel):
 
 
 class RequisicaoCadastro(BaseModel):
-    email: str = Field(examples=["vendedor@quickclick.com.br"])
-    senha: str = Field(min_length=6, description="Senha com no mínimo 6 caracteres")
-    nome: str = Field(default="", examples=["André Tozi"])
-    loja: str = Field(default="", examples=["Minha Loja Oficial"])
+    email: str = Field(max_length=254, examples=["vendedor@quickclick.com.br"])
+    senha: str = Field(min_length=6, max_length=256, description="Senha com no mínimo 6 caracteres")
+    nome: str = Field(default="", max_length=120, examples=["André Tozi"])
+    loja: str = Field(default="", max_length=120, examples=["Minha Loja Oficial"])
     maior_de_idade: bool = Field(default=False, description="Confirma que tem 18 anos ou mais (obrigatório)")
 
 
 class RequisicaoLogin(BaseModel):
-    email: str = Field(examples=["vendedor@quickclick.com.br"])
-    senha: str = Field(description="Senha do usuário")
+    email: str = Field(max_length=254, examples=["vendedor@quickclick.com.br"])
+    senha: str = Field(max_length=256, description="Senha do usuário")
+
+
+class AtributoEntrada(BaseModel):
+    chave: str = Field(default="", max_length=80)
+    valor: str = Field(default="", max_length=300)
+
+
+class RequisicaoConfirmacaoIA(BaseModel):
+    produto: str = Field(default="", max_length=200)
+    categoria: str = Field(default="outros", max_length=60)
+    condicao: str = Field(default="desconhecido", max_length=40)
+    atributos: list[AtributoEntrada] = Field(default_factory=list, max_length=60)
+    defeitos: list[str] = Field(default_factory=list, max_length=20)
+
+
+class RequisicaoPublicarAnuncio(BaseModel):
+    titulo: str = Field(default="", max_length=200)
+    descricao: str = Field(default="", max_length=60_000)
+    preco_centavos: Any = Field(default=None)
+    estoque: Any = Field(default=1)
+    condicao: str = Field(default="novo", max_length=40)
+    atributos: list[AtributoEntrada] = Field(default_factory=list, max_length=60)
+    analise_id: str | None = Field(default=None, max_length=80)
+    ml_categoria_id: str | None = Field(default=None, max_length=40)
+    fotos_mantidas: list[str] = Field(default_factory=list, max_length=6)
+
+
+class RequisicaoStatusAnuncio(BaseModel):
+    status: str = Field(max_length=20, examples=["pausado", "publicado"])
 
 
 class DetalheDoErro(BaseModel):

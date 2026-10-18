@@ -85,6 +85,13 @@ class CredenciaisInvalidas(ErroDeDominio):
         super().__init__(mensagem)
 
 
+class MuitasTentativas(ErroDeDominio):
+    codigo = "muitas_tentativas"
+
+    def __init__(self, mensagem: str = "Muitas tentativas seguidas. Aguarde alguns minutos e tente novamente."):
+        super().__init__(mensagem)
+
+
 class EmailJaCadastrado(ErroDeDominio):
     codigo = "email_em_uso"
 
@@ -164,6 +171,13 @@ class AnaliseNaoEncontrada(ErroDeDominio):
 
     def __init__(self):
         super().__init__("Não encontramos essa análise. Comece uma nova.")
+
+
+class AnuncioNaoEncontrado(ErroDeDominio):
+    codigo = "anuncio_nao_encontrado"
+
+    def __init__(self):
+        super().__init__("Não encontramos esse anúncio na sua conta do Mercado Livre.")
 
 
 class EstadoDaAnaliseInvalido(ErroDeDominio):

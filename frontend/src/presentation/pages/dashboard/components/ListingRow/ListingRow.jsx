@@ -5,12 +5,13 @@ import { cx } from '@/presentation/utils/cx.js';
 import { LISTING_STATUS, listingStatus } from '@/domain/listings/listingRules.js';
 import { formatMoney, formatRelative } from '@/domain/format/format.js';
 import { LISTINGS_PANEL } from '@/domain/content/dashboardContent.js';
-import { hrefForListing } from '@/application/navigation/routes.js';
+import { hrefForListing, hrefForListingEdit } from '@/application/navigation/routes.js';
 import './ListingRow.css';
 
 /**
  * Uma linha da lista de anúncios: foto, título, preço, estoque, atualização, canais e ações.
- * As ações chamam o que o useDashboard devolve (a linha não guarda estado nenhum).
+ * Clicar na linha abre a visão geral das macroinformações (#/anuncios/:id); o botão de editar
+ * leva direto ao editor (#/anuncios/:id/editar).
  */
 export default function ListingRow({ listing, busy, canPublish, onToggle, onDuplicate, onRemove }) {
   const status = listingStatus(listing);
@@ -21,8 +22,7 @@ export default function ListingRow({ listing, busy, canPublish, onToggle, onDupl
       : status === LISTING_STATUS.PAUSED
         ? { icon: 'play', label: canPublish ? actions.resume : actions.resumeBlocked }
         : { icon: 'upload', label: canPublish ? actions.publish : actions.publishBlocked };
-  // Voltar ao ar (publicar ou reativar) só com o Mercado Livre conectado; pausar sempre pode.
-  const blocked = status !== LISTING_STATUS.PUBLISHED && !canPublish;
+  const blocked = !canPublish;
 
   return (
     <li data-enter="3" className={cx('listing-row', busy && 'listing-row--busy')}>
@@ -43,9 +43,15 @@ export default function ListingRow({ listing, busy, canPublish, onToggle, onDupl
 
       <div className="listing-row__actions">
         <IconButton
-          icon="edit"
+          icon="eye"
           size="sm"
           href={hrefForListing(listing.id)}
+          label={actionLabel(actions.view, listing.title)}
+        />
+        <IconButton
+          icon="edit"
+          size="sm"
+          href={hrefForListingEdit(listing.id)}
           label={actionLabel(actions.edit, listing.title)}
         />
         <IconButton

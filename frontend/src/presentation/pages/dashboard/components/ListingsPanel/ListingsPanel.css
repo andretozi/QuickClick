@@ -8,9 +8,16 @@
 .listings-panel__head {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
-  gap: 8px 16px;
+  gap: 10px 16px;
+}
+
+.listings-panel__head-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 14px;
 }
 
 .listings-panel__title {
@@ -23,6 +30,13 @@
   color: rgb(var(--rgb-ink) / 0.6);
   font-size: 14px;
   font-weight: 700;
+}
+
+.listings-panel__empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
 }
 
 .listings-panel__toolbar {

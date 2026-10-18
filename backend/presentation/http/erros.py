@@ -15,27 +15,29 @@ from starlette.exceptions import HTTPException
 from backend.domain.erros import (
     AnaliseEmAndamento,
     AnaliseNaoEncontrada,
+    AnuncioNaoEncontrado,
     CotaEsgotada,
     CredenciaisInvalidas,
+    EmailJaCadastrado,
+    ErroDeDominio,
     EstadoDaAnaliseInvalido,
     FotoInvalida,
     FotosNecessarias,
     IAIndisponivel,
+    LimiteDoPlanoAtingido,
     LimitePorHora,
     MaioridadeNaoConfirmada,
-    PlanoInvalido,
-    TrocaDePlanoIndisponivel,
-    MercadoLivreDesconectado,
-    ProdutoNaoReconhecido,
-    PublicacaoRecusada,
-    EmailJaCadastrado,
-    ErroDeDominio,
-    LimiteDoPlanoAtingido,
     MarketplaceEmBreve,
     MarketplaceNaoEncontrado,
+    MercadoLivreDesconectado,
+    MuitasTentativas,
     NaoAutenticado,
+    PlanoInvalido,
+    ProdutoNaoReconhecido,
+    PublicacaoRecusada,
     ServicoIndisponivel,
     TokenInvalido,
+    TrocaDePlanoIndisponivel,
     VendedorNaoEncontrado,
 )
 
@@ -46,6 +48,7 @@ STATUS_POR_ERRO: tuple[tuple[type[ErroDeDominio], int], ...] = (
     (LimiteDoPlanoAtingido, 403),
     (NaoAutenticado, 401),
     (CredenciaisInvalidas, 401),
+    (MuitasTentativas, 429),
     (TokenInvalido, 401),
     (EmailJaCadastrado, 409),
     (ServicoIndisponivel, 503),
@@ -58,6 +61,7 @@ STATUS_POR_ERRO: tuple[tuple[type[ErroDeDominio], int], ...] = (
     (ProdutoNaoReconhecido, 422),
     (MercadoLivreDesconectado, 409),
     (AnaliseNaoEncontrada, 404),
+    (AnuncioNaoEncontrado, 404),
     (EstadoDaAnaliseInvalido, 409),
     (PublicacaoRecusada, 422),
     (MaioridadeNaoConfirmada, 400),
@@ -72,7 +76,18 @@ ERROS_HTTP = {
     405: ("metodo_nao_permitido", "Esse endereço não aceita esse tipo de pedido."),
     413: ("pedido_grande_demais", "O pedido passou do tamanho máximo."),
     422: ("parametro_invalido", "Faltou ou veio errado algum dado do pedido."),
+    429: ("muitas_tentativas", "Muitas tentativas seguidas. Aguarde alguns minutos e tente novamente."),
 }
+
+MAX_MENSAGEM_VALOR = 200
+
+
+def _mensagem_valor_segura(erro: ValueError) -> str:
+    """Retorna apenas mensagens curtas de validação, ocultando detalhes internos multi-linha."""
+    texto = str(erro).strip()
+    if not texto or "\n" in texto or len(texto) > MAX_MENSAGEM_VALOR:
+        return ERROS_HTTP[400][1]
+    return texto
 
 
 def _resposta(status: int, codigo: str, mensagem: str, **extras) -> JSONResponse:
@@ -91,7 +106,7 @@ def registrar_tratamento_de_erros(app: FastAPI) -> None:
 
     @app.exception_handler(ValueError)
     async def erro_valor(request: Request, erro: ValueError) -> JSONResponse:
-        return _resposta(400, "parametro_invalido", str(erro))
+        return _resposta(400, "parametro_invalido", _mensagem_valor_segura(erro))
 
     @app.exception_handler(RequestValidationError)
     async def erro_de_validacao(request: Request, erro: RequestValidationError) -> JSONResponse:

@@ -88,8 +88,8 @@ class ConectarMarketplace:
         self._contas.salvar(conta)
         return MarketplaceDoVendedor(marketplace, conta)
 
-    def token_ativo(self, vendedor_id: int, slug: str) -> str | None:
-        """O access token em dia (renova se venceu), ou None se a conta não está conectada ou não renovou."""
+    def credenciais_ativas(self, vendedor_id: int, slug: str) -> CredenciaisOAuth | None:
+        """Credenciais OAuth em dia (renova se venceu), ou None se a conta não está conectada."""
         if self._contas.buscar(vendedor_id, slug) is None:
             return None
         try:
@@ -97,7 +97,12 @@ class ConectarMarketplace:
         except (RuntimeError, ValueError) as erro:
             log.warning("Token do %s não renovou (%s).", slug, type(erro).__name__)
             return None
-        return credenciais.access_token
+        return credenciais
+
+    def token_ativo(self, vendedor_id: int, slug: str) -> str | None:
+        """O access token em dia (renova se venceu), ou None se a conta não está conectada ou não renovou."""
+        credenciais = self.credenciais_ativas(vendedor_id, slug)
+        return credenciais.access_token if credenciais is not None else None
 
     def listar_produtos(self, vendedor_id: int, slug: str) -> list[dict[str, Any]]:
         credenciais, gateway = self._obter_conta_e_gateway_ativo(vendedor_id, slug)

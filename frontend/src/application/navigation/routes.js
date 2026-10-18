@@ -15,18 +15,20 @@ export const ROUTES = {
   DASHBOARD: 'dashboard',
   NEW_LISTING: 'new-listing',
   LISTING: 'listing',
+  EDIT_LISTING: 'edit-listing',
   MARKETPLACES: 'marketplaces',
   SETTINGS: 'settings',
   NOT_FOUND: 'not-found'
 };
 
-/** Ordem importa: "/anuncios/novo" precisa vir antes de "/anuncios/:id". */
+/** Ordem importa: "/anuncios/novo" e "/anuncios/:id/editar" precisam vir antes de "/anuncios/:id". */
 const ROUTE_TABLE = [
   { route: ROUTES.LANDING, path: '/' },
   { route: ROUTES.LOGIN, path: '/login', guestOnly: true },
   { route: ROUTES.SIGNUP, path: '/cadastro', guestOnly: true },
   { route: ROUTES.DASHBOARD, path: '/painel', private: true },
   { route: ROUTES.NEW_LISTING, path: '/anuncios/novo', private: true },
+  { route: ROUTES.EDIT_LISTING, path: '/anuncios/:id/editar', private: true },
   { route: ROUTES.LISTING, path: '/anuncios/:id', private: true },
   { route: ROUTES.MARKETPLACES, path: '/marketplaces', private: true },
   { route: ROUTES.SETTINGS, path: '/configuracoes', private: true }
@@ -132,7 +134,12 @@ export function returnHrefFrom(query) {
   return ROUTE_HASH[ROUTES.DASHBOARD];
 }
 
-/** Endereço de um anúncio: "#/anuncios/a_k3f9". */
+/** Endereço da visão geral de um anúncio: "#/anuncios/a_k3f9". */
 export function hrefForListing(id) {
   return hrefFor(ROUTES.LISTING, { id });
+}
+
+/** Endereço da edição de um anúncio: "#/anuncios/a_k3f9/editar". */
+export function hrefForListingEdit(id) {
+  return hrefFor(ROUTES.EDIT_LISTING, { id });
 }
