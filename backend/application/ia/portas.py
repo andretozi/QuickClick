@@ -28,6 +28,7 @@ from backend.application.ia.modelos import (
     RespostaDaIA,
     UsoDeIA,
 )
+from backend.domain.canais.esquema import EsquemaDoCanal
 from backend.domain.ia.atributos_ml import AtributoML
 
 
@@ -116,6 +117,14 @@ class FontePrecosMarketplace(Protocol):
     def tarifa(self, preco_centavos: int, categoria_id: str, access_token: str) -> int | None:
         """Tarifa de venda do anúncio clássico, em centavos."""
         ...
+
+
+class FonteDeEsquema(Protocol):
+    """Campos que um canal pede para uma categoria, no modelo genérico."""
+
+    def descobrir_categoria(self, termos: list[str], access_token: str) -> CategoriaSugerida | None: ...
+
+    def esquema(self, categoria_id: str, access_token: str) -> EsquemaDoCanal: ...
 
 
 class RegistroDeUso(Protocol):

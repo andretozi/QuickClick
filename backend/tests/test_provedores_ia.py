@@ -19,6 +19,7 @@ from backend.application.ia.modelos import (
     FalhaDoProvedor,
     RespostaDaIA,
 )
+from backend.domain.canais.esquema import TipoDeCampo
 from backend.domain.erros import FotoInvalida
 from backend.domain.ia.analise import Nivel
 from backend.domain.ia.fotos import QualidadeFoto
@@ -485,6 +486,19 @@ class TestFontePrecosML(unittest.TestCase):
         self.assertEqual([(a.id, a.obrigatorio) for a in atributos], [("BRAND", True)])
         self.assertNotIn("hierarchy", cache.dados["MLB23262"][0])
         self.assertEqual(fonte.tarifa(18990, "MLB23262", "t"), 2279)
+
+    def test_esquema_no_modelo_generico_usa_o_cache(self):
+        cache = CacheEmMemoria()
+        fonte = FontePrecosMercadoLivre(GatewayMLFalso(), cache, relogio=lambda: AGORA)
+        esquema = fonte.esquema("MLB23262", "t")
+        self.assertEqual((esquema.canal, esquema.categoria_id, esquema.categoria_nome), ("mercado-livre", "MLB23262", ""))
+        self.assertEqual([(c.id, c.obrigatorio, c.tipo, c.chave) for c in esquema.campos],
+                         [("BRAND", True, TipoDeCampo.TEXTO, "marca")])
+        self.assertIn("MLB23262", cache.dados)
+        # Já no cache: lê de lá, não do gateway (que só devolveria BRAND)
+        cache.dados["MLB1"] = [{"id": "COLOR", "name": "Cor", "tags": {}, "values": [{"id": "1", "name": "Preto"}]}]
+        cor = fonte.esquema("MLB1", "t").campos
+        self.assertEqual([(c.id, c.tipo, c.chave) for c in cor], [("COLOR", TipoDeCampo.LISTA, "cor")])
 
 
 if __name__ == "__main__":

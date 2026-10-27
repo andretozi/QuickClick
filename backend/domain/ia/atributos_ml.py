@@ -10,6 +10,10 @@ import unicodedata
 from dataclasses import dataclass
 from typing import Any
 
+from backend.domain.canais.esquema import CampoDoCanal, EsquemaDoCanal, TipoDeCampo
+
+CANAL_ML = "mercado-livre"  # id do catálogo (backend/domain/marketplace.py)
+
 # chave nossa → IDs de atributo do Mercado Livre que costumam significar a mesma coisa
 SINONIMOS_ML: dict[str, tuple[str, ...]] = {
     "marca": ("BRAND",),
@@ -303,3 +307,16 @@ def completar_para_publicacao(ligados: list[AtributoLigado], da_categoria: list[
             usados["EMPTY_GTIN_REASON"] = ligado
 
     return saida
+
+
+def esquema_do_ml(categoria_id: str, categoria_nome: str, atributos: list[AtributoML]) -> EsquemaDoCanal:
+    """Os atributos de uma categoria do Mercado Livre no modelo genérico de campos, na mesma ordem."""
+    campos = tuple(
+        CampoDoCanal(
+            canal=CANAL_ML, id=a.id, nome=a.nome, obrigatorio=a.obrigatorio,
+            tipo=TipoDeCampo.LISTA if a.valores else TipoDeCampo.NUMERO if a.unidade_padrao else TipoDeCampo.TEXTO,
+            valores=a.valores, unidade=a.unidade_padrao, chave=chave_do_atributo_ml(a),
+        )
+        for a in atributos
+    )
+    return EsquemaDoCanal(canal=CANAL_ML, categoria_id=categoria_id, categoria_nome=categoria_nome, campos=campos)

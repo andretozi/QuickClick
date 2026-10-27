@@ -3,6 +3,7 @@ Infraestrutura · Dados reais do Mercado Livre para a IA (com o token do vendedo
 
     descobrir_categoria    GET /sites/MLB/domain_discovery/search?q=...
     atributos_da_categoria GET /categories/{id}/attributes (cache no banco por 24 horas)
+    esquema                os mesmos atributos no modelo genérico de campos (sem chamada nova)
     buscar_parecidos       GET /sites/MLB/search (até 50 ativos parecidos)
     tarifa                 GET /sites/MLB/listing_prices (anúncio Clássico, gold_special)
 
@@ -18,7 +19,8 @@ from typing import Any
 
 from backend.application.ia.modelos import CategoriaSugerida, PrecoObservado
 from backend.application.ia.portas import CacheDeCategoriasML
-from backend.domain.ia.atributos_ml import AtributoML
+from backend.domain.canais.esquema import EsquemaDoCanal
+from backend.domain.ia.atributos_ml import AtributoML, esquema_do_ml
 from backend.infrastructure.marketplaces.mercado_livre import ErroDoMercadoLivre, GatewayMercadoLivre
 
 log = logging.getLogger("quickclick.marketplaces")
@@ -80,6 +82,10 @@ class FontePrecosMercadoLivre:
             guardados = [_resumo_do_atributo(b) for b in brutos if isinstance(b, dict) and b.get("id")]
             self._cache.salvar(categoria_id, guardados, agora + VALIDADE_DOS_ATRIBUTOS)
         return [AtributoML.de_api(a) for a in guardados]
+
+    def esquema(self, categoria_id: str, access_token: str) -> EsquemaDoCanal:
+        # O nome da categoria não vem do endpoint de atributos
+        return esquema_do_ml(categoria_id, "", self.atributos_da_categoria(categoria_id, access_token))
 
     def buscar_parecidos(self, termos: list[str], categoria_id: str | None, condicao: str,
                          access_token: str) -> list[PrecoObservado] | None:
