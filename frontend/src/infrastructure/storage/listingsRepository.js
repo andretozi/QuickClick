@@ -1,11 +1,29 @@
 /**
- * Infraestrutura · Repositório de anúncios (localStorage + sincronização com o Mercado Livre)
+ * Infraestrutura · Repositório de anúncios (API /api/produtos + sincronização com o Mercado Livre)
  *
- * Faz o papel da API local de anúncios e sincroniza os dados vindos do Mercado Livre.
- * Os anúncios de cada conta ficam na chave dela ("quickclick:v1:usuario:<id>:anuncios"):
- * uma conta nunca enxerga os de outra.
+ * Os anúncios ficam no banco, por vendedor. As funções exportadas mantêm a assinatura e o
+ * retorno de quando tudo ficava no localStorage. No navegador ficam só:
+ * - as fotos fora do https (anúncio sem publicar), na chave "fotos_anuncio:<id>" do produto;
+ * - a cópia da última lista boa ("anuncios_cache"), para o painel sem conexão;
+ * - a chave antiga "anuncios", importada uma vez por conta e nunca escrita nem apagada aqui.
+ * As conversões puras estão em listingRecord.js.
  */
-import { USER_KEYS, newId, nowIso, readJson, simulateLatency, userKey, writeJson } from './localStore.js';
+import { ApiError, requestJson } from '../http/httpClient.js';
+import { STORAGE_KEYS, USER_KEYS, newId, nowIso, readJson, removeKey, userKey, writeJson } from './localStore.js';
+import {
+  allHttps,
+  applyMlItemToStoreRecord,
+  byUpdatedDesc,
+  fromApi,
+  mapChannels,
+  matchMlItems,
+  pickPhotos,
+  samePhotos,
+  sameRecord,
+  toApi,
+  toListing,
+  toStoreFields
+} from './listingRecord.js';
 
 class ListingNotFoundError extends Error {
   constructor() {
@@ -15,210 +33,180 @@ class ListingNotFoundError extends Error {
   }
 }
 
-const STATUS_TO_FRONT = { publicado: 'published', pausado: 'paused', nao_publicado: 'unpublished' };
-const STATUS_TO_STORE = { published: 'publicado', paused: 'pausado', unpublished: 'nao_publicado' };
-const CONDITION_TO_FRONT = { novo: 'new', usado: 'used' };
-const CONDITION_TO_STORE = { new: 'novo', used: 'usado' };
+const productPath = (id) => `/produtos/${encodeURIComponent(id)}`;
+const photosKey = (accountId, id) => userKey(accountId, `${USER_KEYS.LISTING_PHOTOS}:${id}`);
 
-const mapChannels = (channels, table) =>
-  Object.fromEntries(Object.entries(channels ?? {}).map(([slug, status]) => [slug, table[status] ?? status]));
+const legacyRecords = (accountId) => {
+  const records = readJson(userKey(accountId, USER_KEYS.LISTINGS), []);
+  return Array.isArray(records) ? records.filter((record) => record?.id) : [];
+};
 
-const normalizeTitle = (text) =>
-  String(text ?? '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .trim();
+/** Rede fora, back fora do ar ou 5xx. */
+const isConnectionError = (error) => error?.status === 0 || error?.status >= 500 || error?.code === 'sem_conexao';
 
-function mlStatusToStore(status) {
-  if (status === 'active') return 'publicado';
-  if (status === 'paused' || status === 'under_review') return 'pausado';
-  return 'nao_publicado';
-}
-
-function inferCategoryFromTitle(title) {
-  const normalized = normalizeTitle(title);
-  if (/\b(caneca|xicara|copo|prato|panela|talher|tigela|garrafa|pote)\b/.test(normalized)) return 'cozinha';
-  if (/\b(tenis|sapato|bota|sandalia|chinelo|sapatilha)\b/.test(normalized)) return 'calcados';
-  if (/\b(camisa|camiseta|calca|vestido|jaqueta|blusa|moletom|shorts|saia)\b/.test(normalized)) return 'moda';
-  if (/\b(bolsa|mochila|carteira|cinto|oculos|relogio|colar|anel)\b/.test(normalized)) return 'acessorios';
-  if (/\b(celular|notebook|fone|teclado|mouse|monitor|camera|console|carregador)\b/.test(normalized)) return 'eletronicos';
-  if (/\b(livro|revista|hq|manga)\b/.test(normalized)) return 'livros';
-  if (/\b(luminaria|almofada|tapete|quadro|vaso|cortina|decoracao)\b/.test(normalized)) return 'casa';
-  return 'outros';
-}
-
-/** JSON guardado → anúncio do front. */
-const toListing = (anuncio) => ({
-  id: anuncio.id,
-  mlItemId: anuncio.ml_item_id ?? null,
-  permalink: anuncio.permalink ?? null,
-  mlCategoryId: anuncio.ml_categoria_id ?? null,
-  health: anuncio.saude_ml ?? null,
-  soldQuantity: Number(anuncio.vendidos ?? 0),
-  title: anuncio.titulo,
-  description: anuncio.descricao ?? '',
-  category: anuncio.categoria || inferCategoryFromTitle(anuncio.titulo),
-  condition: CONDITION_TO_FRONT[anuncio.condicao] ?? 'new',
-  priceCents: anuncio.preco_centavos,
-  suggestedPriceCents: anuncio.preco_sugerido_centavos ?? null,
-  stock: anuncio.estoque,
-  photos: anuncio.fotos ?? [],
-  coverIndex: anuncio.capa ?? 0,
-  attributes: (anuncio.atributos ?? []).map(({ id, nome, valor }) => ({ id: id ?? null, name: nome, value: valor })),
-  channels: mapChannels(anuncio.canais, STATUS_TO_FRONT),
-  createdAt: anuncio.criado_em,
-  updatedAt: anuncio.atualizado_em
-});
-
-/** Campos do front (só os presentes) → campos guardados. */
-function toStoreFields(data) {
-  const fields = {};
-  if (data.mlItemId !== undefined) fields.ml_item_id = data.mlItemId;
-  if (data.permalink !== undefined) fields.permalink = data.permalink;
-  if (data.mlCategoryId !== undefined) fields.ml_categoria_id = data.mlCategoryId;
-  if (data.health !== undefined) fields.saude_ml = data.health;
-  if (data.soldQuantity !== undefined) fields.vendidos = Number(data.soldQuantity);
-  if (data.title !== undefined) fields.titulo = data.title.trim();
-  if (data.description !== undefined) fields.descricao = data.description.trim();
-  if (data.category !== undefined) fields.categoria = data.category;
-  if (data.condition !== undefined) fields.condicao = CONDITION_TO_STORE[data.condition] ?? 'novo';
-  if (data.priceCents !== undefined) fields.preco_centavos = data.priceCents;
-  if (data.suggestedPriceCents !== undefined) fields.preco_sugerido_centavos = data.suggestedPriceCents;
-  if (data.stock !== undefined) fields.estoque = Number(data.stock);
-  if (data.photos !== undefined) fields.fotos = data.photos;
-  if (data.coverIndex !== undefined) fields.capa = data.coverIndex;
-  if (data.attributes !== undefined) {
-    fields.atributos = data.attributes.map(({ id, name, key, value }) => ({
-      id: id ?? null,
-      nome: name ?? key ?? '',
-      valor: value
-    }));
+/**
+ * O token sai da sessão gravada, que todas as abas dividem; a conta vem da memória desta aba.
+ * Se outra aba trocou de conta, nada é pedido nem gravado em nome desta (vira 401).
+ */
+function assertSessionAccount(accountId) {
+  const sessao = readJson(STORAGE_KEYS.SESSION, null);
+  if (sessao?.conta_id == null || String(sessao.conta_id) !== String(accountId)) {
+    throw new ApiError({ status: 401, code: 'nao_autenticado' });
   }
-  if (data.channels !== undefined) fields.canais = mapChannels(data.channels, STATUS_TO_STORE);
-  return fields;
 }
 
-function applyMlItemToStoreRecord(existing, mlItem) {
-  const now = nowIso();
-  const pictures = Array.isArray(mlItem.pictures) && mlItem.pictures.length
-    ? mlItem.pictures
-    : mlItem.thumbnail
-      ? [mlItem.thumbnail]
-      : existing?.fotos ?? [];
-  const attributes = Array.isArray(mlItem.attributes) && mlItem.attributes.length
-    ? mlItem.attributes.map((a) => ({ id: a.id ?? null, nome: a.name ?? a.id ?? '', valor: a.value ?? '' }))
-    : existing?.atributos ?? [];
-  const title = String(mlItem.title || existing?.titulo || '').trim();
-  const description = mlItem.description !== undefined && mlItem.description !== ''
-    ? String(mlItem.description)
-    : existing?.descricao ?? '';
-  const priceCents = mlItem.price !== undefined && mlItem.price !== null
-    ? Math.round(Number(mlItem.price) * 100)
-    : existing?.preco_centavos ?? 0;
-  const stock = mlItem.available_quantity !== undefined && mlItem.available_quantity !== null
-    ? Number(mlItem.available_quantity)
-    : existing?.estoque ?? 0;
+/** requestJson conferindo a conta antes do pedido e depois da resposta. */
+async function api(accountId, path, options) {
+  assertSessionAccount(accountId);
+  const data = await requestJson(path, options);
+  assertSessionAccount(accountId);
+  return data;
+}
 
-  return {
-    id: existing?.id ?? newId('a'),
-    ml_item_id: mlItem.id ?? existing?.ml_item_id ?? null,
-    permalink: mlItem.permalink ?? existing?.permalink ?? null,
-    ml_categoria_id: mlItem.category_id ?? existing?.ml_categoria_id ?? null,
-    saude_ml: mlItem.health ?? existing?.saude_ml ?? null,
-    vendidos: Number(mlItem.sold_quantity ?? existing?.vendidos ?? 0),
-    titulo: title,
-    descricao: description,
-    categoria: existing?.categoria || inferCategoryFromTitle(title),
-    condicao: mlItem.condition === 'used' ? 'usado' : 'novo',
-    preco_centavos: priceCents,
-    preco_sugerido_centavos: existing?.preco_sugerido_centavos ?? null,
-    estoque: stock,
-    fotos: pictures,
-    capa: 0,
-    atributos: attributes,
-    canais: {
-      ...(existing?.canais ?? {}),
-      'mercado-livre': mlStatusToStore(mlItem.status)
-    },
-    criado_em: existing?.criado_em ?? mlItem.last_updated ?? now,
-    atualizado_em: mlItem.last_updated ?? existing?.atualizado_em ?? now
-  };
+const notFound = (error) => {
+  throw error?.status === 404 ? new ListingNotFoundError() : error;
+};
+
+/** Junta as fotos guardadas no navegador aos registros que vieram do servidor sem foto. */
+function withPhotos(accountId, records) {
+  let legacy;
+  return records.map((record) => {
+    if (record.fotos?.length) return record;
+    legacy ??= new Map(legacyRecords(accountId).map((item) => [item.id, item]));
+    const local = readJson(photosKey(accountId, record.id), null);
+    return { ...record, fotos: pickPhotos(record, local, legacy.get(record.id)) };
+  });
+}
+
+const imports = new Map();
+
+/** Importação única da chave antiga, uma Promise por conta e por carga da página. */
+function importOnce(accountId) {
+  if (!imports.has(accountId)) imports.set(accountId, importLegacy(accountId).catch(() => {}));
+  return imports.get(accountId);
+}
+
+async function importLegacy(accountId) {
+  const markKey = userKey(accountId, USER_KEYS.LISTINGS_IMPORTED);
+  if (readJson(markKey, null)) return;
+  const records = legacyRecords(accountId);
+  // Só o registro: foto fora do https não vai (fica na chave antiga, onde a leitura acha).
+  const results = await Promise.allSettled(
+    records.map(async (record) => api(accountId, '/produtos/importar', { method: 'POST', body: toApi(record) }))
+  );
+  const failures = results.filter((result) => result.status === 'rejected').map((result) => result.reason);
+  // Rede, 5xx ou sessão vencida: sem marca, tenta de novo na próxima carga. Outro 4xx conta como recusado.
+  if (failures.some((error) => isConnectionError(error) || error?.status === 401)) return;
+  try {
+    writeJson(markKey, { em: nowIso(), total: records.length, recusados: failures.length });
+  } catch {
+    // sem espaço para a marca: a importação roda de novo na próxima carga, e o servidor não duplica
+  }
+}
+
+/** Lista do servidor; grava a cópia local e junta as fotos. */
+async function loadRecords(accountId) {
+  await importOnce(accountId);
+  const data = await api(accountId, '/produtos');
+  const records = data.produtos.map(fromApi);
+  try {
+    writeJson(userKey(accountId, USER_KEYS.LISTINGS_CACHE), records);
+  } catch {
+    // a cópia é só para o painel sem conexão: sem espaço, fica a anterior
+  }
+  return withPhotos(accountId, records);
+}
+
+async function fetchRecord(accountId, id) {
+  const produto = await api(accountId, productPath(id)).catch(notFound);
+  return withPhotos(accountId, [fromApi(produto)])[0];
 }
 
 /**
- * Ler e gravar sempre juntos, sem await no meio (a latência simulada vem antes): assim
- * duas ações seguidas, como pausar um anúncio e duplicar outro, não se atropelam.
+ * PUT com a versão lida do servidor (`version`). Fotos fora do https vão para a chave local do
+ * produto antes do PUT (pode lançar StorageFullError, como antes); se o PUT falhar, a chave volta
+ * ao que era. `shownPhotos` são as fotos que o registro já tinha: iguais, a chave não é regravada.
  */
-const load = (accountId) => readJson(userKey(accountId, USER_KEYS.LISTINGS), []);
-
-/** Lança StorageFullError (localStore) quando as fotos não cabem mais no navegador. */
-const save = (accountId, anuncios) => writeJson(userKey(accountId, USER_KEYS.LISTINGS), anuncios);
-
-const byUpdatedDesc = (a, b) => String(b.atualizado_em).localeCompare(String(a.atualizado_em));
+async function saveRecord(accountId, record, version, shownPhotos = []) {
+  assertSessionAccount(accountId);
+  const key = photosKey(accountId, record.id);
+  const fotos = record.fotos ?? [];
+  const local = !allHttps(fotos);
+  const writeLocal = local && !samePhotos(fotos, shownPhotos);
+  const before = writeLocal ? readJson(key, null) : null;
+  if (writeLocal) writeJson(key, fotos);
+  let produto;
+  try {
+    // Conta conferida só antes (início da função): depois da resposta, o servidor já gravou e as fotos locais não podem voltar
+    produto = await requestJson(productPath(record.id), { method: 'PUT', body: toApi({ ...record, atualizado_em: version }) });
+  } catch (error) {
+    if (writeLocal) {
+      try {
+        if (before === null) removeKey(key);
+        else writeJson(key, before);
+      } catch {
+        // sem espaço para voltar: ficam as fotos novas
+      }
+    }
+    throw error;
+  }
+  if (!local) removeKey(key);
+  return withPhotos(accountId, [fromApi(produto)])[0];
+}
 
 export async function listListings(accountId) {
-  await simulateLatency(180);
-  const anuncios = load(accountId);
-  return [...anuncios].sort(byUpdatedDesc).map(toListing);
+  const records = await loadRecords(accountId);
+  return records.sort(byUpdatedDesc).map(toListing);
+}
+
+/** Cópia salva neste navegador (última lista boa do servidor; sem ela, a chave antiga), para o painel sem conexão. */
+export async function listLocalListings(accountId) {
+  const cached = readJson(userKey(accountId, USER_KEYS.LISTINGS_CACHE), null);
+  const records = Array.isArray(cached) ? cached : legacyRecords(accountId);
+  return withPhotos(accountId, records).sort(byUpdatedDesc).map(toListing);
 }
 
 export async function getListing(accountId, id) {
-  await simulateLatency(120);
-  const anuncios = load(accountId);
-  const anuncio = anuncios.find((item) => item.id === id);
-  if (!anuncio) throw new ListingNotFoundError();
-  return toListing(anuncio);
+  await importOnce(accountId);
+  return toListing(await fetchRecord(accountId, id));
 }
 
 /**
- * Sincroniza a lista de anúncios locais com os produtos reais retornados pelo Mercado Livre.
- * Atualiza fotos, título, descrição, atributos, preço, estoque, vendas e status.
+ * Sincroniza os anúncios com os produtos reais retornados pelo Mercado Livre.
+ * Grava (em paralelo) só os que mudaram; 409 é pulado (o próximo sync acerta) e outro erro
+ * sobe depois de todos terminarem.
  */
 export async function syncListingsWithMercadoLivre(accountId, mlProducts) {
   if (!Array.isArray(mlProducts)) return listListings(accountId);
-  const anuncios = load(accountId);
-  const next = [...anuncios];
-  const matchedIndices = new Set();
-
-  for (const mlItem of mlProducts) {
-    if (!mlItem?.id) continue;
-    let index = next.findIndex((item) => item.ml_item_id === mlItem.id);
-    if (index < 0) {
-      const targetTitle = normalizeTitle(mlItem.title);
-      index = next.findIndex(
-        (item, idx) => !matchedIndices.has(idx) && !item.ml_item_id && normalizeTitle(item.titulo) === targetTitle
-      );
-    }
-    if (index >= 0) {
-      matchedIndices.add(index);
-      next[index] = applyMlItemToStoreRecord(next[index], mlItem);
-    } else {
-      const created = applyMlItemToStoreRecord(null, mlItem);
-      next.unshift(created);
-      matchedIndices.add(0);
-    }
-  }
-
-  save(accountId, next);
-  return [...next].sort(byUpdatedDesc).map(toListing);
+  const records = await loadRecords(accountId);
+  const before = new Map(records.map((record) => [record.id, record]));
+  const next = matchMlItems(records, mlProducts);
+  const results = await Promise.allSettled(
+    next.map(async (record) => {
+      const old = before.get(record.id);
+      if (old && sameRecord(old, record)) return old;
+      return saveRecord(accountId, record, old?.atualizado_em ?? record.atualizado_em, old?.fotos ?? []);
+    })
+  );
+  const failure = results.find((result) => result.status === 'rejected' && result.reason?.status !== 409);
+  if (failure) throw failure.reason;
+  return results
+    .map((result, index) => (result.status === 'fulfilled' ? result.value : before.get(next[index].id)))
+    .filter(Boolean)
+    .sort(byUpdatedDesc)
+    .map(toListing);
 }
 
-/** Atualiza um anúncio local específico com os dados frescos vindos do Mercado Livre. */
+/** Atualiza um anúncio específico com os dados frescos vindos do Mercado Livre. */
 export async function mergeMercadoLivreItem(accountId, id, mlItem) {
-  const anuncios = load(accountId);
-  const index = anuncios.findIndex((item) => item.id === id);
-  if (index < 0) throw new ListingNotFoundError();
-  const updated = applyMlItemToStoreRecord(anuncios[index], mlItem);
-  const next = [...anuncios];
-  next[index] = updated;
-  save(accountId, next);
-  return toListing(updated);
+  const current = await fetchRecord(accountId, id);
+  const updated = applyMlItemToStoreRecord(current, mlItem);
+  // Abrir o anúncio não grava nada se o ML não mudou (gravar levaria o anúncio para o topo do painel)
+  if (sameRecord(current, updated)) return toListing(current);
+  return toListing(await saveRecord(accountId, updated, current.atualizado_em, current.fotos));
 }
 
 export async function createListing(accountId, data) {
-  await simulateLatency(200);
-  const anuncios = load(accountId);
   const now = nowIso();
   const anuncio = {
     id: newId('a'),
@@ -237,33 +225,24 @@ export async function createListing(accountId, data) {
     fotos: [],
     capa: 0,
     atributos: [],
+    analise_id: null,
     canais: {},
     ...toStoreFields(data),
     criado_em: now,
     atualizado_em: now
   };
-  save(accountId, [anuncio, ...anuncios]);
-  return toListing(anuncio);
+  return toListing(await saveRecord(accountId, anuncio, now));
 }
 
 export async function updateListing(accountId, id, patch) {
-  await simulateLatency(160);
-  const anuncios = load(accountId);
-  const index = anuncios.findIndex((item) => item.id === id);
-  if (index < 0) throw new ListingNotFoundError();
-  const updated = { ...anuncios[index], ...toStoreFields(patch), atualizado_em: nowIso() };
-  const next = [...anuncios];
-  next[index] = updated;
-  save(accountId, next);
-  return toListing(updated);
+  const current = await fetchRecord(accountId, id);
+  const updated = { ...current, ...toStoreFields(patch) };
+  return toListing(await saveRecord(accountId, updated, current.atualizado_em, current.fotos));
 }
 
 /** Copia um anúncio. A cópia nasce fora do ar (não publicada), sem vínculo com o item original do ML. */
 export async function duplicateListing(accountId, id, { title }) {
-  await simulateLatency(200);
-  const anuncios = load(accountId);
-  const original = anuncios.find((item) => item.id === id);
-  if (!original) throw new ListingNotFoundError();
+  const original = await fetchRecord(accountId, id);
   const now = nowIso();
   const copy = {
     ...original,
@@ -277,14 +256,10 @@ export async function duplicateListing(accountId, id, { title }) {
     criado_em: now,
     atualizado_em: now
   };
-  save(accountId, [copy, ...anuncios]);
-  return toListing(copy);
+  return toListing(await saveRecord(accountId, copy, now));
 }
 
 export async function removeListing(accountId, id) {
-  await simulateLatency(160);
-  const anuncios = load(accountId);
-  const next = anuncios.filter((item) => item.id !== id);
-  if (next.length === anuncios.length) throw new ListingNotFoundError();
-  save(accountId, next);
+  await api(accountId, productPath(id), { method: 'DELETE' }).catch(notFound);
+  removeKey(photosKey(accountId, id));
 }

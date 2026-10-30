@@ -20,6 +20,7 @@ from backend.application.casos_de_uso import (
     CasosDeUso,
     ConectarMarketplace,
     DesconectarMarketplace,
+    GerenciarProdutos,
     ListarMarketplaces,
     ListarPlanos,
     ObterUsuarioAtual,
@@ -43,6 +44,7 @@ from backend.infrastructure.banco.repositorio_ia import (
     RegistroDeUsoSQL,
     RepositorioDeAnalisesSQL,
 )
+from backend.infrastructure.banco.repositorio_produtos import RepositorioDeProdutosSQL
 from backend.infrastructure.banco.repositorio_usuarios import RepositorioUsuariosSQL
 from backend.infrastructure.banco.repositorio_vendedores import RepositorioVendedoresSQL
 from backend.infrastructure.configuracao import (
@@ -152,6 +154,7 @@ def criar_app(
         analises_ia=analises_ia,
         publicar_no_mercado_livre=PublicarNoMercadoLivre(conectar, gateways["mercado-livre"], fonte_ml, analises,
                                                          preparador),
+        produtos=GerenciarProdutos(RepositorioDeProdutosSQL(session_factory), relogio),
     )
 
     documentacao_ativa = leitor.booleano("DOCUMENTACAO_API_ATIVA", False)

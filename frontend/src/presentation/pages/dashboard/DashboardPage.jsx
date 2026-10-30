@@ -1,4 +1,5 @@
 import Button from '@/presentation/components/Button/Button.jsx';
+import FormAlert from '@/presentation/components/FormAlert/FormAlert.jsx';
 import Modal from '@/presentation/components/Modal/Modal.jsx';
 import PageHeader from '@/presentation/components/PageHeader/PageHeader.jsx';
 import SegmentedControl from '@/presentation/components/SegmentedControl/SegmentedControl.jsx';
@@ -48,6 +49,10 @@ export default function DashboardPage() {
           {DASHBOARD.connected(connections.length)}
         </StatusPill>
       </PageHeader>
+
+      {dashboard.offline && (
+        <FormAlert className="dashboard__offline" title={DASHBOARD.offline.title} text={DASHBOARD.offline.text} />
+      )}
 
       <ul className="dashboard__stats" aria-label={stats.label}>
         <StatCard

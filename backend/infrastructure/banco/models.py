@@ -6,7 +6,19 @@ As tabelas nascem e mudam só pelas migrações do Alembic (banco/migracoes), se
 JSON vira JSONB no Postgres e JSON no SQLite dos testes.
 """
 
-from sqlalchemy import JSON, Column, DateTime, ForeignKey, Index, Integer, Numeric, String
+from sqlalchemy import (
+    JSON,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    ForeignKeyConstraint,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    Text,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 
 from backend.infrastructure.database import Base
@@ -144,3 +156,50 @@ class CategoriaMLCacheModel(Base):
     categoria_id = Column(String(40), primary_key=True)
     atributos = Column(Json, nullable=False)
     expira_em = Column(DateTime(timezone=True), nullable=False)
+
+
+class ProdutoModel(Base):
+    """Um anúncio da Quick Click. A chave é por vendedor: o mesmo id em dois vendedores são dois produtos."""
+
+    __tablename__ = "produtos"
+
+    vendedor_id = Column(Integer, ForeignKey("vendedores.id", ondelete="CASCADE"), primary_key=True)
+    id = Column(String(40), primary_key=True)
+    titulo = Column(String(300), nullable=False)
+    descricao = Column(Text, nullable=False)
+    categoria = Column(String(40), nullable=False)
+    condicao = Column(String(10), nullable=False)
+    preco_centavos = Column(Integer, nullable=False)
+    preco_sugerido_centavos = Column(Integer, nullable=True)
+    estoque = Column(Integer, nullable=False)
+    fotos = Column(Json, nullable=False)  # só URLs https (fotos do marketplace)
+    capa = Column(Integer, nullable=False)
+    atributos = Column(Json, nullable=False)
+    analise_id = Column(String(36), ForeignKey("ia_analises.id", ondelete="SET NULL"), nullable=True)
+    criado_em = Column(DateTime(timezone=True), nullable=False)
+    atualizado_em = Column(DateTime(timezone=True), nullable=False)  # versão do registro
+
+    __table_args__ = (Index("ix_produtos_vendedor_atualizado", "vendedor_id", "atualizado_em"),)
+
+
+class PublicacaoModel(Base):
+    """Um produto num canal (marketplace): status, item no marketplace e números."""
+
+    __tablename__ = "publicacoes"
+
+    vendedor_id = Column(Integer, primary_key=True)
+    produto_id = Column(String(40), primary_key=True)
+    canal = Column(String(40), primary_key=True)
+    status = Column(String(20), nullable=False)
+    id_externo = Column(String(60), nullable=True)
+    permalink = Column(String(500), nullable=True)
+    categoria_id = Column(String(40), nullable=True)
+    saude = Column(Float, nullable=True)
+    vendidos = Column(Integer, nullable=False, default=0)
+    atualizado_em = Column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        ForeignKeyConstraint(["vendedor_id", "produto_id"], ["produtos.vendedor_id", "produtos.id"],
+                             ondelete="CASCADE"),
+        Index("ux_publicacoes_externo", "vendedor_id", "canal", "id_externo", unique=True),
+    )

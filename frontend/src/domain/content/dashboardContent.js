@@ -37,6 +37,10 @@ export const DASHBOARD = {
     idPrefix: 'painel',
     listings: 'Anúncios',
     insights: 'Insights'
+  },
+  offline: {
+    title: 'Sem conexão com o servidor.',
+    text: 'Mostrando a cópia salva neste navegador, que pode estar desatualizada.'
   }
 };
 

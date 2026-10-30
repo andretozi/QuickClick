@@ -9,6 +9,7 @@ from backend.application.casos_de_uso.listar_marketplaces import ListarMarketpla
 from backend.application.casos_de_uso.listar_planos import ListarPlanos
 from backend.application.casos_de_uso.obter_usuario_atual import ObterUsuarioAtual
 from backend.application.casos_de_uso.obter_vendedor_atual import ObterVendedorAtual
+from backend.application.casos_de_uso.produtos import GerenciarProdutos
 from backend.application.casos_de_uso.publicar_no_mercado_livre import PublicarNoMercadoLivre
 from backend.application.casos_de_uso.registrar_usuario import RegistrarUsuario
 from backend.application.casos_de_uso.trocar_plano import TrocarPlano
@@ -30,3 +31,4 @@ class CasosDeUso:
     analises_ia: ServicoDeAnalises | None = None
     publicar_no_mercado_livre: PublicarNoMercadoLivre | None = None
     trocar_plano: TrocarPlano | None = None
+    produtos: GerenciarProdutos | None = None

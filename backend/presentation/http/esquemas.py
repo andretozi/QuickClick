@@ -5,15 +5,17 @@ Modelos pydantic usados só na fronteira HTTP: validam a entrada e a saída.
 As funções de conversão traduzem os resultados dos casos de uso para JSON.
 """
 
+from dataclasses import asdict
 from datetime import datetime
-from typing import Any
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from backend.application.casos_de_uso.comum import MarketplaceDoVendedor
 from backend.application.casos_de_uso.obter_vendedor_atual import ResumoDoVendedor
-from backend.domain.marketplace import StatusMarketplace
+from backend.domain.marketplace import CATALOGO, StatusMarketplace
 from backend.domain.plano import Plano
+from backend.domain.produto import Produto, Publicacao
 from backend.domain.usuario import Usuario
 
 
@@ -132,6 +134,72 @@ class RequisicaoStatusAnuncio(BaseModel):
     status: str = Field(max_length=20, examples=["pausado", "publicado"])
 
 
+PADRAO_ID_PRODUTO = r"^[A-Za-z0-9_-]{1,40}$"
+MAX_CENTAVOS = 1_000_000_000
+UrlDaFoto = Annotated[str, Field(max_length=1000, pattern=r"^https://")]  # data: e http: são recusados
+Permalink = Annotated[str, Field(max_length=500, pattern=r"^https://")]
+TextoDoAtributo = Annotated[str, Field(max_length=1000)]
+NumeroFinito = Annotated[float, Field(allow_inf_nan=False)]
+
+
+class AtributoDoProduto(BaseModel):
+    id: str | None = Field(default=None, max_length=60)
+    nome: str = Field(default="", max_length=200)
+    valor: TextoDoAtributo | int | NumeroFinito | bool | None = None
+
+
+class PublicacaoDoProduto(BaseModel):
+    canal: str = Field(max_length=40, examples=["mercado-livre"])
+    status: Literal["publicado", "pausado", "nao_publicado"]
+    id_externo: str | None = Field(default=None, max_length=60, examples=["MLB1234567890"])
+    permalink: Permalink | None = None
+    categoria_id: str | None = Field(default=None, max_length=40)
+    saude: float | None = Field(default=None, ge=0, le=100, allow_inf_nan=False)
+    vendidos: int = Field(default=0, ge=0, le=10_000_000)
+
+    @field_validator("canal")
+    @classmethod
+    def _canal_do_catalogo(cls, canal: str) -> str:
+        if canal not in {marketplace.slug for marketplace in CATALOGO}:
+            raise ValueError("canal fora do catálogo")
+        return canal
+
+
+class ProdutoApi(BaseModel):
+    """Um anúncio no banco, igual na entrada e na saída. O vendedor vem do token: campo extra no corpo é ignorado."""
+
+    id: str = Field(pattern=PADRAO_ID_PRODUTO, examples=["a_k3j9x0q2mz"])
+    titulo: str = Field(max_length=300)
+    descricao: str = Field(default="", max_length=50_000)
+    categoria: str = Field(max_length=40)
+    condicao: Literal["novo", "usado"]
+    preco_centavos: int = Field(ge=0, le=MAX_CENTAVOS)
+    preco_sugerido_centavos: int | None = Field(default=None, ge=0, le=MAX_CENTAVOS)
+    estoque: int = Field(ge=0, le=1_000_000)
+    fotos: list[UrlDaFoto] = Field(default_factory=list, max_length=12)
+    capa: int = Field(default=0, ge=0, le=11)
+    atributos: list[AtributoDoProduto] = Field(default_factory=list, max_length=200)
+    analise_id: str | None = Field(default=None, max_length=36)
+    criado_em: datetime
+    atualizado_em: datetime = Field(description="Versão lida; no PUT, 409 se o servidor tiver uma mais nova")
+    publicacoes: list[PublicacaoDoProduto] = Field(default_factory=list, max_length=len(CATALOGO))
+
+    @field_validator("publicacoes")
+    @classmethod
+    def _um_por_canal(cls, publicacoes: list[PublicacaoDoProduto]) -> list[PublicacaoDoProduto]:
+        if len({p.canal for p in publicacoes}) != len(publicacoes):
+            raise ValueError("canal repetido")
+        return publicacoes
+
+
+class ListaDeProdutos(BaseModel):
+    produtos: list[ProdutoApi]
+
+
+class ResultadoDaImportacao(BaseModel):
+    importado: bool = Field(description="false: o produto ou o item do canal já existia")
+
+
 class DetalheDoErro(BaseModel):
     codigo: str = Field(examples=["limite_do_plano"])
     mensagem: str = Field(description="Texto amigável, pronto para aparecer na tela")
@@ -182,3 +250,12 @@ def usuario_saida(usuario: Usuario) -> UsuarioSaida:
         loja=usuario.loja,
         plano=usuario.plano,
     )
+
+
+def produto_do_corpo(corpo: ProdutoApi, produto_id: str) -> Produto:
+    dados = corpo.model_dump(exclude={"id", "publicacoes"})
+    return Produto(id=produto_id, **dados, publicacoes=[Publicacao(**p.model_dump()) for p in corpo.publicacoes])
+
+
+def produto_saida(produto: Produto) -> ProdutoApi:
+    return ProdutoApi.model_validate(asdict(produto))

@@ -48,7 +48,8 @@ export function toListingData(draft, range) {
       name: attribute.key ?? attribute.name,
       value: attribute.value
     })),
-    mlCategoryId: draft.mlCategoryId ?? null
+    mlCategoryId: draft.mlCategoryId ?? null,
+    analysisId: draft.analysisId ?? null
   };
 }
 
