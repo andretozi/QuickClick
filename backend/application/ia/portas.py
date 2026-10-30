@@ -124,7 +124,9 @@ class FonteDeEsquema(Protocol):
 
     def descobrir_categoria(self, termos: list[str], access_token: str) -> CategoriaSugerida | None: ...
 
-    def esquema(self, categoria_id: str, access_token: str) -> EsquemaDoCanal: ...
+    def esquema(self, categoria_id: str, access_token: str, categoria_nome: str = "") -> EsquemaDoCanal | None:
+        """None = não consegui ler o canal ("não sei"); esquema sem campos = a categoria não pede campos."""
+        ...
 
 
 class RegistroDeUso(Protocol):
@@ -165,11 +167,13 @@ class CacheDeCategoriasML(Protocol):
 
 
 class ContasDoVendedor(Protocol):
-    """Marketplaces que o vendedor conectou (na ordem em que conectou) e o token do Mercado Livre em dia."""
+    """Marketplaces que o vendedor conectou (na ordem em que conectou) e o token de cada um em dia."""
 
     def conectados(self, vendedor_id: int) -> list[str]: ...
 
     def token_mercado_livre(self, vendedor_id: int) -> str | None: ...
+
+    def token(self, vendedor_id: int, canal: str) -> str | None: ...
 
 
 class Executor(Protocol):

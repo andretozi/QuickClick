@@ -3,7 +3,7 @@
 import unittest
 
 from backend.domain.canais.esquema import TipoDeCampo
-from backend.domain.canais.ficha import Embalagem, Identificacao, montar_ficha, gtin_valido
+from backend.domain.canais.ficha import Embalagem, Identificacao, gtin_valido, montar_ficha, normalizar_gtin
 from backend.domain.ia.atributos_ml import AtributoML, esquema_do_ml
 from backend.domain.ia.leitura import (
     Confianca,
@@ -79,6 +79,26 @@ class TestEsquemaDoML(unittest.TestCase):
         esquema = esquema_do_ml("MLB1", "", [])
         self.assertEqual((esquema.campos, esquema.obrigatorios(), esquema.por_chave()), ((), (), {}))
 
+    def test_value_type_do_ml_define_o_tipo_e_os_valores_ficam(self):
+        sim_nao = [{"id": "242085", "name": "Sim"}, {"id": "242084", "name": "Não"}]
+        brutos = [
+            {"id": "IS_KIT", "name": "É kit", "value_type": "boolean", "values": sim_nao},
+            {"id": "WEIGHT", "name": "Peso", "value_type": "number_unit", "default_unit": "g"},
+            {"id": "UNITS", "name": "Unidades", "value_type": "number"},
+            {"id": "GENDER", "name": "Gênero", "value_type": "list", "values": [{"id": "1", "name": "Masculino"}]},
+            {"id": "BRAND", "name": "Marca", "value_type": "string", "values": [{"id": "9", "name": "Nike"}]},
+            {"id": "OLD", "name": "Antigo", "values": [{"id": "1", "name": "A"}]},  # cache antigo, sem value_type
+            {"id": "GRID", "name": "Grade", "value_type": "grid_id", "default_unit": "cm"},  # tipo desconhecido
+        ]
+        campos = esquema_do_ml("MLB1", "", [AtributoML.de_api(b) for b in brutos]).campos
+        self.assertEqual([(c.id, c.tipo, c.unidade) for c in campos], [
+            ("IS_KIT", TipoDeCampo.BOOLEANO, ""), ("WEIGHT", TipoDeCampo.NUMERO, "g"), ("UNITS", TipoDeCampo.NUMERO, ""),
+            ("GENDER", TipoDeCampo.LISTA, ""), ("BRAND", TipoDeCampo.TEXTO, ""), ("OLD", TipoDeCampo.LISTA, ""),
+            ("GRID", TipoDeCampo.NUMERO, "cm"),
+        ])
+        self.assertEqual(campos[0].valores, (("242085", "Sim"), ("242084", "Não")))
+        self.assertEqual(campos[4].valores, (("9", "Nike"),))
+
 
 class TestMontarFicha(unittest.TestCase):
     def setUp(self):
@@ -114,6 +134,24 @@ class TestMontarFicha(unittest.TestCase):
         chaves = [v.chave for v in ficha.valores]
         self.assertEqual(len(chaves), len(set(chaves)))
 
+    def test_identificacao_e_embalagem_so_com_o_confirmado(self):
+        leitura = normalizar_leitura({**LEITURA_BRUTA, "atributos": [
+            {"chave": "gtin", "valor": "4006381333931", "origem": "etiqueta", "evidencia": "x", "confianca": "alta"},
+            {"chave": "peso_g", "valor": "300", "origem": "deducao", "evidencia": "x", "confianca": "media"}]}, 1)
+        self.assertEqual((montar_ficha(leitura).identificacao, montar_ficha(leitura).embalagem),
+                         (Identificacao(), Embalagem()))  # só lido não entra
+        confirmacao = normalizar_confirmacao({"atributos": [
+            {"chave": "gtin", "valor": "400-6381 333931"}, {"chave": "sku", "valor": "TEN-42"},
+            {"chave": "peso_g", "valor": "350,6 g"}, {"chave": "comprimento_cm", "valor": "30"},
+            {"chave": "largura_cm", "valor": "12.5cm"}, {"chave": "altura_cm", "valor": "1,2 m"}]}, leitura)
+        ficha = montar_ficha(leitura, confirmacao)
+        self.assertEqual(ficha.identificacao, Identificacao(gtin="4006381333931", sku="TEN-42"))
+        self.assertEqual(ficha.embalagem, Embalagem(peso_g=351, comprimento_cm=30.0, largura_cm=12.5, altura_cm=None))
+        invalidos = normalizar_confirmacao({"atributos": [{"chave": "gtin", "valor": "4006381333932"},
+                                                          {"chave": "peso_g", "valor": "0"}]}, leitura)
+        ficha = montar_ficha(leitura, invalidos)
+        self.assertEqual((ficha.identificacao.gtin, ficha.embalagem.peso_g), (None, None))
+
 
 class TestGtin(unittest.TestCase):
     def test_validos(self):
@@ -127,6 +165,14 @@ class TestGtin(unittest.TestCase):
                        "４００６３８１３３３９３１", None):
             with self.subTest(codigo=codigo):
                 self.assertFalse(gtin_valido(codigo))
+
+    def test_normalizar_gtin(self):
+        for texto in ("４００６３８１３３３９３１", "400-6381-333931", " 4006381 333931 ", "4006381\u2010333931"):
+            with self.subTest(texto=texto):
+                self.assertEqual(normalizar_gtin(texto), "4006381333931")
+        for texto in ("4006381333932", "400-6381-33393", "", None, "abc"):
+            with self.subTest(texto=texto):
+                self.assertIsNone(normalizar_gtin(texto))
 
 
 if __name__ == "__main__":

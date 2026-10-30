@@ -127,6 +127,8 @@ def criar_app(
             pesquisas=CacheDePesquisasSQL(session_factory),
             config=configuracao_da_ia(leitor),
             relogio=relogio,
+            fontes_de_esquema={"mercado-livre": fonte_ml},
+            orcamento=registro_de_uso,
         ),
         vendedores=vendedores,
         orcamento=registro_de_uso,

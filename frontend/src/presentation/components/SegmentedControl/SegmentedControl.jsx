@@ -27,6 +27,8 @@ export default function SegmentedControl({
   useIndicator(ref, value);
   const onKeyDown = useRovingKeys({ options, value, onChange, containerRef: ref, orientation });
   const tabs = mode === 'tabs';
+  // sem opção escolhida (ex.: Sim ou Não ainda sem resposta), a primeira recebe o foco do Tab
+  const noneSelected = !options.some((option) => option.value === value);
 
   return (
     <div
@@ -38,7 +40,7 @@ export default function SegmentedControl({
       onKeyDown={onKeyDown}
     >
       <span data-part="indicator" className="segmented__indicator" aria-hidden="true" />
-      {options.map((option) => {
+      {options.map((option, index) => {
         const selected = option.value === value;
         return (
           <button
@@ -51,7 +53,7 @@ export default function SegmentedControl({
             aria-controls={tabs ? `${idPrefix}-painel-${option.value}` : undefined}
             aria-selected={tabs ? selected : undefined}
             aria-checked={tabs ? undefined : selected}
-            tabIndex={selected ? 0 : -1}
+            tabIndex={selected || (noneSelected && index === 0) ? 0 : -1}
             className={cx('segmented__option', selected && 'segmented__option--active')}
             onClick={() => onChange(option.value)}
           >

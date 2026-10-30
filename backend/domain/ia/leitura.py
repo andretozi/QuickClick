@@ -4,7 +4,9 @@ Domínio · IA · Leitura do produto (o que a IA viu nas fotos) e a confirmaçã
 A IA devolve um JSON com esquema fechado; aqui ele é conferido e as regras de não inventar
 valem mesmo se a IA errar:
     marca só com logo ou etiqueta (origem foto ou etiqueta); tamanho e voltagem só com etiqueta;
-    "deducao" nunca sai com confiança alta; sem valor, a origem é "desconhecido" e vira pergunta;
+    GTIN só lido na etiqueta e com o dígito verificador certo; embalagem (peso e medidas) é sempre
+    dedução com número positivo; "deducao" nunca sai com confiança alta; sem valor, a origem é
+    "desconhecido" e vira pergunta (menos GTIN e embalagem, que somem);
     produto não reconhecido não carrega atributos; caixas fora de 0 a 1000 são descartadas.
 """
 
@@ -57,8 +59,13 @@ CATEGORIAS: tuple[str, ...] = (
 CHAVES_COMUNS: tuple[str, ...] = (
     "marca", "modelo", "cor", "material", "textura", "tamanho", "voltagem", "quantidade",
     "dimensoes", "capacidade", "genero", "estampa", "acabamento", "potencia", "compatibilidade",
+    "gtin", "peso_g", "comprimento_cm", "largura_cm", "altura_cm",
 )
 CHAVES_SO_COM_ETIQUETA = frozenset({"tamanho", "voltagem"})
+# Embalagem para envio (não confundir com "dimensoes", do produto): chave → unidade
+CHAVES_DA_EMBALAGEM: dict[str, str] = {"peso_g": "g", "comprimento_cm": "cm", "largura_cm": "cm", "altura_cm": "cm"}
+# Só da ficha: não viram pergunta da leitura nem entram na ligação com os atributos do Mercado Livre
+CHAVES_DE_GTIN_E_EMBALAGEM = frozenset({"gtin", *CHAVES_DA_EMBALAGEM})
 # A condição tem campo próprio (novo, usado...): não vira atributo nem pergunta de atributo
 CHAVES_FORA_DOS_ATRIBUTOS = frozenset({"condicao", "estado", "estado_de_conservacao"})
 CHAVES_SO_COM_LOGO_OU_ETIQUETA = frozenset({"marca"})
@@ -73,6 +80,8 @@ MAX_TEXTO_LEGIVEL = 8
 MAX_PERGUNTAS = 8
 MAX_VALOR = 120
 MAX_TEXTO_CURTO = 160
+MAX_CAMPOS_PROPRIOS = 60
+MAX_VALOR_PROPRIO = 300
 
 
 def _texto(valor: Any, limite: int = MAX_TEXTO_CURTO) -> str:
@@ -100,6 +109,15 @@ def _lista_de_textos(valores: Any, maximo: int, limite: int = MAX_TEXTO_CURTO) -
         if len(saida) == maximo:
             break
     return saida
+
+
+def numero_positivo(texto: Any, unidade: str = "") -> float | None:
+    """'350', '350 g' ou '12,5cm' → o número, se for positivo. Outra unidade (ex.: kg) não converte: None."""
+    achado = re.fullmatch(r"(\d+(?:[.,]\d+)?)\s*([^\d\s]*)", texto.strip()) if isinstance(texto, str) else None
+    if achado is None or achado[2].casefold() not in ("", unidade.casefold()):
+        return None
+    numero = float(achado[1].replace(",", "."))
+    return numero if numero > 0 else None
 
 
 def normalizar_chave(chave: Any) -> str:
@@ -208,6 +226,16 @@ def _atributo(bruto: dict[str, Any]) -> Atributo | None:
         valor = ""
     if chave in CHAVES_SO_COM_ETIQUETA and origem is not OrigemAtributo.ETIQUETA:
         valor = ""
+    if chave == "gtin":
+        from backend.domain.canais.ficha import normalizar_gtin  # aqui dentro: a ficha importa este módulo
+
+        valor = (normalizar_gtin(valor) if origem is OrigemAtributo.ETIQUETA else None) or ""
+        if not valor:
+            return None
+    if chave in CHAVES_DA_EMBALAGEM:
+        if numero_positivo(valor, CHAVES_DA_EMBALAGEM[chave]) is None:
+            return None
+        origem = OrigemAtributo.DEDUCAO  # estimativa, nunca leitura
     if origem is OrigemAtributo.DEDUCAO and confianca is Confianca.ALTA:
         confianca = Confianca.MEDIA
     if not valor or origem is OrigemAtributo.DESCONHECIDO:
@@ -234,12 +262,14 @@ def _perguntas(brutas: Any, atributos: tuple[Atributo, ...]) -> tuple[Pergunta, 
             continue
         chave = normalizar_chave(bruta.get("chave"))
         texto = _texto(bruta.get("pergunta"))
-        if chave and texto and chave not in perguntas and chave not in CHAVES_FORA_DOS_ATRIBUTOS:
+        if chave and texto and chave not in perguntas and chave not in CHAVES_FORA_DOS_ATRIBUTOS \
+                and chave not in CHAVES_DE_GTIN_E_EMBALAGEM:
             perguntas[chave] = Pergunta(chave, texto, _enum(SugestaoDeFoto, bruta.get("sugerir_foto"),
                                                             SugestaoDeFoto.NENHUMA))
     # Todo atributo sem valor vira pergunta; atributo já respondido pela foto não precisa de pergunta
     for atributo in atributos:
-        if atributo.cartao is Cartao.PERGUNTA and atributo.chave not in perguntas:
+        if atributo.cartao is Cartao.PERGUNTA and atributo.chave not in perguntas \
+                and atributo.chave not in CHAVES_DE_GTIN_E_EMBALAGEM:
             perguntas[atributo.chave] = Pergunta(atributo.chave, pergunta_padrao(atributo.chave),
                                                  _sugestao_padrao(atributo.chave))
     com_valor = {a.chave for a in atributos if a.cartao is not Cartao.PERGUNTA}
@@ -297,15 +327,17 @@ def normalizar_leitura(bruto: dict[str, Any], quantidade_fotos: int) -> Leitura:
     return replace(leitura, perguntas=_perguntas(bruto.get("perguntas"), leitura.atributos))
 
 
-def juntar_leitura_parcial(leitura: Leitura, bruto: dict[str, Any], origem: OrigemAtributo) -> Leitura:
+def juntar_leitura_parcial(leitura: Leitura, bruto: dict[str, Any], origem: OrigemAtributo | None) -> Leitura:
     """Junta a releitura de uma etiqueta ou de uma foto extra: valor novo com evidência ganha do vazio
-    e da dedução; valor que a IA já viu com confiança alta só muda se a nova leitura também for alta."""
+    e da dedução; valor que a IA já viu com confiança alta só muda se a nova leitura também for alta.
+    `origem` None mantém a origem que a IA deu (releitura dirigida, nas fotos da leitura)."""
     parcial = normalizar_leitura({"reconhecido": True, **bruto}, quantidade_fotos=0)
     atributos = {a.chave: a for a in leitura.atributos}
     for novo in parcial.atributos:
         if novo.cartao is Cartao.PERGUNTA:
             continue
-        novo = replace(novo, origem=origem if novo.origem is not OrigemAtributo.DEDUCAO else novo.origem)
+        if origem is not None and novo.origem is not OrigemAtributo.DEDUCAO:
+            novo = replace(novo, origem=origem)
         atual = atributos.get(novo.chave)
         if atual is None or atual.cartao is not Cartao.VIU or novo.confianca is Confianca.ALTA:
             atributos[novo.chave] = novo
@@ -338,6 +370,15 @@ class AtributoConfirmado:
 
 
 @dataclass(frozen=True)
+class CampoProprioConfirmado:
+    """Valor de um campo que só um canal pede (sem chave nossa)."""
+
+    canal: str
+    id: str
+    valor: str
+
+
+@dataclass(frozen=True)
 class Confirmacao:
     """O que o vendedor confirmou: só isso entra como fato na descrição."""
 
@@ -346,6 +387,7 @@ class Confirmacao:
     condicao: CondicaoProduto
     atributos: tuple[AtributoConfirmado, ...]
     defeitos: tuple[str, ...]
+    campos_proprios: tuple[CampoProprioConfirmado, ...] = ()
 
     def para_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -365,6 +407,16 @@ def normalizar_confirmacao(bruto: dict[str, Any], leitura: Leitura | None) -> Co
             atributos[chave] = AtributoConfirmado(chave, valor)
         if len(atributos) == MAX_ATRIBUTOS * 2:
             break
+    proprios: dict[tuple[str, str], CampoProprioConfirmado] = {}
+    for item in bruto.get("campos_proprios") or []:
+        if not isinstance(item, dict):
+            continue
+        canal, campo_id = _texto(item.get("canal"), 40), _texto(item.get("id"), 80)
+        valor = _texto(item.get("valor"), MAX_VALOR_PROPRIO)
+        if canal and campo_id and valor and (canal, campo_id) not in proprios:
+            proprios[(canal, campo_id)] = CampoProprioConfirmado(canal, campo_id, valor)
+        if len(proprios) == MAX_CAMPOS_PROPRIOS:
+            break
     categoria = _texto(bruto.get("categoria"), 20).lower()
     if categoria not in CATEGORIAS:
         categoria = leitura.categoria if leitura else "outros"
@@ -376,4 +428,5 @@ def normalizar_confirmacao(bruto: dict[str, Any], leitura: Leitura | None) -> Co
         condicao=condicao,
         atributos=tuple(atributos.values()),
         defeitos=tuple(_lista_de_textos(bruto.get("defeitos"), MAX_DEFEITOS)),
+        campos_proprios=tuple(proprios.values()),
     )

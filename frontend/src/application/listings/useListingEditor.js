@@ -47,6 +47,12 @@ import {
   draftPatchFromResult,
   priceRangeFrom
 } from '@/domain/listings/aiAnalysis.js';
+import {
+  coveredCardKeys,
+  requirementAnswers,
+  requirementFields,
+  requirementsConfirmation
+} from '@/domain/listings/exigencias.js';
 import { centsToInput, parseMoney } from '@/domain/format/format.js';
 import { LISTING_EDITOR, LISTING_WIZARD, aiErrorText } from '@/domain/content/listingContent.js';
 
@@ -187,19 +193,21 @@ export default function useListingEditor({ listingId, celebrate }) {
     mounted
   });
 
-  // A leitura chegou (ou mudou com a foto extra): cartões, defeitos e o que a IA reconheceu
+  // A leitura chegou (ou mudou com a foto extra): cartões, defeitos, exigências dos canais e o que a IA reconheceu
   const reading = analysis?.reading;
+  const fields = useMemo(() => requirementFields(reading?.requirements), [reading]);
   useEffect(() => {
     if (!reading) return;
     setDraft((current) => ({
       ...current,
       cards: cardsFromReading(reading, current.cards),
       defects: defectsFromReading(reading, current.defects),
+      requirementAnswers: requirementAnswers(fields, current.requirementAnswers),
       product: current.product || reading.product,
       category: current.category || (reading.recognized ? reading.category : current.category),
       condition: reading.condition.confidence !== 'baixa' ? (conditionFromAi(reading.condition.value) ?? current.condition) : current.condition
     }));
-  }, [reading]);
+  }, [fields, reading]);
 
   // Leitura pronta no passo Análise: segue sozinho para Confirmar (uma vez por análise)
   useEffect(() => {
@@ -225,14 +233,17 @@ export default function useListingEditor({ listingId, celebrate }) {
     if (cota.quota && (!cota.quota.available || cota.quota.remaining <= 0)) return; // o passo mostra o motivo
     const cover = draft.photos[draft.coverIndex] ?? draft.photos[0];
     const ordered = [cover, ...draft.photos.filter((photo) => photo !== cover)];
-    setDraft((current) => ({ ...current, analysisPhotos: key, cards: [], defects: [], product: '' }));
+    setDraft((current) => ({ ...current, analysisPhotos: key, cards: [], defects: [], requirementAnswers: {}, product: '' }));
     await ai.start(photos.readingBlobs(ordered));
   }, [ai, cota.quota, draft.analysisId, draft.analysisPhotos, draft.coverIndex, draft.photos, photos]);
 
   // ---------- Navegação entre os passos ----------
+  // as exigências só seguram o passo enquanto a análise espera a confirmação (à mão ou depois de confirmar, não)
+  const pendingFields = ai.phase === 'waiting' ? fields : null;
   const validateStep = useCallback(
-    (name) => validateListingStep(name, { ...draft, priceCents: parseMoney(draft.priceInput) }),
-    [draft]
+    (name) =>
+      validateListingStep(name, { ...draft, priceCents: parseMoney(draft.priceInput), requirementFields: pendingFields }),
+    [draft, pendingFields]
   );
 
   const showErrors = useCallback((found) => {
@@ -277,6 +288,13 @@ export default function useListingEditor({ listingId, celebrate }) {
     }));
   }, []);
 
+  const setRequirement = useCallback((id, patch) => {
+    setDraft((current) => ({
+      ...current,
+      requirementAnswers: { ...current.requirementAnswers, [id]: { ...current.requirementAnswers?.[id], ...patch } }
+    }));
+  }, []);
+
   const setDefect = useCallback((index, keep) => {
     setDraft((current) => ({
       ...current,
@@ -285,19 +303,26 @@ export default function useListingEditor({ listingId, celebrate }) {
   }, []);
 
   const confirm = useCallback(async () => {
+    const found = validateStep('confirm');
+    if (Object.keys(found).length) {
+      showErrors(found);
+      return;
+    }
+    const covered = coveredCardKeys(fields);
     const payload = confirmationPayload({
       product: draft.product || reading?.product || draft.title,
       category: draft.category || reading?.category || 'outros',
       condition: draft.condition,
-      cards: draft.cards,
-      defects: draft.defects
+      cards: draft.cards.filter((card) => !covered.has(card.key)),
+      defects: draft.defects,
+      requirements: requirementsConfirmation(fields, draft.requirementAnswers)
     });
     const done = await ai.confirm(payload);
     if (done !== null && mounted.current) {
       setStepIndex(steps.indexOf('details'));
       setVisited((current) => Math.max(current, steps.indexOf('details')));
     }
-  }, [ai, draft, mounted, reading, steps]);
+  }, [ai, draft, fields, mounted, reading, showErrors, steps, validateStep]);
 
   const resume = useCallback(() => {
     const blobs = analysis?.needsPhotosToResume ? photos.readingBlobs(draft.photos) : null;
@@ -521,6 +546,8 @@ export default function useListingEditor({ listingId, celebrate }) {
     quota: cota.quota,
     setCard,
     setDefect,
+    requirementFields: fields,
+    setRequirement,
     confirm,
     resume,
     range,

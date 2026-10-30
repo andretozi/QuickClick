@@ -23,7 +23,10 @@ class ContasPelosCasosDeUso:
             return []
 
     def token_mercado_livre(self, vendedor_id: int) -> str | None:
+        return self.token(vendedor_id, MERCADO_LIVRE)
+
+    def token(self, vendedor_id: int, canal: str) -> str | None:
         try:
-            return self._conectar.token_ativo(vendedor_id, MERCADO_LIVRE)
+            return self._conectar.token_ativo(vendedor_id, canal)
         except ServicoIndisponivel:
             return None

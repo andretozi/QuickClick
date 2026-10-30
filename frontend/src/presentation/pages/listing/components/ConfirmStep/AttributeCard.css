@@ -128,3 +128,35 @@
   font-size: 12.5px;
   font-weight: 600;
 }
+
+/* ---------- Exigência dos canais (RequirementCard) ---------- */
+.attribute-card__question {
+  color: rgb(var(--rgb-ink) / 0.6);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* Número com a unidade ao lado do campo */
+.attribute-card__number {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.attribute-card__number > .field {
+  flex: 1;
+  min-width: 0;
+}
+
+.attribute-card__unit {
+  padding-top: 15px;
+  color: var(--color-ink);
+  font-weight: 800;
+}
+
+.attribute-card__error {
+  margin: 0;
+  color: var(--color-coral-deep);
+  font-size: 13px;
+  font-weight: 700;
+}

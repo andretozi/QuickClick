@@ -5,8 +5,10 @@ import SegmentedControl from '@/presentation/components/SegmentedControl/Segment
 import SelectField from '@/presentation/components/Field/SelectField.jsx';
 import TextField from '@/presentation/components/Field/TextField.jsx';
 import AttributeCard from './AttributeCard.jsx';
+import RequirementCard from './RequirementCard.jsx';
 import { cx } from '@/presentation/utils/cx.js';
 import { READING_STAGES, isPendingCheck, stagesProgress } from '@/domain/listings/aiAnalysis.js';
+import { coveredCardKeys, missingRequirements, requirementGroups } from '@/domain/listings/exigencias.js';
 import {
   LISTING_CATEGORIES,
   LISTING_CONDITIONS,
@@ -16,14 +18,21 @@ import {
 } from '@/domain/content/listingContent.js';
 import './ConfirmStep.css';
 
-/** Passo 3: o vendedor confirma ou corrige o que a IA viu. Só o que ele confirmar entra no anúncio. */
+/**
+ * Passo 3: o vendedor confirma ou corrige o que a IA viu. Só o que ele confirmar entra no anúncio.
+ * Com exigências dos canais na leitura, elas vêm antes dos cartões, que mostram só o que elas não cobrem.
+ */
 export default function ConfirmStep({ editor }) {
-  const { draft, update, setField, setCard, setDefect, ai } = editor;
+  const { draft, update, setField, setCard, setDefect, ai, errors, requirementFields, setRequirement } = editor;
   const texts = LISTING_WIZARD.confirm;
   const fields = LISTING_WIZARD.details.fields;
   const reading = ai.analysis?.reading;
   const rereading = ai.phase === 'running';
-  const pending = draft.cards.filter(isPendingCheck).length;
+  const covered = coveredCardKeys(requirementFields);
+  const cards = draft.cards.filter((card) => !covered.has(card.key));
+  const missing = missingRequirements(requirementFields, draft.requirementAnswers);
+  const blocked = Boolean(errors.requirements) && missing.length > 0;
+  const pending = cards.filter(isPendingCheck).length + missing.length;
 
   return (
     <div className="confirm-step">
@@ -77,9 +86,28 @@ export default function ConfirmStep({ editor }) {
         </div>
       </div>
 
-      {draft.cards.length > 0 && (
+      {requirementGroups(requirementFields).map((group) => (
+        <fieldset key={group.id} className="confirm-step__group">
+          <legend className="confirm-step__legend">{group.name || texts.requirements.common}</legend>
+          {!group.name && <p className="confirm-step__group-lead">{texts.requirements.lead}</p>}
+          <ul className="confirm-step__cards">
+            {group.fields.map((field) => (
+              <RequirementCard
+                key={field.id}
+                field={field}
+                answer={draft.requirementAnswers?.[field.id]}
+                texts={texts}
+                error={blocked && missing.includes(field.id) ? texts.requirements.confirmToContinue : undefined}
+                onChange={(patch) => setRequirement(field.id, patch)}
+              />
+            ))}
+          </ul>
+        </fieldset>
+      ))}
+
+      {cards.length > 0 && (
         <ul className="confirm-step__cards">
-          {draft.cards.map((card) => (
+          {cards.map((card) => (
             <AttributeCard
               key={card.key}
               card={card}
@@ -134,6 +162,8 @@ export default function ConfirmStep({ editor }) {
           </ul>
         </section>
       )}
+
+      {blocked && <FormAlert {...texts.requirements.blocked} />}
 
       {pending > 0 && (
         <p className="confirm-step__pending" aria-live="polite">

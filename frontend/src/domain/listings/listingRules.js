@@ -4,6 +4,7 @@
  */
 import { FIELD_ERROR, maxLength, required } from '@/domain/validation/validators.js';
 import { writingProblems } from '@/domain/listings/writingRules.js';
+import { canContinue } from '@/domain/listings/exigencias.js';
 
 export const LISTING_LIMITS = {
   /** Limite de caracteres do título no Mercado Livre */
@@ -51,11 +52,17 @@ function writing(value) {
   return writingProblems(value).length ? FIELD_ERROR.WRITING : null;
 }
 
-/** Erros de cada campo de uma etapa (objeto vazio = pode seguir). */
+/**
+ * Erros de cada campo de uma etapa (objeto vazio = pode seguir). No Confirmar, requirementFields são
+ * as exigências dos canais que ainda contam (vazio quando a análise não espera a confirmação).
+ */
 export function validateListingStep(step, draft) {
   const errors = {};
   if (step === 'photos') {
     if (!draft.photos?.length) errors.photos = FIELD_ERROR.REQUIRED;
+  }
+  if (step === 'confirm' && !canContinue(draft.requirementFields ?? [], draft.requirementAnswers)) {
+    errors.requirements = FIELD_ERROR.REQUIRED;
   }
   if (step === 'details') {
     errors.title = required(draft.title) ?? maxLength(draft.title, LISTING_LIMITS.TITLE_MAX) ?? writing(draft.title);
