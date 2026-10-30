@@ -36,6 +36,11 @@ ITENS: tuple[ItemDeConfiguracao, ...] = (
                        "Mercado Livre Developers, Minhas aplicações (App ID)"),
     ItemDeConfiguracao("MERCADO_LIVRE_CLIENT_SECRET", True, "conexão com o Mercado Livre",
                        "Mercado Livre Developers, Minhas aplicações (Secret Key)"),
+    # Shopee: opcionais até existir conta na Shopee Open Platform (nada usa ainda)
+    ItemDeConfiguracao("SHOPEE_PARTNER_ID", True, "integração com a Shopee (ainda não ligada)",
+                       "Shopee Open Platform, App List (Partner ID)", usada_no_mvp=False),
+    ItemDeConfiguracao("SHOPEE_PARTNER_KEY", True, "integração com a Shopee (ainda não ligada)",
+                       "Shopee Open Platform, App List (Partner Key)", usada_no_mvp=False),
     ItemDeConfiguracao("ANTHROPIC_API_KEY_PAGO", True, "IA dos planos pagos (Claude)",
                        "Claude Console, workspace quickclick-pago, API keys"),
     ItemDeConfiguracao("ANTHROPIC_API_KEY_GRATIS", True, "reserva da IA do plano Grátis (Haiku)",
