@@ -54,7 +54,29 @@ function toReading(leitura) {
       key: q.chave,
       question: q.pergunta,
       suggestPhoto: q.sugerir_foto ?? 'nenhuma'
-    }))
+    })),
+    // ausente (análise antiga ou canal que falhou) = null, e o Confirmar fica como antes
+    requirements: Array.isArray(leitura.exigencias)
+      ? leitura.exigencias.map((e) => ({
+          key: e.chave ?? '',
+          name: e.nome ?? '',
+          type: e.tipo,
+          values: e.valores ?? [],
+          unit: e.unidade ?? '',
+          required: Boolean(e.obrigatoria),
+          channels: e.canais ?? [],
+          own: e.proprio ? { channel: e.proprio.canal, id: e.proprio.id } : null,
+          suggestion: e.sugestao
+            ? {
+                value: e.sugestao.valor ?? '',
+                origin: e.sugestao.origem,
+                confidence: e.sugestao.confianca,
+                card: e.sugestao.cartao,
+                readKey: e.sugestao.chave_lida ?? ''
+              }
+            : null
+        }))
+      : null
   };
 }
 
@@ -175,14 +197,18 @@ export async function sendExtraPhoto(id, blob, kind) {
   return toAnalysis(await requestJson(`/ia/analises/${encodeURIComponent(id)}/fotos`, { method: 'POST', body: form }));
 }
 
-/** { product, category, condition ('novo' ou 'usado'), attributes: [{ key, value }], defects: [] } */
+/**
+ * { product, category, condition ('novo' ou 'usado'), attributes: [{ key, value }], defects: [],
+ *   ownFields: [{ channel, id, value }] (campos próprios dos canais) }
+ */
 export async function confirmAnalysis(id, confirmation) {
   const body = {
     produto: confirmation.product,
     categoria: confirmation.category,
     condicao: confirmation.condition,
     atributos: confirmation.attributes.map((a) => ({ chave: a.key, valor: a.value })),
-    defeitos: confirmation.defects
+    defeitos: confirmation.defects,
+    campos_proprios: (confirmation.ownFields ?? []).map((f) => ({ canal: f.channel, id: f.id, valor: f.value }))
   };
   return toAnalysis(await requestJson(`/ia/analises/${encodeURIComponent(id)}/confirmacao`, { method: 'POST', body }));
 }

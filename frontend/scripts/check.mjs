@@ -11,6 +11,7 @@
  *     application     nunca presentation nem app
  *     presentation    nunca infrastructure nem app
  * - O único fetch do front fica no cliente HTTP (infrastructure/http/httpClient.js).
+ * - A regra pura das exigências dos canais passa na conferência de scripts/exigencias.check.mjs.
  *
  * Sem problemas, sai com 0. Com problemas, lista um por linha e sai com 1.
  */
@@ -166,6 +167,13 @@ for (const file of files) {
   if (rel !== ONLY_FETCH && FETCH.test(code)) {
     problems.push(`${rel}: fetch fora do cliente HTTP (${ONLY_FETCH})`);
   }
+}
+
+// Regras puras com conferência própria (node:assert), sem pacote de teste.
+try {
+  await import('./exigencias.check.mjs');
+} catch (error) {
+  problems.push(`regra das exigências (scripts/exigencias.check.mjs): ${error.message}`);
 }
 
 if (problems.length) {

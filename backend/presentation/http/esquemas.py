@@ -101,12 +101,19 @@ class AtributoEntrada(BaseModel):
     valor: str = Field(default="", max_length=300)
 
 
+class CampoProprioEntrada(BaseModel):
+    canal: str = Field(default="", max_length=40)
+    id: str = Field(default="", max_length=80)
+    valor: str = Field(default="", max_length=300)
+
+
 class RequisicaoConfirmacaoIA(BaseModel):
     produto: str = Field(default="", max_length=200)
     categoria: str = Field(default="outros", max_length=60)
     condicao: str = Field(default="desconhecido", max_length=40)
     atributos: list[AtributoEntrada] = Field(default_factory=list, max_length=60)
     defeitos: list[str] = Field(default_factory=list, max_length=20)
+    campos_proprios: list[CampoProprioEntrada] = Field(default_factory=list, max_length=60)
 
 
 class RequisicaoPublicarAnuncio(BaseModel):

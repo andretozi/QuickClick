@@ -18,7 +18,7 @@ from backend.application.ia.modelos import (
 )
 from backend.domain.ia.fotos import MAX_FOTOS_NA_LEITURA
 from backend.infrastructure.ia import esquemas
-from backend.infrastructure.ia.anthropic_ia import em_json
+from backend.infrastructure.ia.anthropic_ia import em_json, pedido_da_releitura
 from backend.infrastructure.ia.carregador_de_prompts import prompt
 from backend.infrastructure.ia.cliente_gemini import ClienteGemini, parte_de_imagem
 
@@ -53,11 +53,10 @@ class GeminiLeitor(_BaseGemini):
         return self._gerar("leitura", partes, esquemas.LEITURA, contexto, timeout_s=120)
 
     def reler(self, entrada: EntradaDaReleitura, contexto: ContextoDaChamada) -> RespostaDaIA:
-        instrucao = prompt("releitura")
-        partes = [parte_de_imagem(entrada.imagem_jpeg),
-                  f"{instrucao.texto}\n\nTipo da imagem: {entrada.tipo}\nLeitura atual: {em_json(entrada.leitura_atual)}"]
+        imagens, texto, versao = pedido_da_releitura(entrada)
+        partes = [*(parte_de_imagem(i) for i in imagens), texto]
         return self._gerar("leitura", partes, esquemas.RELEITURA, contexto, timeout_s=90, max_tokens=4000,
-                           instrucao_extra=instrucao.versao)
+                           instrucao_extra=versao)
 
 
 class GeminiRedator(_BaseGemini):

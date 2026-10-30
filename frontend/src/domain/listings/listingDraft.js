@@ -24,6 +24,7 @@ export const EMPTY_DRAFT = {
   product: '',
   cards: [],
   defects: [],
+  requirementAnswers: {}, // exigências dos canais: { [id]: { value, confirmed } }
   attributes: [], // confirmados: [{ key, value }], vão para o anúncio e para o Mercado Livre
   specs: [],
   mlCategoryId: null,

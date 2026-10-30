@@ -1,8 +1,8 @@
 """
 Aplicação · IA · As etapas da análise, em segundo plano
 
-    0 preparar (já feito no pedido) → tratar → verificar → 1 ler (releitura da etiqueta e atributos do ML)
-    → aguardando_confirmacao → 3 pesquisa de mercado → 4 preço e canais → 5 título e descrição → pronta
+    0 preparar (já feito no pedido) → tratar → verificar → 1 ler (releitura da etiqueta, atributos do ML e
+    exigências dos canais conectados, com no máximo uma releitura dirigida) → aguardando_confirmacao → 3 pesquisa de mercado → 4 preço e canais → 5 título e descrição → pronta
 
 Cada etapa grava o resultado parcial no banco (nunca a foto). As fotos só existem na memória
 deste processo enquanto a leitura roda. Erro de provedor: a cadeia de reserva; sem reserva, a análise
@@ -12,7 +12,7 @@ Python; a IA só interpreta e escreve.
 
 import logging
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
@@ -32,15 +32,23 @@ from backend.application.ia.modelos import (
 from backend.application.ia.portas import (
     CacheDePesquisas,
     ContasDoVendedor,
+    FonteDeEsquema,
     FontePrecosMarketplace,
     GuardiaoDeFidelidade,
+    LeitorDeProduto,
+    OrcamentoDeIA,
     PreparadorDeFotos,
     RepositorioDeAnalises,
     TratadorDeFoto,
 )
+from backend.domain.canais.esquema import EsquemaDoCanal, TipoDeCampo
+from backend.domain.canais.exigencias import Exigencia, comparavel, faltantes, unir_exigencias
+from backend.domain.canais.ficha import montar_ficha
 from backend.domain.erros import ErroDeDominio, IAIndisponivel
 from backend.domain.ia.analise import Nivel, StatusAnalise, posicao
 from backend.domain.ia.atributos_ml import (
+    CANAL_ML,
+    PREENCHIDOS_NA_PUBLICACAO_ML,
     ligar_por_regra,
     ligar_sugestoes_da_ia,
     mapa_de_chaves,
@@ -58,6 +66,7 @@ from backend.domain.ia.escrita import (
 from backend.domain.ia.fotos import MAX_FOTOS_NA_LEITURA
 from backend.domain.ia.leitura import (
     CATEGORIAS,
+    CHAVES_DE_GTIN_E_EMBALAGEM,
     Cartao,
     Confirmacao,
     Leitura,
@@ -93,6 +102,8 @@ class DependenciasDaAnalise:
     pesquisas: CacheDePesquisas
     config: ConfiguracaoDaIA
     relogio: Callable[[], datetime]
+    fontes_de_esquema: dict[str, FonteDeEsquema] = field(default_factory=dict)  # canal → fonte
+    orcamento: OrcamentoDeIA | None = None  # confere o dia antes da releitura dirigida no pago
 
 
 def com_aviso(avisos: list[dict[str, str]] | None, codigo: str, mensagem: str) -> list[dict[str, str]]:
@@ -170,6 +181,13 @@ class ProcessoDaAnalise:
         if ml is not None:
             dados["ml"], perguntas_ml = ml
             dados["perguntas"] = _juntar_perguntas(dados["perguntas"], perguntas_ml, leitura)
+        try:
+            exigencias = self._exigencias(analise, leitura, dados.get("ml"), leitor, entrada.fotos)
+        except Exception as erro:  # canal que quebra vira "não sei": a análise segue com o Confirmar de hoje
+            log.warning("Exigências dos canais puladas (%s).", type(erro).__name__)
+            exigencias = None
+        if exigencias is not None:
+            dados["exigencias"] = exigencias
         if not leitura.reconhecido:
             avisos = com_aviso(avisos, "produto_nao_reconhecido", "Não consegui reconhecer o produto nessa foto.")
         # As fotos saem da memória quando este método termina (nada guarda referência a elas)
@@ -213,7 +231,9 @@ class ProcessoDaAnalise:
         if categoria is None:
             return None
         da_categoria = self.d.fonte_ml.atributos_da_categoria(categoria.categoria_id, token)
-        com_valor = [(a.chave, a.valor) for a in leitura.atributos if a.cartao is not Cartao.PERGUNTA]
+        # GTIN e embalagem ficam na ficha: não disputam atributo do Mercado Livre por nome ou sinônimo
+        com_valor = [(a.chave, a.valor) for a in leitura.atributos
+                     if a.cartao is not Cartao.PERGUNTA and a.chave not in CHAVES_DE_GTIN_E_EMBALAGEM]
         ligados, sobras = ligar_por_regra(com_valor, da_categoria)
         if sobras and da_categoria:
             resultado = escolha.tentar_em_ordem(
@@ -230,13 +250,76 @@ class ProcessoDaAnalise:
         }
         return ml, perguntas_dos_obrigatorios(faltando)
 
+    def _exigencias(self, analise: dict[str, Any], leitura: Leitura, ml: dict[str, Any] | None,
+                    leitor: LeitorDeProduto, fotos: tuple[FotoPreparada, ...]) -> list[dict[str, Any]] | None:
+        """O que os canais conectados pedem e ainda falta, com a sugestão do que a IA leu. None = não sei
+        (fica o Confirmar de hoje): nenhum canal com fonte, ou algum canal sem token, categoria ou esquema."""
+        if not self.d.fontes_de_esquema or not leitura.reconhecido:
+            return None
+        vendedor_id = analise["vendedor_id"]
+        canais = [c for c in self.d.contas.conectados(vendedor_id) if c in self.d.fontes_de_esquema]
+        if not canais:
+            return None
+        esquemas = []
+        for canal in canais:
+            esquema = self._esquema_do_canal(canal, vendedor_id, leitura, ml)
+            if esquema is None:
+                log.info("Exigências dos canais puladas: não deu para ler os campos de %s.", canal)
+                return None
+            esquemas.append(esquema)
+        # Regra sobre a ficha: o que a publicação do ML completa sozinha não trava o vendedor (fica a pergunta de hoje)
+        exigencias = tuple(e for e in faltantes(unir_exigencias(esquemas), montar_ficha(leitura))
+                           if any(c.obrigatorio and not (c.canal == CANAL_ML and c.id in PREENCHIDOS_NA_PUBLICACAO_ML)
+                                  for c in e.campos))
+        mapa = (ml or {}).get("mapa") or {}
+        sugestoes = [_sugestao(_chaves_lidas(e, mapa), e.tipo.value, e.valores, leitura) for e in exigencias]
+        # Só o que dá para ver em foto vai para a releitura dirigida
+        pedir = tuple(e.chave for e, s in zip(exigencias, sugestoes, strict=True)
+                      if s is None and e.chave and e.chave != "sku")
+        relida = self._reler_campos(analise, leitura, leitor, fotos, pedir) if pedir else None
+        if relida is not None:
+            sugestoes = [
+                s or (_sugestao(_chaves_lidas(e, mapa), e.tipo.value, e.valores, relida) if e.chave in pedir else None)
+                for e, s in zip(exigencias, sugestoes, strict=True)
+            ]
+        return [_exigencia_para_tela(e, s) for e, s in zip(exigencias, sugestoes, strict=True)]
+
+    def _esquema_do_canal(self, canal: str, vendedor_id: int, leitura: Leitura, ml: dict[str, Any] | None
+                          ) -> EsquemaDoCanal | None:
+        fonte = self.d.fontes_de_esquema[canal]
+        token = self.d.contas.token(vendedor_id, canal)
+        if not token:
+            return None
+        if canal == CANAL_ML:
+            # A mesma categoria que a leitura já escolheu; sem ela, não sei
+            return fonte.esquema(ml["categoria_id"], token, ml.get("categoria_nome") or "") if ml else None
+        categoria = fonte.descobrir_categoria(list(leitura.termos_busca) or [leitura.produto], token)
+        return fonte.esquema(categoria.categoria_id, token, categoria.nome) if categoria is not None else None
+
+    def _reler_campos(self, analise: dict[str, Any], leitura: Leitura, leitor: LeitorDeProduto,
+                      fotos: tuple[FotoPreparada, ...], campos: tuple[str, ...]) -> Leitura | None:
+        """Releitura dirigida (uma por análise): o mesmo leitor procura só essas chaves nas fotos da leitura.
+        Devolve uma cópia da leitura com o que achou (só para as sugestões); None se não rodou."""
+        orcamento = self.d.orcamento
+        if Nivel(analise["nivel"]) is Nivel.PAGO and orcamento is not None \
+                and orcamento.gasto_de_hoje_usd(self.d.relogio()) >= self.d.config.orcamento_diario_usd:
+            log.info("Releitura dirigida pulada: o orçamento do dia acabou.")
+            return None
+        try:
+            relida = leitor.reler(EntradaDaReleitura(fotos, leitura.para_dict(), b"", "campos", campos),
+                                  self._contexto(analise, "releitura_campos"))
+        except FalhaDoProvedor as falha:
+            log.info("Releitura dirigida pulada (%s).", falha.motivo)
+            return None
+        return juntar_leitura_parcial(leitura, relida.dados, None)  # None: fica a origem que a IA deu
+
     def ler_foto_extra(self, analise_id: str, foto: FotoPreparada, tipo: str) -> None:
         """A foto extra (etiqueta, verso, detalhe) reabre só a leitura dela, com a leitura atual como contexto."""
         def trabalho():
             analise = self.d.analises.obter(analise_id)
             atual = analise.get("leitura") or {}
             leitura = normalizar_leitura(atual, len(analise.get("fotos_meta") or []))
-            contexto_sem_ml = {k: v for k, v in atual.items() if k != "ml"}
+            contexto_sem_ml = {k: v for k, v in atual.items() if k not in ("ml", "exigencias")}
             resultado = escolha.tentar_em_ordem(
                 escolha.leitores(self.d.provedores, Nivel(analise["nivel"])),
                 lambda p: p.reler(EntradaDaReleitura((), contexto_sem_ml, foto.leitura_jpeg, tipo),
@@ -253,6 +336,13 @@ class ProcessoDaAnalise:
                     dados["ml"] = atual["ml"]
                     perguntas_ml = [p for p in atual.get("perguntas") or [] if p.get("chave") in atual["ml"]["mapa"]]
                     dados["perguntas"] = _juntar_perguntas(dados["perguntas"], perguntas_ml, nova)
+                if "exigencias" in atual:
+                    # Só ganha sugestão a exigência com chave que estava sem nenhuma
+                    dados["exigencias"] = [
+                        {**e, "sugestao": _sugestao([e["chave"]], e["tipo"], e["valores"], nova)}
+                        if e.get("chave") and e.get("sugestao") is None else e
+                        for e in atual["exigencias"]
+                    ]
             self._salvar(analise_id, status=StatusAnalise.AGUARDANDO_CONFIRMACAO.value,
                          etapa_atual=StatusAnalise.AGUARDANDO_CONFIRMACAO.value, leitura=dados, avisos=avisos,
                          fotos_meta=[*(analise.get("fotos_meta") or []), foto.meta()])
@@ -323,7 +413,7 @@ class ProcessoDaAnalise:
             return chave, guardada
         entrada = EntradaDaPesquisa(
             produto=confirmacao.produto, categoria=confirmacao.categoria, condicao=confirmacao.condicao.value,
-            atributos=tuple((a.chave, a.valor) for a in confirmacao.atributos),
+            atributos=_fatos(confirmacao),
             com_web=nivel is Nivel.PAGO and self.d.config.pesquisa_web_ativa,
         )
         resultado = escolha.tentar_em_ordem(escolha.pesquisadores(self.d.provedores, nivel),
@@ -345,7 +435,7 @@ class ProcessoDaAnalise:
             if est is not None:
                 return est, "mercado_livre"
         if nivel is Nivel.PAGO and self.d.config.pesquisa_web_ativa:
-            atributos = tuple((a.chave, a.valor) for a in confirmacao.atributos)
+            atributos = _fatos(confirmacao)
             resultado = escolha.tentar_em_ordem(
                 escolha.precos_na_web(self.d.provedores, nivel),
                 lambda p: p.buscar_precos(confirmacao.produto, confirmacao.condicao.value, atributos,
@@ -395,7 +485,7 @@ class ProcessoDaAnalise:
             entrada = EntradaDoPreco(
                 dados_do_mercado={**est.para_dict(), "fonte": fonte, "tarifa_classico_centavos": tarifa_da_regra,
                                   "sugerido_pela_regra_centavos": regra},
-                atributos=tuple((a.chave, a.valor) for a in confirmacao.atributos), condicao=condicao,
+                atributos=_fatos(confirmacao), condicao=condicao,
                 defeitos=confirmacao.defeitos, canais_candidatos=tuple(c.para_dict() for c in candidatos),
             )
             resultado = escolha.tentar_em_ordem(escolha.precificadores(self.d.provedores, nivel),
@@ -411,7 +501,7 @@ class ProcessoDaAnalise:
                   perfil: dict[str, Any] | None) -> dict[str, Any] | None:
         entrada = EntradaDoTexto(
             produto=confirmacao.produto, categoria=confirmacao.categoria, condicao=confirmacao.condicao.value,
-            atributos=tuple((a.chave, a.valor) for a in confirmacao.atributos), defeitos=confirmacao.defeitos,
+            atributos=_fatos(confirmacao), defeitos=confirmacao.defeitos,
             perfil={k: v for k, v in (perfil or {}).items() if k != "fontes"} or None,
         )
         resultado = escolha.tentar_em_ordem(escolha.redatores(self.d.provedores, nivel),
@@ -460,6 +550,45 @@ def _juntar_perguntas(perguntas: list[dict[str, Any]], extras: list[dict[str, st
             juntas.append(extra)
             vistas.add(extra["chave"])
     return juntas
+
+
+def _fatos(confirmacao: Confirmacao) -> tuple[tuple[str, str], ...]:
+    """Atributos confirmados que vão para pesquisa, preço e texto: GTIN e embalagem (estimada) ficam só na ficha."""
+    return tuple((a.chave, a.valor) for a in confirmacao.atributos if a.chave not in CHAVES_DE_GTIN_E_EMBALAGEM)
+
+
+def _chaves_lidas(exigencia: Exigencia, mapa: dict[str, str]) -> list[str]:
+    """Onde procurar o valor na leitura: a própria chave (ou a dos campos, quando virou campo próprio) e, no
+    Mercado Livre, as chaves da leitura já ligadas ao mesmo atributo (mapa: chave nossa → id do ML)."""
+    chaves = [exigencia.chave] if exigencia.chave else [c.chave for c in exigencia.campos if c.chave]
+    chaves += [k for c in exigencia.campos if c.canal == CANAL_ML for k, ml_id in mapa.items() if ml_id == c.id]
+    return list(dict.fromkeys(chaves))
+
+
+def _sugestao(chaves: list[str], tipo: str, valores: list[str] | tuple[str, ...], leitura: Leitura
+              ) -> dict[str, str] | None:
+    """O primeiro valor que a IA leu numa dessas chaves e que pode ir para a tela (nunca conta como confirmado).
+    Lista: só um dos valores dela, na grafia da lista. Booleano: só "Sim" ou "Não" (o contrato da confirmação)."""
+    opcoes = valores if tipo == TipoDeCampo.LISTA.value else ("Sim", "Não") if tipo == TipoDeCampo.BOOLEANO.value else ()
+    for chave in chaves:
+        lido = leitura.atributo(chave)
+        if lido is None or lido.cartao is Cartao.PERGUNTA:
+            continue
+        valor = lido.valor
+        if opcoes:
+            valor = next((v for v in opcoes if comparavel(v) == comparavel(lido.valor)), "")
+            if not valor:
+                continue
+        return {"valor": valor, "origem": lido.origem.value, "confianca": lido.confianca.value,
+                "cartao": lido.cartao.value, "chave_lida": chave}
+    return None
+
+
+def _exigencia_para_tela(exigencia: Exigencia, sugestao: dict[str, str] | None) -> dict[str, Any]:
+    proprio = None if exigencia.chave else {"canal": exigencia.campos[0].canal, "id": exigencia.campos[0].id}
+    return {"chave": exigencia.chave, "nome": exigencia.nome, "tipo": exigencia.tipo.value,
+            "valores": list(exigencia.valores), "unidade": exigencia.unidade, "obrigatoria": exigencia.obrigatoria,
+            "canais": list(exigencia.canais), "proprio": proprio, "sugestao": sugestao}
 
 
 def _texto_bruto(dados: dict[str, Any]) -> dict[str, Any]:

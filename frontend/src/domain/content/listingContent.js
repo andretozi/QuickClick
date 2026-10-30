@@ -150,6 +150,24 @@ export const LISTING_WIZARD = {
     readingPhoto: 'Lendo a foto…',
     defects: { title: 'Defeitos e desgaste que a IA viu', question: 'Está certo?', removed: 'Fora do anúncio' },
     pending: (count) => `${count} ${plural(count, 'item', 'itens')} esperando a sua resposta`,
+    requirements: {
+      common: 'O que os canais pedem',
+      lead: 'Confira a sugestão da IA ou preencha. Só conta o que você confirmar.',
+      askedBy: (names) => `Quem pede: ${names}`,
+      question: 'Está certo?',
+      choose: 'Escolha',
+      tapToConfirm: 'Toque na resposta certa para confirmar.',
+      origin: {
+        foto: 'Sugestão da IA, lida na foto',
+        etiqueta: 'Sugestão da IA, lida na etiqueta',
+        deducao: 'Sugestão da IA, deduzida pelas fotos'
+      },
+      confirmToContinue: 'Confirme este campo para continuar.',
+      blocked: {
+        title: 'Faltam campos que os canais pedem.',
+        text: 'Confirme ou preencha os campos marcados para continuar.'
+      }
+    },
     notRecognized: {
       title: 'Não consegui reconhecer o produto nessa foto.',
       text: 'Preencha os campos à mão. Se quiser, volte e troque a foto.'

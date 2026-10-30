@@ -17,6 +17,7 @@ from backend.application.ia.modelos import (
     ContextoDaChamada,
     EntradaDaReleitura,
     FalhaDoProvedor,
+    FotoPreparada,
     RespostaDaIA,
 )
 from backend.domain.canais.esquema import TipoDeCampo
@@ -399,7 +400,8 @@ class TestEsquemas(unittest.TestCase):
 
 
 class TestPrompts(unittest.TestCase):
-    ETAPAS = ("leitura", "releitura", "perfil", "pesquisa", "preco", "precos_web", "texto", "correcao", "atributos_ml")
+    ETAPAS = ("leitura", "releitura", "releitura_campos", "perfil", "pesquisa", "preco", "precos_web", "texto",
+              "correcao", "atributos_ml")
 
     def test_um_txt_por_etapa_com_a_versao_no_nome_e_nada_de_md(self):
         arquivos = sorted(p.name for p in PASTA_DE_PROMPTS.iterdir() if p.is_file())
@@ -423,17 +425,36 @@ class TestPrompts(unittest.TestCase):
         prompts = carregar_prompts()
         self.assertEqual(registro.usos[0].versao_prompt, f"{prompts['leitura'].versao}+{prompts['releitura'].versao}")
 
+    def test_releitura_dirigida_manda_as_fotos_da_leitura_e_as_chaves_pedidas(self):
+        cliente, sdk, registro, _ = cliente_anthropic(resposta_anthropic('{"texto_legivel": [], "atributos": [], '
+                                                                         '"defeitos_visiveis": []}'))
+        fotos = tuple(FotoPreparada(i, b"foto%d" % i, b"d") for i in range(2))
+        AnthropicLeitor(cliente, "claude-opus-5-5").reler(
+            EntradaDaReleitura(fotos, {"produto": "Tênis"}, b"", "campos", ("tamanho", "gtin")), CONTEXTO)
+        conteudo = sdk.pedidos[0]["messages"][0]["content"]
+        self.assertEqual([b["type"] for b in conteudo], ["image", "image", "text"])
+        self.assertIn('Chaves pedidas: ["tamanho","gtin"]', conteudo[-1]["text"])
+        prompts = carregar_prompts()
+        self.assertEqual(registro.usos[0].versao_prompt,
+                         f"{prompts['leitura'].versao}+{prompts['releitura_campos'].versao}")
+        self.assertEqual((prompts["leitura"].versao, prompts["releitura_campos"].versao),
+                         ("leitura_v3", "releitura_campos_v1"))
+
 
 class GatewayMLFalso:
-    def __init__(self, busca=None, erro_busca=None, tarifa=None):
+    def __init__(self, busca=None, erro_busca=None, tarifa=None, erro_atributos=None):
         self._busca, self._erro_busca, self._tarifa = busca, erro_busca, tarifa
+        self._erro_atributos = erro_atributos
         self.buscas = 0
 
     def descobrir_dominio(self, termos, token):
         return [{"category_id": "MLB23262", "category_name": "Tênis", "domain_name": "Tênis"}]
 
     def atributos_da_categoria(self, categoria_id, token):
-        return [{"id": "BRAND", "name": "Marca", "tags": {"required": True}, "values": [], "hierarchy": "x"}]
+        if self._erro_atributos:
+            raise self._erro_atributos
+        return [{"id": "BRAND", "name": "Marca", "tags": {"required": True}, "values": [], "hierarchy": "x",
+                 "value_type": "string"}]
 
     def buscar_itens(self, termos, categoria_id, condicao, token):
         self.buscas += 1
@@ -490,8 +511,10 @@ class TestFontePrecosML(unittest.TestCase):
     def test_esquema_no_modelo_generico_usa_o_cache(self):
         cache = CacheEmMemoria()
         fonte = FontePrecosMercadoLivre(GatewayMLFalso(), cache, relogio=lambda: AGORA)
-        esquema = fonte.esquema("MLB23262", "t")
-        self.assertEqual((esquema.canal, esquema.categoria_id, esquema.categoria_nome), ("mercado-livre", "MLB23262", ""))
+        esquema = fonte.esquema("MLB23262", "t", "Tênis")
+        self.assertEqual((esquema.canal, esquema.categoria_id, esquema.categoria_nome),
+                         ("mercado-livre", "MLB23262", "Tênis"))
+        self.assertEqual(cache.dados["MLB23262"][0]["value_type"], "string")
         self.assertEqual([(c.id, c.obrigatorio, c.tipo, c.chave) for c in esquema.campos],
                          [("BRAND", True, TipoDeCampo.TEXTO, "marca")])
         self.assertIn("MLB23262", cache.dados)
@@ -499,6 +522,17 @@ class TestFontePrecosML(unittest.TestCase):
         cache.dados["MLB1"] = [{"id": "COLOR", "name": "Cor", "tags": {}, "values": [{"id": "1", "name": "Preto"}]}]
         cor = fonte.esquema("MLB1", "t").campos
         self.assertEqual([(c.id, c.tipo, c.chave) for c in cor], [("COLOR", TipoDeCampo.LISTA, "cor")])
+
+    def test_ml_fora_do_ar_esquema_none_e_atributos_vazios(self):
+        fonte = FontePrecosMercadoLivre(GatewayMLFalso(erro_atributos=ErroDoMercadoLivre("fora", 503)), CacheEmMemoria(),
+                                        relogio=lambda: AGORA)
+        with self.assertLogs("quickclick.marketplaces", "WARNING"):
+            self.assertIsNone(fonte.esquema("MLB1", "t"))
+        with self.assertLogs("quickclick.marketplaces", "WARNING"):
+            self.assertEqual(fonte.atributos_da_categoria("MLB1", "t"), [])
+        sem_campos = FontePrecosMercadoLivre(GatewayMLFalso(), CacheEmMemoria(), relogio=lambda: AGORA)
+        sem_campos._cache.dados["MLB2"] = []
+        self.assertEqual(sem_campos.esquema("MLB2", "t").campos, ())  # categoria sem campos não é falha
 
 
 if __name__ == "__main__":

@@ -35,6 +35,9 @@ MODELO_PADRAO_ML = "Padrão"
 MOTIVO_SEM_GTIN_ML = "O produto não tem código cadastrado"
 TERMOS_DE_KIT = ("kit", "conjunto", "jogo", "pack")
 IDS_QUANTIDADE_ML = ("UNITS_PER_PACK", "UNITS_PER_PACKAGE", "PACKAGE_QUANTITY")
+# Obrigatórios que completar_para_publicacao preenche sozinho (o GTIN fica coberto pelo EMPTY_GTIN_REASON)
+PREENCHIDOS_NA_PUBLICACAO_ML = frozenset({"BRAND", "MANUFACTURER", "MODEL", "SALE_FORMAT", "UNITS_PER_PACK",
+                                          "IS_SET", "EMPTY_GTIN_REASON", "GTIN"})
 UNIDADES_CANONICAS = {"ml": "mL", "l": "L", "cc": "cc", "cm": "cm", "mm": "mm", "m": "m", "g": "g", "kg": "kg"}
 
 
@@ -56,6 +59,7 @@ class AtributoML:
     obrigatorio: bool
     valores: tuple[tuple[str, str], ...] = ()  # (id do valor, nome do valor), quando a lista é fechada
     unidade_padrao: str = ""
+    tipo_valor: str = ""  # value_type do ML (string, number, number_unit, list, boolean); vazio no cache antigo
 
     @staticmethod
     def de_api(bruto: dict[str, Any]) -> "AtributoML":
@@ -68,7 +72,7 @@ class AtributoML:
         )
         unidade = str(bruto.get("default_unit") or "").strip()
         return AtributoML(id=str(bruto.get("id")), nome=str(bruto.get("name") or ""), obrigatorio=obrigatorio,
-                          valores=valores, unidade_padrao=unidade)
+                          valores=valores, unidade_padrao=unidade, tipo_valor=str(bruto.get("value_type") or "").strip())
 
 
 @dataclass(frozen=True)
@@ -309,12 +313,23 @@ def completar_para_publicacao(ligados: list[AtributoLigado], da_categoria: list[
     return saida
 
 
+TIPOS_DO_ML = {"boolean": TipoDeCampo.BOOLEANO, "number": TipoDeCampo.NUMERO, "number_unit": TipoDeCampo.NUMERO,
+               "list": TipoDeCampo.LISTA, "string": TipoDeCampo.TEXTO}
+
+
+def _tipo_do_campo(atributo: AtributoML) -> TipoDeCampo:
+    if atributo.tipo_valor in TIPOS_DO_ML:
+        return TIPOS_DO_ML[atributo.tipo_valor]
+    # Cache antigo (sem value_type) ou tipo que não conhecemos: deduz pelos valores e pela unidade
+    return TipoDeCampo.LISTA if atributo.valores else TipoDeCampo.NUMERO if atributo.unidade_padrao else TipoDeCampo.TEXTO
+
+
 def esquema_do_ml(categoria_id: str, categoria_nome: str, atributos: list[AtributoML]) -> EsquemaDoCanal:
-    """Os atributos de uma categoria do Mercado Livre no modelo genérico de campos, na mesma ordem."""
+    """Os atributos de uma categoria do Mercado Livre no modelo genérico de campos, na mesma ordem. Os valores
+    do ML ficam no campo em qualquer tipo (servem à conversão, como "Sim" e "Não" do booleano)."""
     campos = tuple(
         CampoDoCanal(
-            canal=CANAL_ML, id=a.id, nome=a.nome, obrigatorio=a.obrigatorio,
-            tipo=TipoDeCampo.LISTA if a.valores else TipoDeCampo.NUMERO if a.unidade_padrao else TipoDeCampo.TEXTO,
+            canal=CANAL_ML, id=a.id, nome=a.nome, obrigatorio=a.obrigatorio, tipo=_tipo_do_campo(a),
             valores=a.valores, unidade=a.unidade_padrao, chave=chave_do_atributo_ml(a),
         )
         for a in atributos

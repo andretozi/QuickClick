@@ -3,7 +3,7 @@ Infraestrutura · Dados reais do Mercado Livre para a IA (com o token do vendedo
 
     descobrir_categoria    GET /sites/MLB/domain_discovery/search?q=...
     atributos_da_categoria GET /categories/{id}/attributes (cache no banco por 24 horas)
-    esquema                os mesmos atributos no modelo genérico de campos (sem chamada nova)
+    esquema                os mesmos atributos no modelo genérico de campos (sem chamada nova; None se o ML falhou)
     buscar_parecidos       GET /sites/MLB/search (até 50 ativos parecidos)
     tarifa                 GET /sites/MLB/listing_prices (anúncio Clássico, gold_special)
 
@@ -45,6 +45,8 @@ def _resumo_do_atributo(bruto: dict[str, Any]) -> dict[str, Any]:
     }
     if bruto.get("default_unit"):
         resumo["default_unit"] = bruto.get("default_unit")
+    if bruto.get("value_type"):
+        resumo["value_type"] = bruto.get("value_type")
     return resumo
 
 
@@ -70,7 +72,8 @@ class FontePrecosMercadoLivre:
                                          str(primeiro.get("domain_name") or ""))
         return None
 
-    def atributos_da_categoria(self, categoria_id: str, access_token: str) -> list[AtributoML]:
+    def _atributos(self, categoria_id: str, access_token: str) -> list[AtributoML] | None:
+        """None quando o Mercado Livre não respondeu (e não havia cache)."""
         agora = self._relogio()
         guardados = self._cache.obter(categoria_id, agora)
         if guardados is None:
@@ -78,14 +81,18 @@ class FontePrecosMercadoLivre:
                 brutos = self._gateway.atributos_da_categoria(categoria_id, access_token)
             except ErroDoMercadoLivre as erro:
                 log.warning("Mercado Livre: atributos da categoria não lidos (%s).", erro.status or "sem resposta")
-                return []
+                return None
             guardados = [_resumo_do_atributo(b) for b in brutos if isinstance(b, dict) and b.get("id")]
             self._cache.salvar(categoria_id, guardados, agora + VALIDADE_DOS_ATRIBUTOS)
         return [AtributoML.de_api(a) for a in guardados]
 
-    def esquema(self, categoria_id: str, access_token: str) -> EsquemaDoCanal:
-        # O nome da categoria não vem do endpoint de atributos
-        return esquema_do_ml(categoria_id, "", self.atributos_da_categoria(categoria_id, access_token))
+    def atributos_da_categoria(self, categoria_id: str, access_token: str) -> list[AtributoML]:
+        return self._atributos(categoria_id, access_token) or []
+
+    def esquema(self, categoria_id: str, access_token: str, categoria_nome: str = "") -> EsquemaDoCanal | None:
+        # O nome da categoria não vem do endpoint de atributos: quem chama passa o da descoberta
+        atributos = self._atributos(categoria_id, access_token)
+        return None if atributos is None else esquema_do_ml(categoria_id, categoria_nome, atributos)
 
     def buscar_parecidos(self, termos: list[str], categoria_id: str | None, condicao: str,
                          access_token: str) -> list[PrecoObservado] | None:

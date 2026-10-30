@@ -50,6 +50,20 @@ def em_json(dados: Any) -> str:
     return json.dumps(dados, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
+def pedido_da_releitura(entrada: EntradaDaReleitura) -> tuple[list[bytes], str, str]:
+    """(imagens, texto, versão da instrução). Releitura dirigida ("campos"): as fotos da leitura e só as chaves
+    pedidas; etiqueta e foto extra: a imagem nova."""
+    if entrada.tipo == "campos":
+        instrucao = prompt("releitura_campos")
+        imagens = [f.leitura_jpeg for f in entrada.fotos_da_leitura[:MAX_FOTOS_NA_LEITURA]]
+        texto = (f"{instrucao.texto}\n\nChaves pedidas: {em_json(list(entrada.campos))}\n"
+                 f"Leitura atual: {em_json(entrada.leitura_atual)}")
+        return imagens, texto, instrucao.versao
+    instrucao = prompt("releitura")
+    texto = f"{instrucao.texto}\n\nTipo da imagem: {entrada.tipo}\nLeitura atual: {em_json(entrada.leitura_atual)}"
+    return [entrada.imagem_jpeg], texto, instrucao.versao
+
+
 def bloco_de_imagem(jpeg: bytes) -> dict[str, Any]:
     return {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg",
                                         "data": base64.standard_b64encode(jpeg).decode("ascii")}}
@@ -121,15 +135,10 @@ class AnthropicLeitor(_BaseAnthropic):
                           effort=self._effort_leitura, max_tokens=self._max_tokens, timeout_s=180)
 
     def reler(self, entrada: EntradaDaReleitura, contexto: ContextoDaChamada) -> RespostaDaIA:
-        instrucao = prompt("releitura")
-        conteudo = [
-            bloco_de_imagem(entrada.imagem_jpeg),
-            {"type": "text", "text": f"{instrucao.texto}\n\nTipo da imagem: {entrada.tipo}\n"
-                                     f"Leitura atual: {em_json(entrada.leitura_atual)}"},
-        ]
+        imagens, texto, versao = pedido_da_releitura(entrada)
+        conteudo = [*(bloco_de_imagem(i) for i in imagens), {"type": "text", "text": texto}]
         return self._json(etapa_prompt="leitura", contexto=contexto, conteudo=conteudo, esquema=esquemas.RELEITURA,
-                          effort=self._effort_releitura, max_tokens=4000, timeout_s=120,
-                          instrucao_extra=instrucao.versao)
+                          effort=self._effort_releitura, max_tokens=4000, timeout_s=120, instrucao_extra=versao)
 
 
 class AnthropicPesquisador(_BaseAnthropic):

@@ -52,11 +52,15 @@ export function photoQualityTips(analysis) {
   return (analysis?.photos ?? []).filter((photo) => photo.quality && photo.quality !== 'ok');
 }
 
+// GTIN e embalagem ficam na ficha (CHAVES_DE_GTIN_E_EMBALAGEM no back): só aparecem quando um canal pede, nas exigências
+const FICHA_ONLY_KEYS = new Set(['gtin', 'peso_g', 'comprimento_cm', 'largura_cm', 'altura_cm']);
+
 /** Leitura → cartões, guardando o que o vendedor já respondeu ou digitou em cada chave. */
 export function cardsFromReading(reading, previous = []) {
   const before = new Map(previous.map((card) => [card.key, card]));
   const questions = new Map((reading?.questions ?? []).map((q) => [q.key, q]));
-  const cards = (reading?.attributes ?? []).map((attribute) => {
+  const attributes = (reading?.attributes ?? []).filter((attribute) => !FICHA_ONLY_KEYS.has(attribute.key));
+  const cards = attributes.map((attribute) => {
     const old = before.get(attribute.key);
     const question = questions.get(attribute.key);
     // a releitura (foto extra) pode ter preenchido o que antes era pergunta: vale o valor novo
@@ -119,13 +123,24 @@ export function conditionFromAi(value) {
   return null;
 }
 
-/** O que vai para a confirmação da análise. */
-export function confirmationPayload({ product, category, condition, cards, defects }) {
+/**
+ * O que vai para a confirmação da análise. requirements: o pedaço das exigências dos canais
+ * ({ attributes, ownFields }, de exigencias.js); o valor da exigência ganha do cartão de mesma chave.
+ */
+export function confirmationPayload({ product, category, condition, cards, defects, requirements }) {
+  const fromRequirements = requirements?.attributes ?? [];
+  const keys = new Set(fromRequirements.map((attribute) => attribute.key));
   return {
     product: String(product ?? '').trim(),
     category,
     condition: condition === 'used' ? 'usado' : 'novo',
-    attributes: cards.filter(isConfirmed).map((card) => ({ key: card.key, value: String(card.value).trim() })),
+    attributes: [
+      ...cards
+        .filter((card) => isConfirmed(card) && !keys.has(card.key))
+        .map((card) => ({ key: card.key, value: String(card.value).trim() })),
+      ...fromRequirements
+    ],
+    ownFields: requirements?.ownFields ?? [],
     defects: defects.filter((defect) => defect.keep).map((defect) => defect.text)
   };
 }

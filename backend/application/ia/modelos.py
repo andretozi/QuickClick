@@ -108,12 +108,14 @@ class EntradaDaLeitura:
 
 @dataclass(frozen=True)
 class EntradaDaReleitura:
-    """Releitura de uma etiqueta (recorte) ou de uma foto extra, com a leitura atual como contexto."""
+    """Releitura de uma etiqueta (recorte), de uma foto extra ou dirigida (só as chaves que faltam, nas
+    fotos da leitura), com a leitura atual como contexto."""
 
     fotos_da_leitura: tuple[FotoPreparada, ...]  # o mesmo começo da leitura (aproveita o cache)
     leitura_atual: dict[str, Any]
-    imagem_jpeg: bytes = field(repr=False)
-    tipo: str = "etiqueta"  # etiqueta | foto_extra
+    imagem_jpeg: bytes = field(repr=False)  # vazia na releitura dirigida
+    tipo: str = "etiqueta"  # etiqueta | verso | detalhe (foto extra) | campos (releitura dirigida)
+    campos: tuple[str, ...] = ()  # as chaves pedidas na releitura dirigida
 
 
 @dataclass(frozen=True)
