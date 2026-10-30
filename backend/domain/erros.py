@@ -210,6 +210,20 @@ class PublicacaoRecusada(ErroDeDominio):
         return {"detalhes": self.detalhes} if self.detalhes else {}
 
 
+class CamposObrigatoriosFaltando(ErroDeDominio):
+    """O canal pede campos que o anúncio ainda não tem; nada foi enviado a ele."""
+
+    codigo = "campos_obrigatorios_faltando"
+
+    def __init__(self, canal: str, faltando: Sequence[str]):
+        super().__init__(f"Para publicar na {canal}, falta preencher {juntar_nomes(faltando)}.")
+        self.faltando = list(faltando)
+
+    @property
+    def extras(self) -> dict:
+        return {"faltando": self.faltando}
+
+
 class PlanoInvalido(ErroDeDominio):
     codigo = "plano_invalido"
 
