@@ -176,8 +176,17 @@ class AnaliseNaoEncontrada(ErroDeDominio):
 class AnuncioNaoEncontrado(ErroDeDominio):
     codigo = "anuncio_nao_encontrado"
 
+    def __init__(self, mensagem: str = "Não encontramos esse anúncio na sua conta do Mercado Livre."):
+        super().__init__(mensagem)
+
+
+class AnuncioDesatualizado(ErroDeDominio):
+    """Outra aba ou aparelho gravou o anúncio depois da versão que o pedido leu."""
+
+    codigo = "anuncio_desatualizado"
+
     def __init__(self):
-        super().__init__("Não encontramos esse anúncio na sua conta do Mercado Livre.")
+        super().__init__("Este anúncio mudou em outra aba ou aparelho. Recarregue a página para ver a versão nova.")
 
 
 class EstadoDaAnaliseInvalido(ErroDeDominio):

@@ -12,6 +12,7 @@
  *     presentation    nunca infrastructure nem app
  * - O único fetch do front fica no cliente HTTP (infrastructure/http/httpClient.js).
  * - A regra pura das exigências dos canais passa na conferência de scripts/exigencias.check.mjs.
+ * - As conversões puras dos anúncios passam na conferência de scripts/listings.check.mjs.
  *
  * Sem problemas, sai com 0. Com problemas, lista um por linha e sai com 1.
  */
@@ -174,6 +175,11 @@ try {
   await import('./exigencias.check.mjs');
 } catch (error) {
   problems.push(`regra das exigências (scripts/exigencias.check.mjs): ${error.message}`);
+}
+try {
+  await import('./listings.check.mjs');
+} catch (error) {
+  problems.push(`conversões dos anúncios (scripts/listings.check.mjs): ${error.message}`);
 }
 
 if (problems.length) {

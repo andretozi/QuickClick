@@ -51,10 +51,12 @@ def _conferir_trava_de_testes(url: str) -> None:
 def criar_engine(url: str, timeout_s: int = TIMEOUT_CONEXAO_S):
     """Engine do Postgres com pool_pre_ping e limite de tempo para abrir cada conexão."""
     _conferir_trava_de_testes(url)
+    # hide_parameters: erro de banco não leva para o log os valores gravados (título, fotos, descrição)
     if url.startswith("sqlite"):
-        return create_engine(url, connect_args={"check_same_thread": False})
+        return create_engine(url, connect_args={"check_same_thread": False}, hide_parameters=True)
     return create_engine(
         url,
+        hide_parameters=True,
         pool_pre_ping=True,
         pool_size=POOL_SIZE,
         max_overflow=MAX_OVERFLOW,

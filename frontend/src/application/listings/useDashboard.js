@@ -6,6 +6,7 @@ import { showToast, TOAST_TONES } from '@/application/feedback/toastStore.js';
 import {
   duplicateListing,
   listListings,
+  listLocalListings,
   mergeMercadoLivreItem,
   removeListing,
   syncListingsWithMercadoLivre,
@@ -38,6 +39,9 @@ export const DASHBOARD_TABS = { LISTINGS: 'listings', INSIGHTS: 'insights' };
 
 const DEFAULT_FILTERS = { query: '', status: 'all', sort: 'recent' };
 
+/** Rede fora ou servidor com erro (5xx): o painel mostra a cópia salva no navegador. */
+const isConnectionError = (error) => error?.status === 0 || error?.status >= 500 || error?.code === 'sem_conexao';
+
 /**
  * Aplicação · Caso de uso "painel do vendedor".
  *
@@ -48,7 +52,7 @@ const DEFAULT_FILTERS = { query: '', status: 'all', sort: 'recent' };
 export default function useDashboard() {
   const { account, welcome } = useSession();
   const accountId = account?.id;
-  const [data, setData] = useState({ status: 'loading', listings: [], connections: [] });
+  const [data, setData] = useState({ status: 'loading', listings: [], connections: [], offline: false });
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [tab, setTab] = useState(DASHBOARD_TABS.LISTINGS);
   const [busyId, setBusyId] = useState(null);
@@ -62,24 +66,33 @@ export default function useDashboard() {
     if (!accountId) return;
     setData((current) => ({ ...current, status: 'loading' }));
     try {
-      const [localListings, connections] = await Promise.all([
-        listListings(accountId),
+      const [{ listings, offline }, connections] = await Promise.all([
+        listListings(accountId).then(
+          (items) => ({ listings: items, offline: false }),
+          async (error) => {
+            if (!isConnectionError(error)) throw error;
+            return { listings: await listLocalListings(accountId), offline: true };
+          }
+        ),
         fetchConnectedMarketplaces().catch(() => [])
       ]);
       if (!mounted.current) return;
-      setData({ status: 'ready', listings: localListings, connections });
+      setData({ status: 'ready', listings, connections, offline });
+      // Sem o servidor, o sync não roda: gravaria por cima de uma cópia que pode estar desatualizada.
+      if (offline) return;
 
       const mlConnected = connections.some((connection) => connection.slug === PRIMARY_CHANNEL);
       if (mlConnected) {
         setSyncing(true);
         try {
           const mlProducts = await fetchMarketplaceProducts(PRIMARY_CHANNEL);
+          if (!mounted.current) return;
           const synced = await syncListingsWithMercadoLivre(accountId, mlProducts);
           if (mounted.current) {
             setData((current) => ({ ...current, listings: synced }));
           }
         } catch {
-          // Sem internet ou token expirado: mantém os dados locais já carregados
+          // Sem internet ou token expirado: mantém a lista já carregada
         } finally {
           if (mounted.current) setSyncing(false);
         }
@@ -248,6 +261,7 @@ export default function useDashboard() {
     account,
     hour,
     status: data.status,
+    offline: data.offline,
     listings: data.listings,
     connections: data.connections,
     mercadoLivreConnected,

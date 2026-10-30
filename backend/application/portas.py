@@ -5,9 +5,11 @@ O que os casos de uso precisam do mundo de fora, descrito como interfaces (Proto
 A infraestrutura implementa estas portas; os testes usam versões falsas, em memória.
 """
 
+from datetime import datetime
 from typing import Any, Never, Protocol
 
 from backend.domain.conta_vinculada import ContaVinculada, CredenciaisOAuth
+from backend.domain.produto import Produto
 from backend.domain.usuario import Usuario
 from backend.domain.vendedor import Vendedor
 
@@ -26,6 +28,22 @@ class RepositorioContasVinculadas(Protocol):
     def salvar(self, conta: ContaVinculada) -> None: ...
 
     def remover(self, vendedor_id: int, marketplace: str) -> None: ...
+
+
+class RepositorioDeProdutos(Protocol):
+    """Todo método recebe o vendedor do token e só enxerga os produtos dele."""
+
+    def listar(self, vendedor_id: int) -> list[Produto]: ...
+
+    def obter(self, vendedor_id: int, produto_id: str) -> Produto | None: ...
+
+    def salvar(self, vendedor_id: int, produto: Produto, agora: datetime) -> Produto:
+        """Cria ou substitui; levanta AnuncioDesatualizado se o gravado for mais novo que `produto.atualizado_em`."""
+        ...
+
+    def importar(self, vendedor_id: int, produto: Produto) -> bool: ...
+
+    def remover(self, vendedor_id: int, produto_id: str) -> bool: ...
 
 
 class RepositorioUsuarios(Protocol):

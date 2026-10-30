@@ -7,6 +7,15 @@
   gap: clamp(20px, 3vw, 30px);
 }
 
+/* O FormAlert nasceu para fundo claro; aqui ele fica sobre o fundo escuro do painel */
+.dashboard .dashboard__offline {
+  color: var(--color-cream);
+}
+
+.dashboard__offline .form-alert__text {
+  color: rgb(var(--rgb-cream) / 0.72);
+}
+
 .dashboard__stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

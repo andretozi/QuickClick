@@ -15,6 +15,7 @@ from starlette.exceptions import HTTPException
 from backend.domain.erros import (
     AnaliseEmAndamento,
     AnaliseNaoEncontrada,
+    AnuncioDesatualizado,
     AnuncioNaoEncontrado,
     CotaEsgotada,
     CredenciaisInvalidas,
@@ -62,6 +63,7 @@ STATUS_POR_ERRO: tuple[tuple[type[ErroDeDominio], int], ...] = (
     (MercadoLivreDesconectado, 409),
     (AnaliseNaoEncontrada, 404),
     (AnuncioNaoEncontrado, 404),
+    (AnuncioDesatualizado, 409),
     (EstadoDaAnaliseInvalido, 409),
     (PublicacaoRecusada, 422),
     (MaioridadeNaoConfirmada, 400),

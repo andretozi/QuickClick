@@ -49,6 +49,15 @@ class TestMigracoes(BaseSQLite):
             diferencas = compare_metadata(MigrationContext.configure(conexao), Base.metadata)
         self.assertEqual(diferencas, [])
 
+    def test_banco_vazio_ganha_produtos_e_publicacoes_com_o_indice_unico(self):
+        preparar_banco(self.engine, self.url)
+        with self.engine.connect() as conexao:
+            banco = inspect(conexao)
+            self.assertTrue({"produtos", "publicacoes"} <= set(banco.get_table_names()))
+            indices = {i["name"]: bool(i["unique"]) for i in banco.get_indexes("publicacoes")}
+            self.assertEqual(indices.get("ux_publicacoes_externo"), True)
+            self.assertIn("ix_produtos_vendedor_atualizado", {i["name"] for i in banco.get_indexes("produtos")})
+
     def test_rodar_duas_vezes_nao_muda_nada(self):
         preparar_banco(self.engine, self.url)
         segundo = preparar_banco(self.engine, self.url)
@@ -79,6 +88,12 @@ class TestTravaAditiva(unittest.TestCase):
     def test_sql_pendente_desde_a_inicial_e_so_aditivo(self):
         sql = sql_pendente("postgresql+psycopg2://", REVISAO_INICIAL)
         self.assertIn("CREATE TABLE ia_analises", sql)
+        self.assertEqual(comandos_proibidos(sql), [])
+
+    def test_sql_da_0003_so_cria_tabelas_e_indices(self):
+        sql = sql_pendente("postgresql+psycopg2://", "0002_ia_anuncios")
+        self.assertIn("CREATE TABLE produtos", sql)
+        self.assertIn("CREATE UNIQUE INDEX ux_publicacoes_externo", sql)
         self.assertEqual(comandos_proibidos(sql), [])
 
     def test_comandos_que_nao_sao_aditivos_sao_achados(self):

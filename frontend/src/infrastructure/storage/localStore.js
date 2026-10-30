@@ -29,7 +29,10 @@ export const USER_KEYS = {
   CONNECTIONS: 'conexoes',
   PREFERENCES: 'preferencias',
   DRAFT: 'rascunho',
-  DRAFT_PHOTOS: 'rascunho_fotos'
+  DRAFT_PHOTOS: 'rascunho_fotos',
+  LISTING_PHOTOS: 'fotos_anuncio', // fotos fora do https de um anúncio: userKey(id, 'fotos_anuncio:<id do produto>')
+  LISTINGS_IMPORTED: 'anuncios_importados',
+  LISTINGS_CACHE: 'anuncios_cache'
 };
 
 const userPrefix = (accountId) => `usuario:${accountId}:`;
