@@ -27,7 +27,7 @@ export const FIELD_ERRORS = {
   'email-taken': 'Esse email já tem conta. Que tal entrar?',
   'wrong-password': 'A senha atual não confere.',
   'invalid-credentials': 'Email ou senha não conferem. Confira os dois e tente de novo.',
-  'password-incorrect': 'A senha não confere.'
+  'confirmation-mismatch': 'O nome da loja não confere. Digite exatamente como aparece acima.'
 };
 
 export const MODAL = {

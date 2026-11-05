@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from backend.application.casos_de_uso.autenticar_usuario import ResultadoAutenticacao
 from backend.application.portas import RepositorioUsuarios, ServicoHashSenha, ServicoToken
 from backend.domain.erros import EmailJaCadastrado, MaioridadeNaoConfirmada
+from backend.domain.usuario import email_valido, normalizar_email
 
 
 class RegistrarUsuario:
@@ -29,9 +30,11 @@ class RegistrarUsuario:
         plano: str = "gratis",
         maior_de_idade: bool = False,
     ) -> ResultadoAutenticacao:
-        email_normalizado = email.strip().lower()
+        email_normalizado = normalizar_email(email)
         if not email_normalizado or not senha:
             raise ValueError("Email e senha são obrigatórios.")
+        if not email_valido(email_normalizado):
+            raise ValueError("Informe um email válido.")
         if not maior_de_idade:
             raise MaioridadeNaoConfirmada()
 

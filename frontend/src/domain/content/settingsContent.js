@@ -4,6 +4,7 @@ export const SETTINGS = {
   eyebrow: 'SUA CONTA',
   title: 'Configurações',
   lead: 'Perfil, segurança, plano, conexões e preferências. Tudo num lugar só.',
+  leadWithoutPassword: 'Perfil, plano, conexões e preferências. Tudo num lugar só.',
   navLabel: 'Seções das configurações',
   idPrefix: 'config',
   sections: {
@@ -51,7 +52,7 @@ export const SECURITY_SECTION = {
   submit: 'Trocar a senha',
   submitting: 'Trocando…',
   done: { title: 'Senha trocada.', text: 'Na próxima vez, entre com a senha nova.' },
-  note: 'Simulação: a senha fica só neste navegador, com hash. A segurança de verdade chega com o back.'
+  note: 'Sua senha é protegida com criptografia irreversível no servidor.'
 };
 
 export const PLAN_SECTION = {
@@ -94,12 +95,15 @@ export const PREFERENCES_SECTION = {
 
 export const DANGER_SECTION = {
   title: 'Zona de risco',
-  lead: 'Excluir a conta apaga deste navegador o perfil, os anúncios, as conexões e as preferências. Não dá pra desfazer.',
+  lead: 'Excluir a conta apaga definitivamente o seu perfil, os anúncios, as conexões e as preferências. Não dá pra desfazer.',
   button: 'Excluir minha conta',
   modal: {
     title: 'Excluir sua conta?',
-    text: 'Tudo o que é seu some deste navegador. Para confirmar, digite a sua senha.',
-    password: { label: 'Sua senha', placeholder: 'A senha da conta' },
+    text: (target) => `Tudo o que é seu será apagado de vez. Para confirmar, digite "${target}" abaixo.`,
+    confirmation: {
+      label: 'Nome da loja para confirmar',
+      placeholder: (target) => target
+    },
     confirm: 'Excluir para sempre',
     confirming: 'Excluindo…',
     cancel: 'Cancelar'

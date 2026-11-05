@@ -1,20 +1,18 @@
 /**
- * Infraestrutura · Repositório de contas (localStorage)
+ * Infraestrutura · Cache local de contas autenticadas (localStorage)
  *
- * Faz o papel da API de contas: criar, ler, atualizar, conferir a senha e excluir.
- * Não existe conta pré-criada: cada vendedor cria a sua em #/cadastro. Várias contas
- * podem morar no mesmo navegador; os dados de cada uma ficam nas chaves dela.
- * Devolve sempre Promises, como uma chamada de rede. Para trocar pela API de verdade,
- * mantenha as mesmas funções e troque o corpo por chamadas ao httpClient.
+ * Sincroniza no navegador os dados retornados pela API (/api/auth/me, /api/me/plano)
+ * junto com preferências visuais locais da conta (telefone e cor do avatar), sem
+ * armazenar senhas nem simular autenticação local.
  */
-import { STORAGE_KEYS, clearUser, newId, nowIso, readJson, simulateLatency, writeJson } from './localStore.js';
-import { hashPassword, verifyPassword } from '../security/passwordHasher.js';
+import { STORAGE_KEYS, clearUser, nowIso, readJson, writeJson } from './localStore.js';
 
-/** Códigos de erro estáveis (como os do back). Os textos ficam no domain/content. */
+/** Códigos de erro estáveis alinhados aos códigos devolvidos pela API. */
 export const ACCOUNT_ERRORS = {
   EMAIL_TAKEN: 'email_em_uso',
   INVALID_CREDENTIALS: 'credenciais_invalidas',
   WRONG_PASSWORD: 'senha_atual_incorreta',
+  CONFIRMATION_MISMATCH: 'confirmacao_incorreta',
   NOT_FOUND: 'conta_nao_encontrada'
 };
 
@@ -28,7 +26,7 @@ export class AccountError extends Error {
 
 const normalizeEmail = (email) => String(email ?? '').trim().toLowerCase();
 
-/** JSON guardado (português) → conta do front. A senha nunca sai daqui. */
+/** JSON guardado (português) → conta do front. */
 const toAccount = (conta) =>
   conta
     ? {
@@ -38,115 +36,30 @@ const toAccount = (conta) =>
         phone: conta.telefone ?? '',
         store: conta.loja,
         plan: conta.plano,
+        hasPassword: conta.tem_senha !== undefined ? Boolean(conta.tem_senha) : true,
         avatarColor: conta.cor_avatar ?? 'coral',
         createdAt: conta.criada_em,
         updatedAt: conta.atualizada_em
       }
     : null;
 
-/**
- * Ler e gravar sempre juntos, sem await no meio (a latência e as contas de senha vêm antes):
- * assim duas ações seguidas não se atropelam.
- */
 const load = () => readJson(STORAGE_KEYS.ACCOUNTS, []);
-
 const save = (contas) => writeJson(STORAGE_KEYS.ACCOUNTS, contas);
 
 export async function getAccount(id) {
-  await simulateLatency(90);
   return toAccount(load().find((conta) => conta.id === id));
 }
 
-export async function createAccount({ name, email, store, password }) {
-  const senha = await hashPassword(password);
-  await simulateLatency(320);
-  const contas = load();
-  const normalized = normalizeEmail(email);
-  if (contas.some((conta) => conta.email === normalized)) throw new AccountError(ACCOUNT_ERRORS.EMAIL_TAKEN);
-
-  const now = nowIso();
-  const conta = {
-    id: newId('c'),
-    nome: name.trim(),
-    email: normalized,
-    telefone: '',
-    loja: store.trim(),
-    plano: 'gratis',
-    cor_avatar: 'coral',
-    senha,
-    criada_em: now,
-    atualizada_em: now
-  };
-  save([...contas, conta]);
-  return toAccount(conta);
-}
-
-/** Confere email e senha. Erro genérico de propósito: não contamos qual dos dois errou. */
-export async function authenticate(email, password) {
-  await simulateLatency(420);
-  const conta = load().find((item) => item.email === normalizeEmail(email));
-  const ok = conta ? await verifyPassword(password, conta.senha) : false;
-  if (!ok) throw new AccountError(ACCOUNT_ERRORS.INVALID_CREDENTIALS);
-  return toAccount(conta);
-}
-
-/** Atualiza o perfil. `patch` usa os nomes do front: name, email, phone, store, avatarColor. */
-export async function updateAccount(id, patch) {
-  await simulateLatency(260);
-  const contas = load();
-  const index = contas.findIndex((conta) => conta.id === id);
-  if (index < 0) throw new AccountError(ACCOUNT_ERRORS.NOT_FOUND);
-
-  const changes = {};
-  if (patch.name !== undefined) changes.nome = patch.name.trim();
-  if (patch.store !== undefined) changes.loja = patch.store.trim();
-  if (patch.phone !== undefined) changes.telefone = patch.phone.trim();
-  if (patch.avatarColor !== undefined) changes.cor_avatar = patch.avatarColor;
-  if (patch.email !== undefined) {
-    const normalized = normalizeEmail(patch.email);
-    if (contas.some((conta) => conta.email === normalized && conta.id !== id)) {
-      throw new AccountError(ACCOUNT_ERRORS.EMAIL_TAKEN);
-    }
-    changes.email = normalized;
-  }
-
-  const updated = { ...contas[index], ...changes, atualizada_em: nowIso() };
-  const next = [...contas];
-  next[index] = updated;
-  save(next);
-  return toAccount(updated);
-}
-
-export async function changePassword(id, currentPassword, newPassword) {
-  await simulateLatency(360);
-  const conta = load().find((item) => item.id === id);
-  if (!conta) throw new AccountError(ACCOUNT_ERRORS.NOT_FOUND);
-  if (!(await verifyPassword(currentPassword, conta.senha))) {
-    throw new AccountError(ACCOUNT_ERRORS.WRONG_PASSWORD);
-  }
-  const senha = await hashPassword(newPassword);
-  // Relê agora: outra ação pode ter gravado enquanto a senha era conferida.
-  const contas = load();
-  const index = contas.findIndex((item) => item.id === id);
-  if (index < 0) throw new AccountError(ACCOUNT_ERRORS.NOT_FOUND);
-  const next = [...contas];
-  next[index] = { ...contas[index], senha, atualizada_em: nowIso() };
-  save(next);
-}
-
-/** Exclui a conta e tudo o que é dela neste navegador (anúncios, conexões, preferências, rascunho). */
-export async function deleteAccount(id, password) {
-  await simulateLatency(420);
-  const conta = load().find((item) => item.id === id);
-  if (!conta) throw new AccountError(ACCOUNT_ERRORS.NOT_FOUND);
-  if (!(await verifyPassword(password, conta.senha))) throw new AccountError(ACCOUNT_ERRORS.WRONG_PASSWORD);
+/** Remove os dados locais da conta neste navegador após exclusão confirmada na API. */
+export function purgeLocalAccount(id) {
   save(load().filter((item) => item.id !== id));
   clearUser(id);
 }
 
 /**
- * Garante que a conta autenticada pela API ou recuperada com o token JWT
- * esteja salva localmente para os repositórios locais (rascunhos, preferências).
+ * Ponto único de conversão e persistência local da conta autenticada na API.
+ * Aceita tanto os campos em português da API (nome, loja, plano, tem_senha)
+ * quanto campos já normalizados do front (name, store, plan, hasPassword, phone, avatarColor).
  */
 export function upsertAccount(contaData) {
   const contas = load();
@@ -155,16 +68,20 @@ export function upsertAccount(contaData) {
   const index = contas.findIndex((c) => c.id === id || c.email === normalizedEmail);
   const now = nowIso();
   const existing = index >= 0 ? contas[index] : null;
+  const loja = String(contaData.store ?? contaData.loja ?? existing?.loja ?? '').trim();
+  const rawName = String(contaData.name ?? contaData.nome ?? existing?.nome ?? '').trim();
+  const nome = rawName || loja || normalizedEmail;
+  const temSenha = contaData.hasPassword ?? contaData.tem_senha ?? existing?.tem_senha ?? true;
 
   const conta = {
-    id: contaData.id,
-    nome: (contaData.name ?? contaData.nome ?? existing?.nome ?? '').trim(),
+    id,
+    nome,
     email: normalizedEmail,
-    telefone: (contaData.phone ?? contaData.telefone ?? existing?.telefone ?? '').trim(),
-    loja: (contaData.store ?? contaData.loja ?? existing?.loja ?? '').trim(),
+    telefone: String(contaData.phone ?? contaData.telefone ?? existing?.telefone ?? '').trim(),
+    loja,
     plano: contaData.plan ?? contaData.plano ?? existing?.plano ?? 'gratis',
+    tem_senha: Boolean(temSenha),
     cor_avatar: contaData.avatarColor ?? contaData.cor_avatar ?? existing?.cor_avatar ?? 'coral',
-    senha: existing?.senha ?? '',
     criada_em: existing?.criada_em ?? now,
     atualizada_em: now
   };

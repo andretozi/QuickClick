@@ -36,12 +36,6 @@ class TestJWT(unittest.TestCase):
         payload = servico.validar_token(servico.gerar_token(7, "A@B.com"))
         self.assertEqual((payload["sub"], payload["email"], payload["fin"]), ("7", "a@b.com", "acesso"))
 
-    def test_create_access_token_emite_jwt_de_acesso_valido(self):
-        servico = ServicoJWT(SEGREDO)
-        token = servico.create_access_token(42, "Loja@Gmail.com")
-        payload = servico.validar_token(token)
-        self.assertEqual((payload["sub"], payload["email"], payload["fin"]), ("42", "loja@gmail.com", "acesso"))
-
     def test_estado_do_oauth_nao_serve_como_login(self):
         servico = ServicoJWT(SEGREDO)
         estado = servico.gerar_token(7, "oauth:mercado-livre", finalidade=FINALIDADE_ESTADO_OAUTH)

@@ -41,9 +41,6 @@ class ServicoJWT:
         }
         return jwt.encode(payload, self._segredo, algorithm="HS256")
 
-    def create_access_token(self, user_id: int, email: str) -> str:
-        return self.gerar_token(user_id, email, finalidade=FINALIDADE_ACESSO)
-
     def validar_token(self, token: str, finalidade: str = FINALIDADE_ACESSO) -> dict[str, Any]:
         if not token:
             raise TokenInvalido("Token de autenticação não fornecido.")

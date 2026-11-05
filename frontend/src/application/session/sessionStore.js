@@ -2,16 +2,18 @@
  * Aplicação · Sessão do vendedor (compartilhada por todas as telas)
  *
  * Uma store pequena lida com useSyncExternalStore: o navbar, a guarda de rotas e as
- * páginas enxergam a mesma conta sem precisar de Context. Quem fala com o "servidor"
+ * páginas enxergam a mesma conta sem precisar de Context. Quem fala com o servidor
  * é o authService (infraestrutura); aqui só guardamos o resultado e avisamos as telas.
  */
 import {
   authenticateWithGoogle,
   completeGoogleRegistration,
+  removeCurrentAccount,
   restoreSession,
   signIn as signInRequest,
   signOut as signOutRequest,
-  signUp as signUpRequest
+  signUp as signUpRequest,
+  updateProfile as updateProfileRequest
 } from '@/infrastructure/auth/authService.js';
 
 export const SESSION_STATUS = { CHECKING: 'checking', GUEST: 'guest', SIGNED_IN: 'signed-in' };
@@ -85,17 +87,28 @@ export async function signUp(data) {
   return account;
 }
 
+export async function updateCurrentAccount(patch) {
+  const updated = await updateProfileRequest(patch);
+  setState({ account: updated });
+  return updated;
+}
+
+export async function deleteCurrentAccount(confirmation) {
+  await removeCurrentAccount(state.account?.id, confirmation);
+  forgetSession();
+}
+
 export async function signOut() {
   await signOutRequest();
   forgetSession();
 }
 
-/** Depois de excluir a conta: a sessão some junto, sem chamar o servidor. */
+/** Depois de sair ou excluir a conta: encerra o estado em memória da sessão. */
 export function forgetSession() {
   setState({ status: SESSION_STATUS.GUEST, account: null, welcome: false, signedOut: true });
 }
 
-/** Atualiza a conta mostrada (depois de editar o perfil). */
+/** Atualiza a conta mostrada (ex.: prévia da cor do avatar ou troca de plano). */
 export function setSessionAccount(account) {
   setState({ account });
 }
