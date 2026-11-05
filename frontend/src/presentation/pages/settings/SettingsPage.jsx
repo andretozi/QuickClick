@@ -7,7 +7,7 @@ import SecuritySection from './components/SecuritySection/SecuritySection.jsx';
 import PlanSection from './components/PlanSection/PlanSection.jsx';
 import PreferencesSection from './components/PreferencesSection/PreferencesSection.jsx';
 import DangerSection from './components/DangerSection/DangerSection.jsx';
-import useSettings, { SETTINGS_SECTIONS } from '@/application/settings/useSettings.js';
+import useSettings from '@/application/settings/useSettings.js';
 import useMarketplaces from '@/application/marketplaces/useMarketplaces.js';
 import { CONNECTIONS_SECTION, SETTINGS } from '@/domain/content/settingsContent.js';
 import './SettingsPage.css';
@@ -28,12 +28,13 @@ function ConnectionsSection() {
  */
 export default function SettingsPage() {
   const settings = useSettings();
-  const { section, setSection } = settings;
+  const { section, setSection, availableSections, hasPassword } = settings;
   const { idPrefix } = SETTINGS;
+  const activeSection = availableSections.includes(section) ? section : availableSections[0];
 
   const views = {
     profile: <ProfileSection profile={settings.profile} />,
-    security: <SecuritySection security={settings.security} />,
+    ...(hasPassword ? { security: <SecuritySection security={settings.security} /> } : {}),
     plan: <PlanSection planId={settings.account?.plan} plan={settings.plan} />,
     connections: <ConnectionsSection />,
     preferences: <PreferencesSection preferences={settings.preferences} onToggle={settings.togglePreference} />,
@@ -42,7 +43,11 @@ export default function SettingsPage() {
 
   return (
     <div className="settings-page">
-      <PageHeader eyebrow={SETTINGS.eyebrow} title={SETTINGS.title} lead={SETTINGS.lead} />
+      <PageHeader
+        eyebrow={SETTINGS.eyebrow}
+        title={SETTINGS.title}
+        lead={hasPassword ? SETTINGS.lead : SETTINGS.leadWithoutPassword}
+      />
 
       <div className="settings-page__layout">
         <SegmentedControl
@@ -50,19 +55,19 @@ export default function SettingsPage() {
           orientation="vertical"
           idPrefix={idPrefix}
           label={SETTINGS.navLabel}
-          value={section}
+          value={activeSection}
           onChange={setSection}
-          options={SETTINGS_SECTIONS.map((id) => ({ value: id, ...SETTINGS.sections[id] }))}
+          options={availableSections.map((id) => ({ value: id, ...SETTINGS.sections[id] }))}
           className="settings-page__nav"
         />
         <div
-          key={section}
+          key={activeSection}
           role="tabpanel"
-          id={`${idPrefix}-painel-${section}`}
-          aria-labelledby={`${idPrefix}-aba-${section}`}
+          id={`${idPrefix}-painel-${activeSection}`}
+          aria-labelledby={`${idPrefix}-aba-${activeSection}`}
           className="settings-page__panel"
         >
-          {views[section]}
+          {views[activeSection]}
         </div>
       </div>
     </div>

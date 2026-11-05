@@ -25,17 +25,22 @@ from backend.presentation.http.esquemas import (
     ListaDeMarketplaces,
     ListaDePlanos,
     MarketplaceSaida,
+    RequisicaoAlterarSenha,
+    RequisicaoAtualizarPerfil,
     RequisicaoCadastro,
     RequisicaoCompletarCadastroGoogle,
     RequisicaoConectar,
+    RequisicaoExcluirConta,
     RequisicaoGoogleAuth,
     RequisicaoLogin,
     RequisicaoTrocarPlano,
     RespostaAutenticacao,
     RespostaCadastroGoogle,
     RespostaDeErro,
+    RespostaExclusaoConta,
     RespostaGoogleLogin,
     RespostaGooglePrecisaLoja,
+    RespostaSenhaAlterada,
     Saude,
     UrlAutorizacaoSaida,
     UsuarioSaida,
@@ -216,7 +221,6 @@ def criar_rotas(
         return RespostaCadastroGoogle(
             status="login",
             access_token=resultado.token,
-            token=resultado.token,
             usuario=usuario_saida(resultado.usuario),
         )
 
@@ -287,6 +291,67 @@ def criar_rotas(
         if casos.obter_usuario_atual is None:
             raise HTTPException(status_code=501, detail="Serviço indisponível.")
         return usuario_saida(casos.obter_usuario_atual.executar(vendedor_id))
+
+    @rotas.put(
+        "/auth/me",
+        tags=["autenticacao"],
+        summary="Atualiza o perfil (nome, email e loja) do usuário autenticado",
+        response_model=UsuarioSaida,
+        responses={
+            **ERRO_401,
+            **ERRO_404,
+            400: {"model": RespostaDeErro, "description": "Dados de perfil inválidos"},
+            409: {"model": RespostaDeErro, "description": "Email já cadastrado em outra conta"},
+        },
+    )
+    def atualizar_perfil_atual(dados: RequisicaoAtualizarPerfil, vendedor_id: VendedorAtual) -> UsuarioSaida:
+        if casos.obter_usuario_atual is None:
+            raise HTTPException(status_code=501, detail="Serviço indisponível.")
+        usuario = casos.obter_usuario_atual.atualizar_perfil(
+            usuario_id=vendedor_id,
+            nome=dados.nome,
+            email=dados.email,
+            loja=dados.loja,
+        )
+        return usuario_saida(usuario)
+
+    @rotas.put(
+        "/auth/me/senha",
+        tags=["autenticacao"],
+        summary="Altera a senha local do usuário autenticado (apenas contas com senha)",
+        response_model=RespostaSenhaAlterada,
+        responses={
+            **ERRO_401,
+            **ERRO_404,
+            400: {"model": RespostaDeErro, "description": "Senha atual incorreta ou conta sem senha local"},
+        },
+    )
+    def alterar_senha_atual(dados: RequisicaoAlterarSenha, vendedor_id: VendedorAtual) -> RespostaSenhaAlterada:
+        if casos.obter_usuario_atual is None:
+            raise HTTPException(status_code=501, detail="Serviço indisponível.")
+        casos.obter_usuario_atual.alterar_senha(
+            usuario_id=vendedor_id,
+            senha_atual=dados.senha_atual,
+            nova_senha=dados.nova_senha,
+        )
+        return RespostaSenhaAlterada(alterada=True)
+
+    @rotas.delete(
+        "/auth/me",
+        tags=["autenticacao"],
+        summary="Exclui definitivamente a conta autenticada mediante confirmação do nome da loja",
+        response_model=RespostaExclusaoConta,
+        responses={
+            **ERRO_401,
+            **ERRO_404,
+            400: {"model": RespostaDeErro, "description": "Confirmação do nome da loja incorreta"},
+        },
+    )
+    def excluir_conta_atual(dados: RequisicaoExcluirConta, vendedor_id: VendedorAtual) -> RespostaExclusaoConta:
+        if casos.obter_usuario_atual is None:
+            raise HTTPException(status_code=501, detail="Serviço indisponível.")
+        casos.obter_usuario_atual.excluir(vendedor_id, dados.confirmacao)
+        return RespostaExclusaoConta(excluida=True)
 
     # -----------------------------------------------------------------------
     # Vendedor e Marketplaces (Rotas Protegidas por JWT)

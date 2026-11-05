@@ -236,6 +236,7 @@ class TestApiSistema(BaseApi):
                 "/api/auth/register",
                 "/api/auth/login",
                 "/api/auth/me",
+                "/api/auth/me/senha",
                 "/api/me",
                 "/api/marketplaces",
                 "/api/marketplaces/{slug}/connection",
@@ -244,6 +245,8 @@ class TestApiSistema(BaseApi):
                 "/api/marketplaces/{slug}/products",
             ):
                 self.assertIn(caminho, caminhos)
+            self.assertIn("put", caminhos["/api/auth/me"])
+            self.assertIn("delete", caminhos["/api/auth/me"])
 
     def test_quando_nao_ha_vendedor_no_banco_api_me_retorna_404(self):
         token_inexistente = self.jwt.gerar_token(user_id=999, email="nao_existe@quickclick.com.br")
@@ -269,6 +272,7 @@ class TestAutenticacaoJWT(BaseApi):
         self.assertEqual(corpo["usuario"]["email"], "carlos@exemplo.com")
         self.assertEqual(corpo["usuario"]["nome"], "Carlos Silva")
         self.assertEqual(corpo["usuario"]["plano"], "gratis")
+        self.assertTrue(corpo["usuario"]["tem_senha"])
 
     def test_cadastro_sem_confirmar_maioridade_e_recusado(self):
         resposta = self.cliente.post("/api/auth/register", json={"nome": "Leo", "email": "leo@exemplo.com",
@@ -373,6 +377,73 @@ class TestAutenticacaoJWT(BaseApi):
         self.assertEqual(usuario["nome"], "Carla Diaz")
         self.assertEqual(usuario["loja"], "Loja da Carla")
         self.assertEqual(usuario["plano"], "gratis")
+        self.assertTrue(usuario["tem_senha"])
+
+    def test_atualizar_perfil_sincroniza_loja_no_banco_e_vale_na_exclusao(self):
+        cad = self.cliente.post(
+            "/api/auth/register",
+            json={
+                "nome": "Dono Loja",
+                "email": "perfil_loja@exemplo.com",
+                "loja": "Loja Antiga",
+                "senha": "senha_segura_123",
+                "maior_de_idade": True,
+            },
+        ).json()
+        headers = {"Authorization": f"Bearer {cad['token']}"}
+
+        atualizado = self.cliente.put(
+            "/api/auth/me",
+            json={"nome": "Dono Atualizado", "email": "perfil_novo@exemplo.com", "loja": "Loja Renovada"},
+            headers=headers,
+        )
+        self.assertEqual(atualizado.status_code, 200)
+        self.assertEqual(atualizado.json()["loja"], "Loja Renovada")
+        self.assertEqual(atualizado.json()["email"], "perfil_novo@exemplo.com")
+
+        # O nome antigo da loja não apaga mais; o nome novo apaga
+        antiga = self.cliente.request("DELETE", "/api/auth/me", json={"confirmacao": "Loja Antiga"}, headers=headers)
+        self.assertEqual((antiga.status_code, antiga.json()["erro"]["codigo"]), (400, "confirmacao_incorreta"))
+
+        nova = self.cliente.request("DELETE", "/api/auth/me", json={"confirmacao": "  loja renovada  "}, headers=headers)
+        self.assertEqual((nova.status_code, nova.json()), (200, {"excluida": True}))
+        self.assertEqual(self.cliente.get("/api/auth/me", headers=headers).status_code, 404)
+
+    def test_alterar_senha_valida_atual_e_permite_login_com_a_nova(self):
+        cad = self.cliente.post(
+            "/api/auth/register",
+            json={
+                "nome": "Troca Senha",
+                "email": "troca_senha@exemplo.com",
+                "loja": "Loja Segura",
+                "senha": "senha_antiga_123",
+                "maior_de_idade": True,
+            },
+        ).json()
+        headers = {"Authorization": f"Bearer {cad['token']}"}
+
+        errada = self.cliente.put(
+            "/api/auth/me/senha",
+            json={"senha_atual": "errada123", "nova_senha": "nova_senha_456"},
+            headers=headers,
+        )
+        self.assertEqual((errada.status_code, errada.json()["erro"]["codigo"]), (400, "senha_atual_incorreta"))
+
+        certa = self.cliente.put(
+            "/api/auth/me/senha",
+            json={"senha_atual": "senha_antiga_123", "nova_senha": "nova_senha_456"},
+            headers=headers,
+        )
+        self.assertEqual((certa.status_code, certa.json()), (200, {"alterada": True}))
+
+        self.assertEqual(
+            self.cliente.post("/api/auth/login", json={"email": "troca_senha@exemplo.com", "senha": "senha_antiga_123"}).status_code,
+            401,
+        )
+        self.assertEqual(
+            self.cliente.post("/api/auth/login", json={"email": "troca_senha@exemplo.com", "senha": "nova_senha_456"}).status_code,
+            200,
+        )
 
     def test_acesso_a_rota_protegida_sem_token_retorna_401(self):
         resposta = self.cliente.get("/api/me", headers={"Authorization": ""})
@@ -435,12 +506,13 @@ class TestAutenticacaoGoogle(BaseApi):
         )
         self.assertEqual(passo2.status_code, 200)
         corpo = passo2.json()
+        self.assertEqual(set(corpo.keys()), {"status", "access_token", "usuario"})
         self.assertEqual(corpo["status"], "login")
         self.assertTrue(len(corpo["access_token"]) > 20)
-        self.assertEqual(corpo["access_token"], corpo["token"])
         self.assertEqual(corpo["usuario"]["email"], "nova.loja@gmail.com")
         self.assertEqual(corpo["usuario"]["loja"], "Bazar Estrela")
         self.assertEqual(corpo["usuario"]["plano"], "gratis")
+        self.assertFalse(corpo["usuario"]["tem_senha"])
 
         with self.Session() as session:
             user = session.query(models.User).filter_by(email="nova.loja@gmail.com").one()
@@ -451,7 +523,9 @@ class TestAutenticacaoGoogle(BaseApi):
             self.assertEqual(vendedor.plano, "gratis")
 
         headers_google = {"Authorization": f"Bearer {corpo['access_token']}"}
-        self.assertEqual(self.cliente.get("/api/auth/me", headers=headers_google).status_code, 200)
+        me_inicial = self.cliente.get("/api/auth/me", headers=headers_google)
+        self.assertEqual(me_inicial.status_code, 200)
+        self.assertFalse(me_inicial.json()["tem_senha"])
         self.assertEqual(self.cliente.get("/api/me", headers=headers_google).status_code, 200)
 
         # Próximo login com Google para o mesmo usuário entra direto com {"status": "login", "access_token": ...}
@@ -468,6 +542,47 @@ class TestAutenticacaoGoogle(BaseApi):
         )
         self.assertEqual(me_resp.status_code, 200)
         self.assertEqual(me_resp.json()["loja"], "Bazar Estrela")
+        self.assertFalse(me_resp.json()["tem_senha"])
+
+    def test_conta_google_sem_senha_recusa_troca_de_senha_e_pode_ser_excluida_pelo_nome_da_loja(self):
+        criacao = self.cliente.post(
+            "/api/auth/google/complete-registration",
+            json={
+                "email": "excluir_google@gmail.com",
+                "google_id": "sub-excluir-google",
+                "store_name": "Atelier Aurora",
+            },
+        ).json()
+        headers = {"Authorization": f"Bearer {criacao['access_token']}"}
+
+        tentativa_senha = self.cliente.put(
+            "/api/auth/me/senha",
+            json={"senha_atual": "qualquer", "nova_senha": "nova_senha_123"},
+            headers=headers,
+        )
+        self.assertEqual(tentativa_senha.status_code, 400)
+
+        recusado = self.cliente.request(
+            "DELETE",
+            "/api/auth/me",
+            json={"confirmacao": "Nome Errado"},
+            headers=headers,
+        )
+        self.assertEqual((recusado.status_code, recusado.json()["erro"]["codigo"]), (400, "confirmacao_incorreta"))
+
+        excluido = self.cliente.request(
+            "DELETE",
+            "/api/auth/me",
+            json={"confirmacao": "Atelier Aurora"},
+            headers=headers,
+        )
+        self.assertEqual((excluido.status_code, excluido.json()), (200, {"excluida": True}))
+        self.assertEqual(self.cliente.get("/api/auth/me", headers=headers).status_code, 404)
+
+        # Após excluir a conta, o mesmo usuário Google pode criar conta novamente do zero
+        with self._mock_google_claims(email="excluir_google@gmail.com", sub="sub-excluir-google"):
+            novo_login = self.cliente.post("/api/auth/google", json={"token": "token_pos_exclusao"})
+        self.assertEqual(novo_login.json()["status"], "needs_store_name")
 
     def test_usuario_existente_por_email_entra_direto_e_vincula_google_id(self):
         with self._mock_google_claims(email="teste@quickclick.com.br", sub="google-sub-existente"):
@@ -477,6 +592,12 @@ class TestAutenticacaoGoogle(BaseApi):
         dados = resp.json()
         self.assertEqual(dados["status"], "login")
         self.assertTrue(len(dados["access_token"]) > 20)
+
+        me_resp = self.cliente.get(
+            "/api/auth/me",
+            headers={"Authorization": f"Bearer {dados['access_token']}"},
+        )
+        self.assertTrue(me_resp.json()["tem_senha"])
 
         with self.Session() as session:
             user = session.query(models.User).filter_by(email="teste@quickclick.com.br").one()

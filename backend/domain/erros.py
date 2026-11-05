@@ -85,6 +85,20 @@ class CredenciaisInvalidas(ErroDeDominio):
         super().__init__(mensagem)
 
 
+class SenhaAtualIncorreta(ErroDeDominio):
+    codigo = "senha_atual_incorreta"
+
+    def __init__(self, mensagem: str = "A senha atual não confere."):
+        super().__init__(mensagem)
+
+
+class ConfirmacaoExclusaoInvalida(ErroDeDominio):
+    codigo = "confirmacao_incorreta"
+
+    def __init__(self, mensagem: str = "O nome da loja informado não confere."):
+        super().__init__(mensagem)
+
+
 class MuitasTentativas(ErroDeDominio):
     codigo = "muitas_tentativas"
 

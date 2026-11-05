@@ -3,15 +3,12 @@ Aplicação · Caso de uso: Autenticar e concluir cadastro via Google OAuth.
 """
 
 from dataclasses import dataclass
-import re
 from typing import Literal
 
 from backend.application.casos_de_uso.autenticar_usuario import ResultadoAutenticacao
 from backend.application.portas import RepositorioUsuarios, ServicoToken, VerificadorGoogleToken
 from backend.domain.erros import EmailJaCadastrado, TokenInvalido
-from backend.domain.usuario import Usuario
-
-_PADRAO_EMAIL = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]{2,}$")
+from backend.domain.usuario import Usuario, email_valido, normalizar_email
 
 
 @dataclass(frozen=True)
@@ -51,7 +48,7 @@ class AutenticarComGoogle:
         if registro is not None:
             usuario, _ = registro
             self._usuarios.vincular_google_id(usuario.id, identidade.google_id)
-            jwt_token = self._token_service.create_access_token(usuario.id, usuario.email)
+            jwt_token = self._token_service.gerar_token(usuario.id, usuario.email)
             return ResultadoLoginGoogle(
                 status="login",
                 access_token=jwt_token,
@@ -71,12 +68,12 @@ class AutenticarComGoogle:
         store_name: str,
         nome: str = "",
     ) -> ResultadoAutenticacao:
-        email_normalizado = (email or "").strip().lower()
+        email_normalizado = normalizar_email(email)
         google_id_limpo = (google_id or "").strip()
         loja_limpa = (store_name or "").strip()
         nome_limpo = (nome or "").strip() or loja_limpa
 
-        if not email_normalizado or not _PADRAO_EMAIL.match(email_normalizado):
+        if not email_valido(email_normalizado):
             raise ValueError("Informe um email válido.")
         if not google_id_limpo:
             raise ValueError("Identificador do Google é obrigatório.")
@@ -96,5 +93,5 @@ class AutenticarComGoogle:
             plano="gratis",
             google_id=google_id_limpo,
         )
-        jwt_token = self._token_service.create_access_token(usuario.id, usuario.email)
+        jwt_token = self._token_service.gerar_token(usuario.id, usuario.email)
         return ResultadoAutenticacao(usuario=usuario, token=jwt_token)

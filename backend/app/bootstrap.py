@@ -156,7 +156,7 @@ def criar_app(
         autenticar_usuario=AutenticarUsuario(usuarios, hasher, token_service),
         autenticar_google=AutenticarComGoogle(usuarios, verificador_google, token_service),
         registrar_usuario=RegistrarUsuario(usuarios, hasher, token_service),
-        obter_usuario_atual=ObterUsuarioAtual(usuarios),
+        obter_usuario_atual=ObterUsuarioAtual(usuarios, hasher),
         trocar_plano=TrocarPlano(vendedores, usuarios, livre=leitor.booleano("TROCA_DE_PLANO_LIVRE", True)),
         analises_ia=analises_ia,
         publicar_no_mercado_livre=PublicarNoMercadoLivre(conectar, gateways["mercado-livre"], fonte_ml, analises,

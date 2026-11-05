@@ -11,6 +11,7 @@ export const FIELD_ERROR = {
   PASSWORD_SHORT: 'password-short',
   PASSWORD_WEAK: 'password-weak',
   PASSWORD_MISMATCH: 'password-mismatch',
+  CONFIRMATION_MISMATCH: 'confirmation-mismatch',
   PHONE: 'phone',
   TOO_LONG: 'too-long',
   PRICE: 'price',
@@ -24,6 +25,7 @@ const PASSWORD_MIN_LENGTH = 8;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 const isBlank = (value) => String(value ?? '').trim() === '';
+const normalizeText = (value) => String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
 
 export function required(value) {
   return isBlank(value) ? FIELD_ERROR.REQUIRED : null;
@@ -51,6 +53,12 @@ export function validateNewPassword(value) {
 export function validatePasswordConfirmation(password, confirmation) {
   if (isBlank(confirmation)) return FIELD_ERROR.REQUIRED;
   return password === confirmation ? null : FIELD_ERROR.PASSWORD_MISMATCH;
+}
+
+/** Confirmação textual (ex.: nome da loja ao excluir a conta), sem diferenciar maiúsculas ou espaços extras. */
+export function validateTextConfirmation(value, expected) {
+  if (isBlank(value)) return FIELD_ERROR.REQUIRED;
+  return normalizeText(value) === normalizeText(expected) ? null : FIELD_ERROR.CONFIRMATION_MISMATCH;
 }
 
 /** Telefone é opcional; quando vem, precisa ter de 10 a 13 dígitos (DDD e, se quiser, o 55). */

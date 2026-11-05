@@ -1,18 +1,19 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import useMountedRef from '@/application/ui/useMountedRef.js';
 import useForm from '@/application/ui/useForm.js';
 import useSession from '@/application/session/useSession.js';
 import usePlanChange from '@/application/settings/usePlanChange.js';
-import { forgetSession, setSessionAccount } from '@/application/session/sessionStore.js';
+import {
+  deleteCurrentAccount,
+  setSessionAccount,
+  updateCurrentAccount
+} from '@/application/session/sessionStore.js';
 import { showToast, TOAST_TONES } from '@/application/feedback/toastStore.js';
 import {
   ACCOUNT_ERRORS,
   AccountError,
-  changePassword,
-  deleteAccount,
-  updateAccount
-} from '@/infrastructure/storage/accountsRepository.js';
-import { endSession } from '@/infrastructure/storage/sessionRepository.js';
+  changeAccountPassword
+} from '@/infrastructure/auth/authService.js';
 import { getPreferences, savePreferences } from '@/infrastructure/storage/preferencesRepository.js';
 import {
   required,
@@ -20,7 +21,8 @@ import {
   validateName,
   validateNewPassword,
   validatePasswordConfirmation,
-  validatePhone
+  validatePhone,
+  validateTextConfirmation
 } from '@/domain/validation/validators.js';
 import { DANGER_SECTION, SECURITY_SECTION, SETTINGS } from '@/domain/content/settingsContent.js';
 
@@ -39,21 +41,30 @@ const validateSecurity = (values) => ({
   confirmation: validatePasswordConfirmation(values.next, values.confirmation)
 });
 
-const validateDanger = (values) => ({ password: required(values.password) });
-
 const EMPTY_SECURITY = { current: '', next: '', confirmation: '' };
 
 /**
  * Aplicação · Caso de uso "configurações da conta".
- * Perfil (a navbar se atualiza na hora), troca de senha, troca de plano (usePlanChange),
- * preferências com interruptores e a exclusão da conta (apaga tudo dela deste navegador).
- * A tela só desenha o que volta daqui.
+ * Perfil (persistido no servidor e refletido na hora na navbar), troca de senha (apenas quando
+ * a conta tem senha local), troca de plano (usePlanChange), preferências e exclusão da conta
+ * confirmada pelo nome da loja.
  */
 export default function useSettings() {
   const { account } = useSession();
   const accountId = account?.id;
-  const [section, setSection] = useState(SETTINGS_SECTIONS[0]);
+  const hasPassword = account?.hasPassword !== false;
+  const availableSections = useMemo(
+    () => (hasPassword ? SETTINGS_SECTIONS : SETTINGS_SECTIONS.filter((id) => id !== 'security')),
+    [hasPassword]
+  );
+  const [section, setSection] = useState(availableSections[0]);
   const mounted = useMountedRef();
+
+  useEffect(() => {
+    if (!availableSections.includes(section)) {
+      setSection(availableSections[0]);
+    }
+  }, [availableSections, section]);
 
   const failed = () => showToast({ tone: TOAST_TONES.ERROR, ...SETTINGS.errorToast });
 
@@ -93,10 +104,9 @@ export default function useSettings() {
       if (savingProfile || !profile.check()) return;
       setSavingProfile(true);
       try {
-        const updated = await updateAccount(accountId, profile.values);
+        const updated = await updateCurrentAccount(profile.values);
         savedColor.current = updated.avatarColor;
         if (!mounted.current) return;
-        setSessionAccount(updated);
         showToast({ tone: TOAST_TONES.SUCCESS, ...SETTINGS.savedToast });
       } catch (error) {
         if (!mounted.current) return;
@@ -107,7 +117,7 @@ export default function useSettings() {
         if (mounted.current) setSavingProfile(false);
       }
     },
-    [accountId, profile, savingProfile, mounted]
+    [profile, savingProfile, mounted]
   );
 
   /** A cor do avatar já aparece na navbar enquanto o vendedor escolhe (só fica se ele salvar). */
@@ -126,10 +136,10 @@ export default function useSettings() {
   const savePassword = useCallback(
     async (event) => {
       event.preventDefault();
-      if (savingPassword || !security.check()) return;
+      if (!hasPassword || savingPassword || !security.check()) return;
       setSavingPassword(true);
       try {
-        await changePassword(accountId, security.values.current, security.values.next);
+        await changeAccountPassword(security.values.current, security.values.next);
         if (!mounted.current) return;
         security.reset(EMPTY_SECURITY);
         showToast({ tone: TOAST_TONES.SUCCESS, ...SECURITY_SECTION.done });
@@ -142,7 +152,7 @@ export default function useSettings() {
         if (mounted.current) setSavingPassword(false);
       }
     },
-    [accountId, savingPassword, security, mounted]
+    [hasPassword, savingPassword, security, mounted]
   );
 
   // ---------- Preferências ----------
@@ -175,10 +185,15 @@ export default function useSettings() {
   // ---------- Zona de risco ----------
   const [deleting, setDeleting] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const danger = useForm({ password: '' }, validateDanger);
+  const expectedStoreName = (account?.store || account?.email || '').trim();
+  const validateDanger = useCallback(
+    (values) => ({ confirmation: validateTextConfirmation(values.confirmation, expectedStoreName) }),
+    [expectedStoreName]
+  );
+  const danger = useForm({ confirmation: '' }, validateDanger);
 
   const openDelete = useCallback(() => {
-    danger.reset({ password: '' });
+    danger.reset({ confirmation: '' });
     setConfirmingDelete(true);
   }, [danger]);
 
@@ -192,23 +207,23 @@ export default function useSettings() {
       if (deleting || !danger.check()) return;
       setDeleting(true);
       try {
-        await deleteAccount(accountId, danger.values.password);
-        await endSession();
+        await deleteCurrentAccount(danger.values.confirmation);
         showToast({ tone: TOAST_TONES.INFO, ...DANGER_SECTION.done });
-        forgetSession();
       } catch (error) {
         if (!mounted.current) return;
         setDeleting(false);
-        if (error instanceof AccountError && error.code === ACCOUNT_ERRORS.WRONG_PASSWORD) {
-          danger.setFieldError('password', 'password-incorrect');
+        if (error instanceof AccountError && error.code === ACCOUNT_ERRORS.CONFIRMATION_MISMATCH) {
+          danger.setFieldError('confirmation', 'confirmation-mismatch');
         } else failed();
       }
     },
-    [accountId, danger, deleting, mounted]
+    [danger, deleting, mounted]
   );
 
   return {
     account,
+    hasPassword,
+    availableSections,
     section,
     setSection,
     profile: { ...profile, save: saveProfile, saving: savingProfile, pickAvatarColor },
@@ -216,6 +231,14 @@ export default function useSettings() {
     preferences,
     togglePreference,
     plan,
-    danger: { ...danger, open: openDelete, cancel: cancelDelete, confirm: confirmDelete, confirming: confirmingDelete, deleting }
+    danger: {
+      ...danger,
+      expectedConfirmation: expectedStoreName,
+      open: openDelete,
+      cancel: cancelDelete,
+      confirm: confirmDelete,
+      confirming: confirmingDelete,
+      deleting
+    }
   };
 }

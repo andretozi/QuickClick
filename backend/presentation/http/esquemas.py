@@ -41,6 +41,29 @@ class RequisicaoTrocarPlano(BaseModel):
     plano: str = Field(max_length=40, examples=["pro"], description="gratis, essencial, pro ou business")
 
 
+class RequisicaoAtualizarPerfil(BaseModel):
+    nome: str = Field(min_length=2, max_length=120)
+    email: str = Field(min_length=3, max_length=254)
+    loja: str = Field(min_length=2, max_length=120)
+
+
+class RequisicaoAlterarSenha(BaseModel):
+    senha_atual: str = Field(min_length=1, max_length=256)
+    nova_senha: str = Field(min_length=8, max_length=256)
+
+
+class RespostaSenhaAlterada(BaseModel):
+    alterada: bool = True
+
+
+class RequisicaoExcluirConta(BaseModel):
+    confirmacao: str = Field(min_length=1, max_length=254, description="Nome da loja para confirmar a exclusão")
+
+
+class RespostaExclusaoConta(BaseModel):
+    excluida: bool = True
+
+
 class VendedorSaida(BaseModel):
     id: int
     nome: str
@@ -78,6 +101,7 @@ class UsuarioSaida(BaseModel):
     nome: str
     loja: str
     plano: str
+    tem_senha: bool = True
 
 
 class RespostaAutenticacao(BaseModel):
@@ -114,8 +138,7 @@ class RequisicaoCompletarCadastroGoogle(BaseModel):
 
 class RespostaCadastroGoogle(BaseModel):
     status: Literal["login"] = "login"
-    access_token: str = Field(description="Token de autenticação JWT Bearer")
-    token: str = Field(description="Token de autenticação JWT Bearer")
+    access_token: str = Field(description="Token de autenticação JWT Bearer da Quick Click")
     usuario: UsuarioSaida
 
 
@@ -283,6 +306,7 @@ def usuario_saida(usuario: Usuario) -> UsuarioSaida:
         nome=usuario.nome,
         loja=usuario.loja,
         plano=usuario.plano,
+        tem_senha=usuario.tem_senha,
     )
 
 

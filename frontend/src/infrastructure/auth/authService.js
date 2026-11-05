@@ -1,24 +1,21 @@
 /**
- * Infraestrutura · Autenticação via API com Token JWT e Google OAuth
+ * Infraestrutura · Autenticação e Gestão de Conta via API (Token JWT e Google OAuth)
  *
- * Emite e valida tokens JWT nas rotas de login (/api/auth/login), cadastro (/api/auth/register)
- * e Google OAuth (/api/auth/google e /api/auth/google/complete-registration).
- * O token recebido é persistido na sessão e utilizado para proteger todas as requisições
- * autenticadas e navegação do usuário.
+ * Centraliza todas as operações de sessão e autoatendimento de conta com o back-end:
+ * login, cadastro, Google OAuth, leitura/edição de perfil, troca de senha e exclusão.
  */
 import { ApiError, requestJson } from '../http/httpClient.js';
 import {
   ACCOUNT_ERRORS,
   AccountError,
-  authenticate,
-  createAccount,
   getAccount,
+  purgeLocalAccount,
   upsertAccount
 } from '../storage/accountsRepository.js';
 import { endSession, getSession, startSession } from '../storage/sessionRepository.js';
 import { StorageFullError } from '../storage/localStore.js';
 
-export { ACCOUNT_ERRORS } from '../storage/accountsRepository.js';
+export { ACCOUNT_ERRORS, AccountError } from '../storage/accountsRepository.js';
 
 /** Lê o Client ID público do Google exposto no build do Vite ou servido em runtime pelo Azure. */
 export function getBuildGoogleClientId() {
@@ -43,6 +40,8 @@ export function describeAuthError(error) {
   if (error instanceof ApiError) {
     if (error.code === 'email_em_uso') return ACCOUNT_ERRORS.EMAIL_TAKEN;
     if (error.code === 'credenciais_invalidas') return ACCOUNT_ERRORS.INVALID_CREDENTIALS;
+    if (error.code === 'senha_atual_incorreta') return ACCOUNT_ERRORS.WRONG_PASSWORD;
+    if (error.code === 'confirmacao_incorreta') return ACCOUNT_ERRORS.CONFIRMATION_MISMATCH;
     return error.code;
   }
   return 'desconhecido';
@@ -54,13 +53,7 @@ async function persistJwtSession(accessToken, usuarioData = null) {
     (await requestJson('/auth/me', {
       headers: { Authorization: `Bearer ${accessToken}` }
     }));
-  const account = upsertAccount({
-    id: usuario.id,
-    name: usuario.nome || usuario.loja || usuario.email,
-    email: usuario.email,
-    store: usuario.loja,
-    plan: usuario.plano
-  });
+  const account = upsertAccount(usuario);
   await startSession(usuario.id, accessToken);
   return account;
 }
@@ -74,15 +67,8 @@ export async function signIn({ email, password }) {
     });
     return await persistJwtSession(data.token, data.usuario);
   } catch (error) {
-    if (error instanceof ApiError) {
-      if (error.code === 'credenciais_invalidas' || error.status === 401) {
-        throw new AccountError(ACCOUNT_ERRORS.INVALID_CREDENTIALS);
-      }
-      if (error.code === 'sem_conexao') {
-        const account = await authenticate(email, password);
-        await startSession(account.id);
-        return account;
-      }
+    if (error instanceof ApiError && (error.code === 'credenciais_invalidas' || error.status === 401)) {
+      throw new AccountError(ACCOUNT_ERRORS.INVALID_CREDENTIALS);
     }
     throw error;
   }
@@ -99,8 +85,7 @@ export async function authenticateWithGoogle(token) {
     body: { token }
   });
   if (data.status === 'login') {
-    const accessToken = data.access_token ?? data.token;
-    const account = await persistJwtSession(accessToken, data.usuario ?? null);
+    const account = await persistJwtSession(data.access_token);
     return { status: 'login', account };
   }
   return {
@@ -124,8 +109,7 @@ export async function completeGoogleRegistration({ email, googleId, storeName })
         store_name: storeName
       }
     });
-    const accessToken = res.access_token ?? res.token;
-    return await persistJwtSession(accessToken, res.usuario ?? null);
+    return await persistJwtSession(res.access_token, res.usuario);
   } catch (error) {
     if (error instanceof ApiError && (error.code === 'email_em_uso' || error.status === 409)) {
       throw new AccountError(ACCOUNT_ERRORS.EMAIL_TAKEN);
@@ -134,7 +118,7 @@ export async function completeGoogleRegistration({ email, googleId, storeName })
   }
 }
 
-/** @param {{ name: string, email: string, store: string, password: string }} data */
+/** @param {{ name: string, email: string, store: string, password: string, adult?: boolean }} data */
 export async function signUp(data) {
   try {
     const res = await requestJson('/auth/register', {
@@ -149,15 +133,72 @@ export async function signUp(data) {
     });
     return await persistJwtSession(res.token, res.usuario);
   } catch (error) {
-    if (error instanceof ApiError) {
-      if (error.code === 'email_em_uso' || error.status === 409) {
-        throw new AccountError(ACCOUNT_ERRORS.EMAIL_TAKEN);
+    if (error instanceof ApiError && (error.code === 'email_em_uso' || error.status === 409)) {
+      throw new AccountError(ACCOUNT_ERRORS.EMAIL_TAKEN);
+    }
+    throw error;
+  }
+}
+
+/**
+ * Persiste nome, email e loja no servidor (/api/auth/me) e sincroniza telefone/avatar localmente.
+ * @param {{ name: string, email: string, phone?: string, store: string, avatarColor?: string }} patch
+ */
+export async function updateProfile(patch) {
+  try {
+    const usuario = await requestJson('/auth/me', {
+      method: 'PUT',
+      body: {
+        nome: patch.name,
+        email: patch.email,
+        loja: patch.store
       }
-      if (error.code === 'sem_conexao') {
-        const account = await createAccount(data);
-        await startSession(account.id);
-        return account;
+    });
+    return upsertAccount({
+      ...usuario,
+      phone: patch.phone,
+      avatarColor: patch.avatarColor
+    });
+  } catch (error) {
+    if (error instanceof ApiError && (error.code === 'email_em_uso' || error.status === 409)) {
+      throw new AccountError(ACCOUNT_ERRORS.EMAIL_TAKEN);
+    }
+    throw error;
+  }
+}
+
+/** Altera a senha local da conta autenticada (/api/auth/me/senha). */
+export async function changeAccountPassword(currentPassword, newPassword) {
+  try {
+    await requestJson('/auth/me/senha', {
+      method: 'PUT',
+      body: {
+        senha_atual: currentPassword,
+        nova_senha: newPassword
       }
+    });
+  } catch (error) {
+    if (error instanceof ApiError && error.code === 'senha_atual_incorreta') {
+      throw new AccountError(ACCOUNT_ERRORS.WRONG_PASSWORD);
+    }
+    throw error;
+  }
+}
+
+/** Exclui definitivamente a conta autenticada mediante confirmação do nome da loja. */
+export async function removeCurrentAccount(accountId, confirmation) {
+  try {
+    await requestJson('/auth/me', {
+      method: 'DELETE',
+      body: { confirmacao: confirmation }
+    });
+    if (accountId !== undefined && accountId !== null) {
+      purgeLocalAccount(accountId);
+    }
+    await endSession();
+  } catch (error) {
+    if (error instanceof ApiError && error.code === 'confirmacao_incorreta') {
+      throw new AccountError(ACCOUNT_ERRORS.CONFIRMATION_MISMATCH);
     }
     throw error;
   }
@@ -167,39 +208,25 @@ export async function signOut() {
   await endSession();
 }
 
-/** Conta logada neste navegador, validando com o token JWT ou null se expirado/inválido. */
+/** Conta logada neste navegador, validando o token JWT contra /api/auth/me. */
 export async function restoreSession() {
   const session = await getSession();
-  if (!session) return null;
-
-  if (session.token) {
-    try {
-      const data = await requestJson('/auth/me');
-      const account = upsertAccount({
-        id: data.id,
-        name: data.nome || data.loja || data.email,
-        email: data.email,
-        store: data.loja,
-        plan: data.plano
-      });
-      return account;
-    } catch (error) {
-      if (
-        error instanceof ApiError &&
-        (error.status === 401 || error.code === 'token_invalido' || error.code === 'nao_autenticado')
-      ) {
-        await endSession();
-        return null;
-      }
-      const account = await getAccount(session.accountId);
-      return account;
-    }
-  }
-
-  const account = await getAccount(session.accountId);
-  if (!account) {
-    await endSession();
+  if (!session?.token) {
+    if (session) await endSession();
     return null;
   }
-  return account;
+
+  try {
+    const data = await requestJson('/auth/me');
+    return upsertAccount(data);
+  } catch (error) {
+    if (
+      error instanceof ApiError &&
+      (error.status === 401 || error.status === 404 || error.code === 'token_invalido' || error.code === 'nao_autenticado')
+    ) {
+      await endSession();
+      return null;
+    }
+    return await getAccount(session.accountId);
+  }
 }
