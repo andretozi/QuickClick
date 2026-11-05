@@ -29,13 +29,14 @@ def _montar_usuario(session: Session, user: User | None) -> tuple[Usuario, str |
     vendedor = session.query(VendedorModel).filter_by(id=user.id).first()
     plano = vendedor.plano if vendedor else "gratis"
     loja = user.store_name or user.loja or ""
+    tem_senha_local = bool(user.password_hash) and not bool(user.google_id)
     usuario = Usuario(
         id=user.id,
         email=user.email,
         nome=user.nome or "",
         loja=loja,
         plano=plano,
-        tem_senha=bool(user.password_hash),
+        tem_senha=tem_senha_local,
     )
     return usuario, user.password_hash
 

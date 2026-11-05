@@ -52,6 +52,9 @@ def registrar_cabecalhos_de_seguranca(app: FastAPI) -> None:
         for nome, valor in CABECALHOS_DE_SEGURANCA:
             if nome not in resposta.headers:
                 resposta.headers[nome] = valor
+        caminho = request.url.path
+        if (caminho == PREFIXO or caminho.startswith(f"{PREFIXO}/")) and "Cache-Control" not in resposta.headers:
+            resposta.headers["Cache-Control"] = "no-store"
         return resposta
 
 
