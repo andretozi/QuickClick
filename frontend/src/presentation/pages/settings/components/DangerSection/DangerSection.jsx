@@ -10,6 +10,7 @@ import './DangerSection.css';
 export default function DangerSection({ danger }) {
   const { modal } = DANGER_SECTION;
   const target = danger.expectedConfirmation || '';
+  const fieldLabel = danger.hasStoreName ? modal.confirmation.label : modal.confirmation.fallbackLabel;
 
   return (
     <SettingsSection id="risco" tone="glass" title={DANGER_SECTION.title} lead={DANGER_SECTION.lead} className="danger-section">
@@ -43,7 +44,7 @@ export default function DangerSection({ danger }) {
           <TextField
             id="excluir-confirmacao"
             name="confirmation"
-            label={modal.confirmation.label}
+            label={fieldLabel}
             placeholder={modal.confirmation.placeholder(target)}
             value={danger.values.confirmation}
             onChange={danger.handleChange}

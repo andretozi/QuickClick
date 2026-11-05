@@ -47,14 +47,14 @@ export function describeAuthError(error) {
   return 'desconhecido';
 }
 
-async function persistJwtSession(accessToken, usuarioData = null) {
+async function persistJwtSession(accessToken, usuarioData = null, { provider = null, accountPatch = null } = {}) {
   const usuario =
     usuarioData ??
     (await requestJson('/auth/me', {
       headers: { Authorization: `Bearer ${accessToken}` }
     }));
-  const account = upsertAccount(usuario);
-  await startSession(usuario.id, accessToken);
+  const account = upsertAccount(accountPatch ? { ...usuario, ...accountPatch } : usuario);
+  await startSession(usuario.id, accessToken, provider);
   return account;
 }
 
@@ -65,7 +65,7 @@ export async function signIn({ email, password }) {
       method: 'POST',
       body: { email, senha: password }
     });
-    return await persistJwtSession(data.token, data.usuario);
+    return await persistJwtSession(data.token, data.usuario, { provider: 'password' });
   } catch (error) {
     if (error instanceof ApiError && (error.code === 'credenciais_invalidas' || error.status === 401)) {
       throw new AccountError(ACCOUNT_ERRORS.INVALID_CREDENTIALS);
@@ -85,7 +85,10 @@ export async function authenticateWithGoogle(token) {
     body: { token }
   });
   if (data.status === 'login') {
-    const account = await persistJwtSession(data.access_token);
+    const account = await persistJwtSession(data.access_token, null, {
+      provider: 'google',
+      accountPatch: { hasPassword: false }
+    });
     return { status: 'login', account };
   }
   return {
@@ -109,7 +112,10 @@ export async function completeGoogleRegistration({ email, googleId, storeName })
         store_name: storeName
       }
     });
-    return await persistJwtSession(res.access_token, res.usuario);
+    return await persistJwtSession(res.access_token, res.usuario, {
+      provider: 'google',
+      accountPatch: { hasPassword: false }
+    });
   } catch (error) {
     if (error instanceof ApiError && (error.code === 'email_em_uso' || error.status === 409)) {
       throw new AccountError(ACCOUNT_ERRORS.EMAIL_TAKEN);
@@ -131,7 +137,7 @@ export async function signUp(data) {
         maior_de_idade: Boolean(data.adult)
       }
     });
-    return await persistJwtSession(res.token, res.usuario);
+    return await persistJwtSession(res.token, res.usuario, { provider: 'password' });
   } catch (error) {
     if (error instanceof ApiError && (error.code === 'email_em_uso' || error.status === 409)) {
       throw new AccountError(ACCOUNT_ERRORS.EMAIL_TAKEN);
@@ -146,6 +152,7 @@ export async function signUp(data) {
  */
 export async function updateProfile(patch) {
   try {
+    const session = await getSession();
     const usuario = await requestJson('/auth/me', {
       method: 'PUT',
       body: {
@@ -156,6 +163,7 @@ export async function updateProfile(patch) {
     });
     return upsertAccount({
       ...usuario,
+      ...(session?.provider === 'google' ? { hasPassword: false } : {}),
       phone: patch.phone,
       avatarColor: patch.avatarColor
     });
@@ -216,9 +224,10 @@ export async function restoreSession() {
     return null;
   }
 
+  const isGoogleSession = session.provider === 'google';
   try {
     const data = await requestJson('/auth/me');
-    return upsertAccount(data);
+    return upsertAccount(isGoogleSession ? { ...data, hasPassword: false } : data);
   } catch (error) {
     if (
       error instanceof ApiError &&
@@ -227,6 +236,7 @@ export async function restoreSession() {
       await endSession();
       return null;
     }
-    return await getAccount(session.accountId);
+    const cached = await getAccount(session.accountId);
+    return cached && isGoogleSession ? { ...cached, hasPassword: false } : cached;
   }
 }

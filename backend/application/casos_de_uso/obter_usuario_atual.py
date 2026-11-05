@@ -3,7 +3,7 @@ Aplicação · Autoatendimento da conta do usuário autenticado (/api/auth/me).
 
 Concentra em um único caso de uso todas as operações sobre a própria conta:
 leitura dos dados atuais, edição do perfil, troca da senha local (apenas quando
-a conta possui senha) e exclusão definitiva mediante confirmação do nome da loja.
+a conta possui senha exclusiva local) e exclusão definitiva mediante confirmação do nome da loja.
 """
 
 from backend.application.portas import RepositorioUsuarios, ServicoHashSenha
@@ -53,8 +53,8 @@ class ObterUsuarioAtual:
     def alterar_senha(self, usuario_id: int, senha_atual: str, nova_senha: str) -> None:
         if self._hasher is None:
             raise RuntimeError("Serviço de hash de senha não configurado.")
-        _, hash_atual = self._obter_registro(usuario_id)
-        if not hash_atual:
+        usuario, hash_atual = self._obter_registro(usuario_id)
+        if not usuario.tem_senha or not hash_atual:
             raise ValueError("Esta conta usa login social e não possui senha local.")
         if not senha_atual or not self._hasher.verificar(senha_atual, hash_atual):
             raise SenhaAtualIncorreta()

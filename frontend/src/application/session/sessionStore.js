@@ -93,6 +93,18 @@ export async function updateCurrentAccount(patch) {
   return updated;
 }
 
+/** Revalida os dados da conta autenticada direto em /api/auth/me (evita estado antigo em memória). */
+export async function refreshCurrentAccount() {
+  if (state.status !== SESSION_STATUS.SIGNED_IN) return state.account;
+  const refreshed = await restoreSession();
+  if (!refreshed) {
+    forgetSession();
+    return null;
+  }
+  setState({ account: refreshed });
+  return refreshed;
+}
+
 export async function deleteCurrentAccount(confirmation) {
   await removeCurrentAccount(state.account?.id, confirmation);
   forgetSession();

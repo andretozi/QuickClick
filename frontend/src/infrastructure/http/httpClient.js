@@ -43,7 +43,8 @@ export async function requestJson(path, { method = 'GET', body, headers = {} } =
 
   const fetchOptions = {
     method,
-    headers: requestHeaders
+    headers: requestHeaders,
+    cache: 'no-store'
   };
 
   if (body !== undefined) {

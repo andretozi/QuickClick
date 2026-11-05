@@ -102,6 +102,7 @@ export const DANGER_SECTION = {
     text: (target) => `Tudo o que é seu será apagado de vez. Para confirmar, digite "${target}" abaixo.`,
     confirmation: {
       label: 'Nome da loja para confirmar',
+      fallbackLabel: 'Email da conta para confirmar',
       placeholder: (target) => target
     },
     confirm: 'Excluir para sempre',

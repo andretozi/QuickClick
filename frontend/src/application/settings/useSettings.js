@@ -5,6 +5,7 @@ import useSession from '@/application/session/useSession.js';
 import usePlanChange from '@/application/settings/usePlanChange.js';
 import {
   deleteCurrentAccount,
+  refreshCurrentAccount,
   setSessionAccount,
   updateCurrentAccount
 } from '@/application/session/sessionStore.js';
@@ -46,8 +47,8 @@ const EMPTY_SECURITY = { current: '', next: '', confirmation: '' };
 /**
  * Aplicação · Caso de uso "configurações da conta".
  * Perfil (persistido no servidor e refletido na hora na navbar), troca de senha (apenas quando
- * a conta tem senha local), troca de plano (usePlanChange), preferências e exclusão da conta
- * confirmada pelo nome da loja.
+ * a conta tem senha exclusiva local), troca de plano (usePlanChange), preferências e exclusão da
+ * conta confirmada pelo nome da loja.
  */
 export default function useSettings() {
   const { account } = useSession();
@@ -59,6 +60,11 @@ export default function useSettings() {
   );
   const [section, setSection] = useState(availableSections[0]);
   const mounted = useMountedRef();
+
+  // Ao abrir Configurações, sincroniza com /api/auth/me para descartar qualquer cache local antigo.
+  useEffect(() => {
+    refreshCurrentAccount().catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!availableSections.includes(section)) {
@@ -185,6 +191,7 @@ export default function useSettings() {
   // ---------- Zona de risco ----------
   const [deleting, setDeleting] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const hasStoreName = Boolean((account?.store || '').trim());
   const expectedStoreName = (account?.store || account?.email || '').trim();
   const validateDanger = useCallback(
     (values) => ({ confirmation: validateTextConfirmation(values.confirmation, expectedStoreName) }),
@@ -233,6 +240,7 @@ export default function useSettings() {
     plan,
     danger: {
       ...danger,
+      hasStoreName,
       expectedConfirmation: expectedStoreName,
       open: openDelete,
       cancel: cancelDelete,

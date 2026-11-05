@@ -130,8 +130,9 @@ class BaseApi(unittest.TestCase):
         self._pasta = tempfile.TemporaryDirectory()
         raiz = Path(self._pasta.name)
         front = raiz / "frontend" / "dist"
-        front.mkdir(parents=True)
+        (front / "assets").mkdir(parents=True)
         (front / "index.html").write_text(INDEX_HTML, encoding="utf-8")
+        (front / "assets" / "index-hash123.js").write_text("console.log('ok');", encoding="utf-8")
         self.config = Config(raiz=raiz, pasta_front=front)
         self._engine = create_engine(
             "sqlite:///:memory:",
@@ -190,16 +191,23 @@ class TestApiSistema(BaseApi):
         self.assertIn("default-src 'self'", resposta.headers["content-security-policy"])
         self.assertIn("frame-ancestors 'none'", resposta.headers["content-security-policy"])
         self.assertIn("https://accounts.google.com", resposta.headers["content-security-policy"])
+        self.assertEqual(resposta.headers["cache-control"], "no-store")
 
-    def test_front_na_raiz(self):
+    def test_front_na_raiz_sem_cache_de_html_e_com_cache_imutavel_em_assets(self):
         resposta = self.cliente.get("/")
         self.assertEqual(resposta.status_code, 200)
         self.assertIn("text/html", resposta.headers["content-type"])
+        self.assertEqual(resposta.headers["cache-control"], "no-cache, no-store, must-revalidate")
         self.assertEqual(resposta.text, INDEX_HTML)
+
+        asset = self.cliente.get("/assets/index-hash123.js")
+        self.assertEqual(asset.status_code, 200)
+        self.assertEqual(asset.headers["cache-control"], "public, max-age=31536000, immutable")
 
     def test_caminho_desconhecido_do_site_cai_no_index(self):
         resposta = self.cliente.get("/qualquer/pagina")
         self.assertEqual(resposta.status_code, 200)
+        self.assertEqual(resposta.headers["cache-control"], "no-cache, no-store, must-revalidate")
         self.assertEqual(resposta.text, INDEX_HTML)
 
     def test_caminho_desconhecido_da_api_e_404_em_json(self):
@@ -584,7 +592,7 @@ class TestAutenticacaoGoogle(BaseApi):
             novo_login = self.cliente.post("/api/auth/google", json={"token": "token_pos_exclusao"})
         self.assertEqual(novo_login.json()["status"], "needs_store_name")
 
-    def test_usuario_existente_por_email_entra_direto_e_vincula_google_id(self):
+    def test_usuario_existente_por_email_entra_direto_vincula_google_id_e_oculta_senha(self):
         with self._mock_google_claims(email="teste@quickclick.com.br", sub="google-sub-existente"):
             resp = self.cliente.post("/api/auth/google", json={"token": "id_token_google_existente"})
 
@@ -593,11 +601,16 @@ class TestAutenticacaoGoogle(BaseApi):
         self.assertEqual(dados["status"], "login")
         self.assertTrue(len(dados["access_token"]) > 20)
 
-        me_resp = self.cliente.get(
-            "/api/auth/me",
-            headers={"Authorization": f"Bearer {dados['access_token']}"},
+        headers_google = {"Authorization": f"Bearer {dados['access_token']}"}
+        me_resp = self.cliente.get("/api/auth/me", headers=headers_google)
+        self.assertFalse(me_resp.json()["tem_senha"])
+
+        tentativa_senha = self.cliente.put(
+            "/api/auth/me/senha",
+            json={"senha_atual": "senha_segura_123", "nova_senha": "nova_senha_456"},
+            headers=headers_google,
         )
-        self.assertTrue(me_resp.json()["tem_senha"])
+        self.assertEqual(tentativa_senha.status_code, 400)
 
         with self.Session() as session:
             user = session.query(models.User).filter_by(email="teste@quickclick.com.br").one()
