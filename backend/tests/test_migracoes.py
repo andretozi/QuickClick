@@ -33,10 +33,17 @@ class BaseSQLite(unittest.TestCase):
         self._pasta.cleanup()
 
     def criar_banco_antigo(self, sem_coluna: tuple[str, str] | None = None):
-        """As tabelas como o create_all criava antes do Alembic (sem a coluna que a 0002 acrescenta)."""
+        """As tabelas como o create_all criava antes do Alembic (sem as colunas que 0002 e 0004 acrescentam)."""
         Base.metadata.create_all(self.engine, tables=[Base.metadata.tables[nome] for nome in TABELAS_DE_ANTES])
         with self.engine.begin() as conexao:
-            for tabela, coluna in [("users", "confirmou_maioridade_em"), *([sem_coluna] if sem_coluna else [])]:
+            conexao.execute(text("DROP INDEX IF EXISTS ix_users_google_id"))
+            colunas_posteriores = [
+                ("users", "confirmou_maioridade_em"),
+                ("users", "google_id"),
+                ("users", "store_name"),
+                *([sem_coluna] if sem_coluna else []),
+            ]
+            for tabela, coluna in colunas_posteriores:
                 conexao.execute(text(f"ALTER TABLE {tabela} DROP COLUMN {coluna}"))  # só no SQLite do teste
 
 
@@ -58,6 +65,17 @@ class TestMigracoes(BaseSQLite):
             self.assertEqual(indices.get("ux_publicacoes_externo"), True)
             self.assertIn("ix_produtos_vendedor_atualizado", {i["name"] for i in banco.get_indexes("produtos")})
 
+    def test_banco_vazio_ganha_colunas_do_google_oauth_com_indice_unico(self):
+        preparar_banco(self.engine, self.url)
+        with self.engine.connect() as conexao:
+            banco = inspect(conexao)
+            colunas = {c["name"]: c["nullable"] for c in banco.get_columns("users")}
+            self.assertEqual(colunas.get("password_hash"), True)
+            self.assertEqual(colunas.get("google_id"), True)
+            self.assertEqual(colunas.get("store_name"), True)
+            indices = {i["name"]: bool(i["unique"]) for i in banco.get_indexes("users")}
+            self.assertEqual(indices.get("ix_users_google_id"), True)
+
     def test_rodar_duas_vezes_nao_muda_nada(self):
         preparar_banco(self.engine, self.url)
         segundo = preparar_banco(self.engine, self.url)
@@ -74,6 +92,8 @@ class TestMigracoes(BaseSQLite):
             self.assertEqual(conexao.execute(text("SELECT plano FROM vendedores")).scalar(), "pro")
             colunas = {c["name"] for c in inspect(conexao).get_columns("users")}
             self.assertIn("confirmou_maioridade_em", colunas)
+            self.assertIn("google_id", colunas)
+            self.assertIn("store_name", colunas)
             self.assertIn("ia_analises", inspect(conexao).get_table_names())
 
     def test_banco_antigo_diferente_da_revisao_inicial_nao_e_marcado(self):
@@ -94,6 +114,13 @@ class TestTravaAditiva(unittest.TestCase):
         sql = sql_pendente("postgresql+psycopg2://", "0002_ia_anuncios")
         self.assertIn("CREATE TABLE produtos", sql)
         self.assertIn("CREATE UNIQUE INDEX ux_publicacoes_externo", sql)
+        self.assertEqual(comandos_proibidos(sql), [])
+
+    def test_sql_da_0004_so_adiciona_colunas_e_indice_unico_do_google(self):
+        sql = sql_pendente("postgresql+psycopg2://", "0003_produtos")
+        self.assertIn("ALTER TABLE users ADD COLUMN google_id VARCHAR", sql)
+        self.assertIn("ALTER TABLE users ADD COLUMN store_name VARCHAR", sql)
+        self.assertIn("CREATE UNIQUE INDEX ix_users_google_id ON users (google_id)", sql)
         self.assertEqual(comandos_proibidos(sql), [])
 
     def test_comandos_que_nao_sao_aditivos_sao_achados(self):

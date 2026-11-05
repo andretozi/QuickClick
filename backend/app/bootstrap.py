@@ -16,6 +16,7 @@ from fastapi import FastAPI
 from sqlalchemy.orm import Session
 
 from backend.application.casos_de_uso import (
+    AutenticarComGoogle,
     AutenticarUsuario,
     CasosDeUso,
     ConectarMarketplace,
@@ -35,6 +36,7 @@ from backend.application.ia.etapas import DependenciasDaAnalise
 from backend.application.ia.modelos import ConfiguracaoDaIA
 from backend.application.ia.portas import Executor, FontePrecosMarketplace
 from backend.application.ia.servico import ServicoDeAnalises
+from backend.application.portas import VerificadorGoogleToken
 from backend.domain.ia.capacidade import ORCAMENTO_DIARIO_PADRAO_USD
 from backend.infrastructure.banco import models  # noqa: F401
 from backend.infrastructure.banco.repositorio_contas import RepositorioContasVinculadasSQL
@@ -53,6 +55,7 @@ from backend.infrastructure.configuracao import (
     LeitorDeConfiguracao,
     carregar_config,
     configuracao,
+    google_client_id,
     segredo_jwt,
 )
 from backend.infrastructure.database import SessionLocal
@@ -62,6 +65,7 @@ from backend.infrastructure.ia.sem_tratamento import SemTratamento, SemVerificac
 from backend.infrastructure.marketplaces.fonte_precos_ml import FontePrecosMercadoLivre
 from backend.infrastructure.marketplaces.registro import criar_gateways
 from backend.infrastructure.seguranca.cripto_tokens import CifradorDeTokens
+from backend.infrastructure.seguranca.google_oauth import VerificadorGoogleOAuth
 from backend.infrastructure.seguranca.hasher import HasherPBKDF2
 from backend.infrastructure.seguranca.token_jwt import ServicoJWT
 from backend.presentation.http.api import criar_api
@@ -94,6 +98,7 @@ def criar_app(
     fonte_ml: FontePrecosMarketplace | None = None,
     executor: Executor | None = None,
     relogio: Callable[[], datetime] = agora_utc,
+    verificador_google: VerificadorGoogleToken | None = None,
 ) -> FastAPI:
     """Os parâmetros opcionais existem para os testes (provedores falsos, sem rede, e executor na hora)."""
     leitor = leitor or configuracao()
@@ -106,6 +111,7 @@ def criar_app(
 
     hasher = HasherPBKDF2()
     token_service = ServicoJWT(segredo_jwt(leitor))
+    verificador_google = verificador_google or VerificadorGoogleOAuth(google_client_id(leitor))
     gateways = criar_gateways(leitor)
     conectar = ConectarMarketplace(vendedores, contas, gateways)
 
@@ -148,6 +154,7 @@ def criar_app(
         conectar_marketplace=conectar,
         desconectar_marketplace=DesconectarMarketplace(contas),
         autenticar_usuario=AutenticarUsuario(usuarios, hasher, token_service),
+        autenticar_google=AutenticarComGoogle(usuarios, verificador_google, token_service),
         registrar_usuario=RegistrarUsuario(usuarios, hasher, token_service),
         obter_usuario_atual=ObterUsuarioAtual(usuarios),
         trocar_plano=TrocarPlano(vendedores, usuarios, livre=leitor.booleano("TROCA_DE_PLANO_LIVRE", True)),

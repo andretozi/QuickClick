@@ -23,6 +23,7 @@ from backend.tests import leitor_de_teste
 
 SEGREDO_JWT_TESTE = "segredo-jwt-so-dos-testes-com-mais-de-32-caracteres"
 CHAVE_CRIPTO_TESTE = "nN1Yc8pK0wVQx3vT1o6m2f9W1u0Hq2c5e7Kx8Zl4bD0="
+GOOGLE_CLIENT_ID_TESTE = "1234567890-teste.apps.googleusercontent.com"
 
 INDEX_HTML = "<!doctype html><title>Quick Click</title>"
 
@@ -120,6 +121,7 @@ class BaseApi(unittest.TestCase):
             MERCADO_LIVRE_REDIRECT_URI="https://quickclick.azurewebsites.net/api/marketplaces/mercado-livre/callback",
             QUICKCLICK_JWT_SECRET=SEGREDO_JWT_TESTE,
             TOKENS_CHAVE_CRIPTO=CHAVE_CRIPTO_TESTE,
+            GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID_TESTE,
         )
 
         self._patch_meli = patch("backend.infrastructure.marketplaces.mercado_livre.httpx.Client", new=MockMeliClient)
@@ -187,6 +189,7 @@ class TestApiSistema(BaseApi):
         self.assertIn("camera=()", resposta.headers["permissions-policy"])
         self.assertIn("default-src 'self'", resposta.headers["content-security-policy"])
         self.assertIn("frame-ancestors 'none'", resposta.headers["content-security-policy"])
+        self.assertIn("https://accounts.google.com", resposta.headers["content-security-policy"])
 
     def test_front_na_raiz(self):
         resposta = self.cliente.get("/")
@@ -227,6 +230,9 @@ class TestApiSistema(BaseApi):
             for caminho in (
                 "/api/health",
                 "/api/plans",
+                "/api/auth/google/config",
+                "/api/auth/google",
+                "/api/auth/google/complete-registration",
                 "/api/auth/register",
                 "/api/auth/login",
                 "/api/auth/me",
@@ -385,6 +391,168 @@ class TestAutenticacaoJWT(BaseApi):
         resposta = self.cliente.get("/api/me", headers={"Authorization": f"Bearer {token_velho}"})
         self.assertEqual(resposta.status_code, 401)
         self.assertEqual(resposta.json()["erro"]["codigo"], "token_invalido")
+
+
+class TestAutenticacaoGoogle(BaseApi):
+    def _mock_google_claims(self, email: str, sub: str, verified: bool = True, nome: str = "Lojista Google"):
+        return patch(
+            "backend.infrastructure.seguranca.google_oauth.id_token.verify_oauth2_token",
+            return_value={
+                "iss": "https://accounts.google.com",
+                "sub": sub,
+                "email": email,
+                "email_verified": verified,
+                "name": nome,
+            },
+        )
+
+    def test_config_retorna_google_client_id_configurado(self):
+        resp = self.cliente.get("/api/auth/google/config")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json(), {"client_id": GOOGLE_CLIENT_ID_TESTE})
+
+    def test_fluxo_completo_novo_usuario_needs_store_name_depois_complete_registration_e_login(self):
+        with self._mock_google_claims(email="Nova.Loja@Gmail.com", sub="google-sub-001"):
+            passo1 = self.cliente.post("/api/auth/google", json={"token": "id_token_google_valido"})
+
+        self.assertEqual(passo1.status_code, 200)
+        self.assertEqual(
+            passo1.json(),
+            {
+                "status": "needs_store_name",
+                "email": "nova.loja@gmail.com",
+                "google_id": "google-sub-001",
+            },
+        )
+
+        passo2 = self.cliente.post(
+            "/api/auth/google/complete-registration",
+            json={
+                "email": "nova.loja@gmail.com",
+                "google_id": "google-sub-001",
+                "store_name": "Bazar Estrela",
+            },
+        )
+        self.assertEqual(passo2.status_code, 200)
+        corpo = passo2.json()
+        self.assertEqual(corpo["status"], "login")
+        self.assertTrue(len(corpo["access_token"]) > 20)
+        self.assertEqual(corpo["access_token"], corpo["token"])
+        self.assertEqual(corpo["usuario"]["email"], "nova.loja@gmail.com")
+        self.assertEqual(corpo["usuario"]["loja"], "Bazar Estrela")
+        self.assertEqual(corpo["usuario"]["plano"], "gratis")
+
+        with self.Session() as session:
+            user = session.query(models.User).filter_by(email="nova.loja@gmail.com").one()
+            self.assertIsNone(user.password_hash)
+            self.assertEqual(user.google_id, "google-sub-001")
+            self.assertEqual(user.store_name, "Bazar Estrela")
+            vendedor = session.query(models.VendedorModel).filter_by(id=user.id).one()
+            self.assertEqual(vendedor.plano, "gratis")
+
+        headers_google = {"Authorization": f"Bearer {corpo['access_token']}"}
+        self.assertEqual(self.cliente.get("/api/auth/me", headers=headers_google).status_code, 200)
+        self.assertEqual(self.cliente.get("/api/me", headers=headers_google).status_code, 200)
+
+        # Próximo login com Google para o mesmo usuário entra direto com {"status": "login", "access_token": ...}
+        with self._mock_google_claims(email="nova.loja@gmail.com", sub="google-sub-001"):
+            login_direto = self.cliente.post("/api/auth/google", json={"token": "id_token_google_valido_2"})
+
+        self.assertEqual(login_direto.status_code, 200)
+        corpo_login = login_direto.json()
+        self.assertEqual(set(corpo_login.keys()), {"status", "access_token"})
+        self.assertEqual(corpo_login["status"], "login")
+        me_resp = self.cliente.get(
+            "/api/auth/me",
+            headers={"Authorization": f"Bearer {corpo_login['access_token']}"},
+        )
+        self.assertEqual(me_resp.status_code, 200)
+        self.assertEqual(me_resp.json()["loja"], "Bazar Estrela")
+
+    def test_usuario_existente_por_email_entra_direto_e_vincula_google_id(self):
+        with self._mock_google_claims(email="teste@quickclick.com.br", sub="google-sub-existente"):
+            resp = self.cliente.post("/api/auth/google", json={"token": "id_token_google_existente"})
+
+        self.assertEqual(resp.status_code, 200)
+        dados = resp.json()
+        self.assertEqual(dados["status"], "login")
+        self.assertTrue(len(dados["access_token"]) > 20)
+
+        with self.Session() as session:
+            user = session.query(models.User).filter_by(email="teste@quickclick.com.br").one()
+            self.assertEqual(user.google_id, "google-sub-existente")
+            self.assertIsNotNone(user.password_hash)
+
+    def test_conta_google_sem_senha_recusa_login_por_senha_local(self):
+        self.cliente.post(
+            "/api/auth/google/complete-registration",
+            json={
+                "email": "sem_senha@gmail.com",
+                "google_id": "sub-sem-senha",
+                "store_name": "Loja Sem Senha",
+            },
+        )
+        tentativa = self.cliente.post(
+            "/api/auth/login",
+            json={"email": "sem_senha@gmail.com", "senha": "qualquer_senha_123"},
+        )
+        self.assertEqual((tentativa.status_code, tentativa.json()["erro"]["codigo"]), (401, "credenciais_invalidas"))
+
+    def test_complete_registration_recusa_email_ou_google_id_duplicados_com_409(self):
+        primeiro = self.cliente.post(
+            "/api/auth/google/complete-registration",
+            json={
+                "email": "unico@gmail.com",
+                "google_id": "sub-unico-777",
+                "store_name": "Loja Unica",
+            },
+        )
+        self.assertEqual(primeiro.status_code, 200)
+
+        mesmo_email = self.cliente.post(
+            "/api/auth/google/complete-registration",
+            json={
+                "email": "unico@gmail.com",
+                "google_id": "outro-sub-888",
+                "store_name": "Outra Loja",
+            },
+        )
+        self.assertEqual((mesmo_email.status_code, mesmo_email.json()["erro"]["codigo"]), (409, "email_em_uso"))
+
+        mesmo_sub = self.cliente.post(
+            "/api/auth/google/complete-registration",
+            json={
+                "email": "outro_email@gmail.com",
+                "google_id": "sub-unico-777",
+                "store_name": "Outra Loja",
+            },
+        )
+        self.assertEqual((mesmo_sub.status_code, mesmo_sub.json()["erro"]["codigo"]), (409, "email_em_uso"))
+
+    def test_conta_vinculada_a_outro_google_id_recusa_troca_de_identidade(self):
+        self.cliente.post(
+            "/api/auth/google/complete-registration",
+            json={
+                "email": "protegido@gmail.com",
+                "google_id": "sub-legitimo",
+                "store_name": "Loja Protegida",
+            },
+        )
+        with self._mock_google_claims(email="protegido@gmail.com", sub="sub-diferente"):
+            resp = self.cliente.post("/api/auth/google", json={"token": "token_outro_sub"})
+        self.assertEqual((resp.status_code, resp.json()["erro"]["codigo"]), (401, "credenciais_invalidas"))
+
+    def test_token_google_invalido_retorna_401_e_bloqueia_apos_limite_de_tentativas(self):
+        with patch(
+            "backend.infrastructure.seguranca.google_oauth.id_token.verify_oauth2_token",
+            side_effect=ValueError("Invalid token"),
+        ):
+            for _ in range(8):
+                resp = self.cliente.post("/api/auth/google", json={"token": "token_forjado"})
+                self.assertEqual((resp.status_code, resp.json()["erro"]["codigo"]), (401, "token_invalido"))
+
+            bloqueado = self.cliente.post("/api/auth/google", json={"token": "token_forjado"})
+            self.assertEqual((bloqueado.status_code, bloqueado.json()["erro"]["codigo"]), (429, "muitas_tentativas"))
 
 
 class TestApiConsultas(BaseApi):

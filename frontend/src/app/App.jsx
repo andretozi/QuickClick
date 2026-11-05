@@ -1,3 +1,4 @@
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import LandingPage from '@/presentation/pages/landing/LandingPage.jsx';
 import LoginPage from '@/presentation/pages/login/LoginPage.jsx';
 import SignupPage from '@/presentation/pages/signup/SignupPage.jsx';
@@ -10,6 +11,7 @@ import NotFoundPage from '@/presentation/pages/not-found/NotFoundPage.jsx';
 import AppShell from '@/presentation/components/AppShell/AppShell.jsx';
 import SplashScreen from '@/presentation/components/SplashScreen/SplashScreen.jsx';
 import ToastViewport from '@/presentation/components/Toast/ToastViewport.jsx';
+import useGoogleClientId from '@/application/auth/useGoogleClientId.js';
 import useHashRoute from '@/application/navigation/useHashRoute.js';
 import useRouteGuard, { ACCESS } from '@/application/navigation/useRouteGuard.js';
 import useSession from '@/application/session/useSession.js';
@@ -42,6 +44,7 @@ export default function App() {
   const location = useHashRoute();
   const session = useSession();
   const access = useRouteGuard(location, session);
+  const googleClientId = useGoogleClientId();
 
   let content = <SplashScreen />;
   if (access === ACCESS.ALLOWED && isPrivateRoute(location.route)) {
@@ -56,10 +59,18 @@ export default function App() {
     content = <Page key={location.path} params={location.params} />;
   }
 
-  return (
+  const tree = (
     <>
       {content}
       <ToastViewport />
     </>
+  );
+
+  if (!googleClientId) return tree;
+
+  return (
+    <GoogleOAuthProvider clientId={googleClientId} locale="pt-BR">
+      {tree}
+    </GoogleOAuthProvider>
   );
 }

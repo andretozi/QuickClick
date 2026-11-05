@@ -9,6 +9,9 @@ export default defineConfig({
   plugins: [react()],
   // Caminhos relativos: o build funciona em qualquer subpasta (ex.: GitHub Pages).
   base: './',
+  // Expõe VITE_* e GOOGLE_CLIENT_ID (público) ao front no build ou dev, sem expor segredos.
+  envDir: '..',
+  envPrefix: ['VITE_', 'GOOGLE_CLIENT_ID'],
   resolve: {
     // Permite importar com "@/..." a partir de src/, sem "../../.."
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) }

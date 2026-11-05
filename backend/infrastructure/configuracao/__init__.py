@@ -29,6 +29,7 @@ from backend.infrastructure.configuracao.leitor import (
 from backend.infrastructure.configuracao.obrigatorias import (
     ConfiguracaoObrigatoriaAusente,
     database_url,
+    google_client_id,
     normalizar_url_postgres,
     segredo_jwt,
 )
@@ -51,6 +52,7 @@ __all__ = [
     "configuracao",
     "database_url",
     "definir_configuracao",
+    "google_client_id",
     "leitor_do_sistema",
     "ler_arquivo_env",
     "nome_no_cofre",

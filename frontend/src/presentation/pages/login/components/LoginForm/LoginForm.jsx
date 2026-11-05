@@ -19,11 +19,55 @@ export default function LoginForm() {
     handleSubmit,
     loading,
     formError,
+    googleEnabled,
+    pendingGoogleUser,
+    storeName,
+    storeNameError,
+    handleGoogleSuccess,
+    handleGoogleError,
+    handleStoreNameChange,
+    handleStoreNameSubmit,
     announceSocialSoon,
     announceForgotSoon,
     announceTermsSoon
   } = useLoginForm();
-  const { title, lead, divider, email, password, submit, signup, terms } = LOGIN_FORM;
+  const { title, lead, divider, email, password, submit, googleStore, signup, terms } = LOGIN_FORM;
+
+  if (pendingGoogleUser) {
+    return (
+      <AuthForm
+        title={googleStore.title}
+        lead={googleStore.lead(pendingGoogleUser.email)}
+        alert={formError ? LOGIN_FORM.errors[formError] : null}
+        switchTo={signup}
+        terms={terms}
+        onTerms={announceTermsSoon}
+      >
+        <form className="login-form" onSubmit={handleStoreNameSubmit} noValidate>
+          <TextField
+            id="google-store-name"
+            name="storeName"
+            value={storeName}
+            onChange={handleStoreNameChange}
+            label={googleStore.label}
+            placeholder={googleStore.placeholder}
+            autoComplete="organization"
+            error={FIELD_ERRORS[storeNameError]}
+          />
+          <Button
+            type="submit"
+            size="block"
+            loading={loading}
+            loadingText={googleStore.submit.loading}
+            disabled={loading}
+            className="login-form__submit"
+          >
+            {googleStore.submit.label}
+          </Button>
+        </form>
+      </AuthForm>
+    );
+  }
 
   return (
     <AuthForm
@@ -34,7 +78,13 @@ export default function LoginForm() {
       terms={terms}
       onTerms={announceTermsSoon}
     >
-      <SocialLogin providers={SOCIAL_PROVIDERS} onSelect={announceSocialSoon} />
+      <SocialLogin
+        providers={SOCIAL_PROVIDERS}
+        googleEnabled={googleEnabled}
+        onGoogleSuccess={handleGoogleSuccess}
+        onGoogleError={handleGoogleError}
+        onSelect={announceSocialSoon}
+      />
 
       <Divider>{divider}</Divider>
 

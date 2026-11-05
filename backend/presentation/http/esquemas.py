@@ -85,6 +85,40 @@ class RespostaAutenticacao(BaseModel):
     usuario: UsuarioSaida
 
 
+class ConfiguracaoGoogleSaida(BaseModel):
+    client_id: str = Field(default="", description="Client ID público do Google OAuth 2.0")
+
+
+class RequisicaoGoogleAuth(BaseModel):
+    token: str | None = Field(default=None, max_length=4096, description="ID Token assinado emitido pelo Google")
+    credential: str | None = Field(default=None, max_length=4096, description="Alias do credential do @react-oauth/google")
+
+
+class RespostaGoogleLogin(BaseModel):
+    status: Literal["login"] = "login"
+    access_token: str = Field(description="Token de autenticação JWT Bearer da Quick Click")
+
+
+class RespostaGooglePrecisaLoja(BaseModel):
+    status: Literal["needs_store_name"] = "needs_store_name"
+    email: str
+    google_id: str
+
+
+class RequisicaoCompletarCadastroGoogle(BaseModel):
+    email: str = Field(max_length=254, examples=["vendedor@gmail.com"])
+    google_id: str = Field(min_length=1, max_length=256, description="Identificador único (sub) da conta Google")
+    store_name: str = Field(min_length=1, max_length=120, examples=["Minha Loja Oficial"])
+    nome: str = Field(default="", max_length=120)
+
+
+class RespostaCadastroGoogle(BaseModel):
+    status: Literal["login"] = "login"
+    access_token: str = Field(description="Token de autenticação JWT Bearer")
+    token: str = Field(description="Token de autenticação JWT Bearer")
+    usuario: UsuarioSaida
+
+
 class RequisicaoCadastro(BaseModel):
     email: str = Field(max_length=254, examples=["vendedor@quickclick.com.br"])
     senha: str = Field(min_length=6, max_length=256, description="Senha com no mínimo 6 caracteres")

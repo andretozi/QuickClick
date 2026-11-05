@@ -8,6 +8,14 @@
   gap: 11px;
 }
 
+.social-login__google {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  min-height: 44px;
+  overflow: hidden;
+}
+
 .social-login__button {
   --button-glow: transparent;
 

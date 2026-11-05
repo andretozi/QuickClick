@@ -30,7 +30,11 @@ PASTA_MIGRACOES = Path(__file__).resolve().parent / "migracoes"
 REVISAO_INICIAL = "0001_estado_atual"
 TABELAS_DE_ANTES = ("users", "marketplace_tokens", "ai_usage", "vendedores", "contas_vinculadas")
 # Colunas que as migrações seguintes acrescentam nas tabelas de antes (não contam como diferença)
-COLUNAS_NOVAS_NAS_TABELAS_DE_ANTES = {("users", "confirmou_maioridade_em")}
+COLUNAS_NOVAS_NAS_TABELAS_DE_ANTES = {
+    ("users", "confirmou_maioridade_em"),
+    ("users", "google_id"),
+    ("users", "store_name"),
+}
 
 _COMANDO_PROIBIDO = re.compile(
     r"^\s*(DROP\b|TRUNCATE\b|DELETE\b|UPDATE\b|ALTER\s+TABLE\s+\S+\s+(?:DROP|RENAME|ALTER)\b|"
