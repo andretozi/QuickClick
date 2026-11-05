@@ -38,6 +38,11 @@ class AutenticarUsuario:
             raise CredenciaisInvalidas()
 
         usuario, hash_armazenado = registro
+        if not hash_armazenado:
+            # Conta criada via Google OAuth (sem senha local): mantém tempo constante
+            self._hasher.verificar(senha, self._hash_falso)
+            raise CredenciaisInvalidas()
+
         if not self._hasher.verificar(senha, hash_armazenado):
             raise CredenciaisInvalidas()
 

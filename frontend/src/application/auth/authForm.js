@@ -5,9 +5,13 @@
 import { showToast, TOAST_TONES } from '@/application/feedback/toastStore.js';
 import { LOGIN_SOON } from '@/domain/content/loginContent.js';
 
-/** Código do erro do formulário inteiro: navegador sem espaço ("storage") ou qualquer outro ("unknown"). */
+/** Código do erro do formulário inteiro a partir do código devolvido pela API ou storage. */
 export function formErrorFor(code) {
-  return code === 'armazenamento_cheio' ? 'storage' : 'unknown';
+  if (code === 'armazenamento_cheio') return 'storage';
+  if (code === 'muitas_tentativas') return 'rateLimit';
+  if (code === 'email_em_uso') return 'emailTaken';
+  if (code === 'token_invalido') return 'google';
+  return 'unknown';
 }
 
 /** Termos e privacidade ainda não têm página: um aviso elegante. */

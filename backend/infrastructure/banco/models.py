@@ -30,9 +30,11 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    # O banco de produção nasceu com email e password_hash aceitando vazio; o cadastro sempre preenche os dois
+    # Contas do Google OAuth não possuem senha local (password_hash=None)
     email = Column(String, unique=True, index=True, nullable=True)
     password_hash = Column(String, nullable=True)
+    google_id = Column(String, unique=True, index=True, nullable=True)
+    store_name = Column(String, nullable=True)
     nome = Column(String, nullable=True)
     loja = Column(String, nullable=True)
     criado_em = Column(String, nullable=True)

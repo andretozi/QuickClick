@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 
+from backend.application.casos_de_uso.autenticar_google import AutenticarComGoogle, ResultadoLoginGoogle
 from backend.application.casos_de_uso.autenticar_usuario import AutenticarUsuario, ResultadoAutenticacao
 from backend.application.casos_de_uso.conectar_marketplace import ConectarMarketplace
 from backend.application.casos_de_uso.desconectar_marketplace import DesconectarMarketplace
@@ -26,6 +27,7 @@ class CasosDeUso:
     conectar_marketplace: ConectarMarketplace
     desconectar_marketplace: DesconectarMarketplace
     autenticar_usuario: AutenticarUsuario | None = None
+    autenticar_google: AutenticarComGoogle | None = None
     registrar_usuario: RegistrarUsuario | None = None
     obter_usuario_atual: ObterUsuarioAtual | None = None
     analises_ia: ServicoDeAnalises | None = None

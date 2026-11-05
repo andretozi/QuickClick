@@ -18,18 +18,24 @@ from fastapi.responses import RedirectResponse
 
 from backend.application.casos_de_uso import CasosDeUso
 from backend.application.portas import ServicoToken
-from backend.domain.erros import CredenciaisInvalidas, ErroDeDominio, MuitasTentativas
+from backend.domain.erros import CredenciaisInvalidas, ErroDeDominio, MuitasTentativas, TokenInvalido
 from backend.presentation.http.autenticacao import dependencia_do_vendedor
 from backend.presentation.http.esquemas import (
+    ConfiguracaoGoogleSaida,
     ListaDeMarketplaces,
     ListaDePlanos,
     MarketplaceSaida,
     RequisicaoCadastro,
+    RequisicaoCompletarCadastroGoogle,
     RequisicaoConectar,
+    RequisicaoGoogleAuth,
     RequisicaoLogin,
     RequisicaoTrocarPlano,
     RespostaAutenticacao,
+    RespostaCadastroGoogle,
     RespostaDeErro,
+    RespostaGoogleLogin,
+    RespostaGooglePrecisaLoja,
     Saude,
     UrlAutorizacaoSaida,
     UsuarioSaida,
@@ -65,6 +71,11 @@ ERROS_CADASTRO = {
 }
 ERROS_LOGIN = {
     401: {"model": RespostaDeErro, "description": "Email ou senha incorretos"},
+    **ERRO_429,
+}
+ERROS_GOOGLE_AUTH = {
+    401: {"model": RespostaDeErro, "description": "Token do Google inválido ou expirado"},
+    503: {"model": RespostaDeErro, "description": "Serviço do Google OAuth indisponível ou não configurado"},
     **ERRO_429,
 }
 
@@ -137,8 +148,77 @@ def criar_rotas(
                              troca_de_plano_livre=livre)
 
     # -----------------------------------------------------------------------
-    # Autenticação (JWT)
+    # Autenticação (JWT e Google OAuth)
     # -----------------------------------------------------------------------
+
+    @rotas.get(
+        "/auth/google/config",
+        tags=["autenticacao"],
+        summary="Retorna o Client ID público configurado para o Google OAuth",
+        response_model=ConfiguracaoGoogleSaida,
+    )
+    def configuracao_google() -> ConfiguracaoGoogleSaida:
+        client_id = casos.autenticar_google.client_id if casos.autenticar_google is not None else ""
+        return ConfiguracaoGoogleSaida(client_id=client_id)
+
+    @rotas.post(
+        "/auth/google",
+        tags=["autenticacao"],
+        summary="Valida o ID Token do Google OAuth e autentica ou solicita o nome da loja",
+        response_model=RespostaGoogleLogin | RespostaGooglePrecisaLoja,
+        responses=ERROS_GOOGLE_AUTH,
+    )
+    def autenticar_google(
+        dados: RequisicaoGoogleAuth,
+        request: Request,
+    ) -> RespostaGoogleLogin | RespostaGooglePrecisaLoja:
+        if casos.autenticar_google is None:
+            raise HTTPException(status_code=501, detail="Serviço de autenticação com Google não disponível.")
+        chave_ip = f"google_login:ip:{_ip_do_cliente(request)}"
+        limitador.conferir(chave_ip, LIMITE_FALHAS_LOGIN, JANELA_LOGIN_S)
+        token_recebido = (dados.token or dados.credential or "").strip()
+        try:
+            resultado = casos.autenticar_google.executar(token_recebido)
+        except (TokenInvalido, CredenciaisInvalidas):
+            limitador.registrar(chave_ip, JANELA_LOGIN_S)
+            raise
+
+        if resultado.status == "login":
+            return RespostaGoogleLogin(status="login", access_token=resultado.access_token or "")
+        return RespostaGooglePrecisaLoja(
+            status="needs_store_name",
+            email=resultado.email or "",
+            google_id=resultado.google_id or "",
+        )
+
+    @rotas.post(
+        "/auth/google/complete-registration",
+        tags=["autenticacao"],
+        summary="Conclui o cadastro de conta Google com o nome da loja e devolve o JWT",
+        response_model=RespostaCadastroGoogle,
+        responses=ERROS_CADASTRO,
+    )
+    def completar_cadastro_google(
+        dados: RequisicaoCompletarCadastroGoogle,
+        request: Request,
+    ) -> RespostaCadastroGoogle:
+        if casos.autenticar_google is None:
+            raise HTTPException(status_code=501, detail="Serviço de autenticação com Google não disponível.")
+        chave_ip = f"cadastro:ip:{_ip_do_cliente(request)}"
+        limitador.conferir(chave_ip, LIMITE_CADASTROS_IP, JANELA_CADASTRO_S)
+        limitador.registrar(chave_ip, JANELA_CADASTRO_S)
+        resultado = casos.autenticar_google.completar_cadastro(
+            email=dados.email,
+            google_id=dados.google_id,
+            store_name=dados.store_name,
+            nome=dados.nome,
+        )
+        return RespostaCadastroGoogle(
+            status="login",
+            access_token=resultado.token,
+            token=resultado.token,
+            usuario=usuario_saida(resultado.usuario),
+        )
 
     @rotas.post(
         "/auth/register",

@@ -6,6 +6,8 @@
  * é o authService (infraestrutura); aqui só guardamos o resultado e avisamos as telas.
  */
 import {
+  authenticateWithGoogle,
+  completeGoogleRegistration,
   restoreSession,
   signIn as signInRequest,
   signOut as signOutRequest,
@@ -60,6 +62,20 @@ export function getSessionSnapshot() {
 export async function signIn(credentials) {
   const account = await signInRequest(credentials);
   setState({ status: SESSION_STATUS.SIGNED_IN, account, welcome: false, signedOut: false });
+  return account;
+}
+
+export async function signInWithGoogle(token) {
+  const result = await authenticateWithGoogle(token);
+  if (result.status === 'login') {
+    setState({ status: SESSION_STATUS.SIGNED_IN, account: result.account, welcome: false, signedOut: false });
+  }
+  return result;
+}
+
+export async function completeGoogleSignUp(payload) {
+  const account = await completeGoogleRegistration(payload);
+  setState({ status: SESSION_STATUS.SIGNED_IN, account, welcome: true, signedOut: false });
   return account;
 }
 

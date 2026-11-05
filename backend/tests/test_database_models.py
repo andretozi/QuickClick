@@ -1,5 +1,6 @@
 import unittest
 from sqlalchemy import create_engine
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
 from backend.infrastructure.banco.models import User, MarketplaceToken, AiUsage, VendedorModel, ContaVinculadaModel
@@ -45,6 +46,36 @@ class TestDatabaseModels(unittest.TestCase):
         self.assertIsNotNone(consultado)
         self.assertEqual(consultado.email, "vendedor@quickclick.com")
         self.assertEqual(consultado.password_hash, "hash_secreto_123")
+
+    def test_criar_usuario_google_sem_senha_com_google_id_e_store_name(self):
+        user = User(
+            email="google_seller@quickclick.com",
+            password_hash=None,
+            google_id="google-sub-987654",
+            store_name="Loja Google Oficial",
+        )
+        self.session.add(user)
+        self.session.commit()
+
+        consultado = self.session.query(User).filter_by(google_id="google-sub-987654").first()
+        self.assertIsNotNone(consultado)
+        self.assertIsNone(consultado.password_hash)
+        self.assertEqual(consultado.email, "google_seller@quickclick.com")
+        self.assertEqual(consultado.google_id, "google-sub-987654")
+        self.assertEqual(consultado.store_name, "Loja Google Oficial")
+
+    def test_google_id_unico_recusa_duplicidade_mas_permite_multiplos_nulos(self):
+        u1 = User(email="local1@quickclick.com", password_hash="h1", google_id=None)
+        u2 = User(email="local2@quickclick.com", password_hash="h2", google_id=None)
+        u3 = User(email="g1@quickclick.com", password_hash=None, google_id="sub-unico-1")
+        self.session.add_all([u1, u2, u3])
+        self.session.commit()
+
+        duplicado = User(email="g2@quickclick.com", password_hash=None, google_id="sub-unico-1")
+        self.session.add(duplicado)
+        with self.assertRaises(IntegrityError):
+            self.session.commit()
+        self.session.rollback()
 
     def test_marketplace_token_vinculado_a_usuario(self):
         user = User(email="seller@quickclick.com", password_hash="hash_seller")

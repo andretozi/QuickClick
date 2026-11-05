@@ -5,6 +5,7 @@ O que os casos de uso precisam do mundo de fora, descrito como interfaces (Proto
 A infraestrutura implementa estas portas; os testes usam versões falsas, em memória.
 """
 
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Never, Protocol
 
@@ -12,6 +13,13 @@ from backend.domain.conta_vinculada import ContaVinculada, CredenciaisOAuth
 from backend.domain.produto import Produto
 from backend.domain.usuario import Usuario
 from backend.domain.vendedor import Vendedor
+
+
+@dataclass(frozen=True)
+class IdentidadeGoogle:
+    google_id: str
+    email: str
+    nome: str = ""
 
 
 class RepositorioVendedores(Protocol):
@@ -47,12 +55,24 @@ class RepositorioDeProdutos(Protocol):
 
 
 class RepositorioUsuarios(Protocol):
-    def obter_por_id(self, user_id: int) -> tuple[Usuario, str] | None: ...
+    def obter_por_id(self, user_id: int) -> tuple[Usuario, str | None] | None: ...
 
-    def obter_por_email(self, email: str) -> tuple[Usuario, str] | None: ...
+    def obter_por_email(self, email: str) -> tuple[Usuario, str | None] | None: ...
 
-    def salvar(self, email: str, password_hash: str, nome: str, loja: str, plano: str = "gratis",
-               confirmou_maioridade_em: str | None = None) -> Usuario: ...
+    def obter_por_google_id(self, google_id: str) -> tuple[Usuario, str | None] | None: ...
+
+    def vincular_google_id(self, user_id: int, google_id: str) -> None: ...
+
+    def salvar(
+        self,
+        email: str,
+        password_hash: str | None,
+        nome: str,
+        loja: str,
+        plano: str = "gratis",
+        confirmou_maioridade_em: str | None = None,
+        google_id: str | None = None,
+    ) -> Usuario: ...
 
 
 class ServicoToken(Protocol):
@@ -60,7 +80,18 @@ class ServicoToken(Protocol):
 
     def gerar_token(self, user_id: int, email: str, finalidade: str = "acesso") -> str: ...
 
+    def create_access_token(self, user_id: int, email: str) -> str: ...
+
     def validar_token(self, token: str, finalidade: str = "acesso") -> dict[str, Any]: ...
+
+
+class VerificadorGoogleToken(Protocol):
+    """Valida criptograficamente o ID Token emitido pelo Google OAuth 2.0 / OIDC."""
+
+    @property
+    def client_id(self) -> str: ...
+
+    def verificar_id_token(self, token: str) -> IdentidadeGoogle: ...
 
 
 class ServicoHashSenha(Protocol):

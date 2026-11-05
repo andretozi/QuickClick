@@ -7,6 +7,7 @@ ou que não guarda nada. No PC, o JWT ganha um segredo aleatório só para aquel
 """
 
 import logging
+import os
 import secrets
 
 from backend.infrastructure.configuracao.leitor import LeitorDeConfiguracao
@@ -63,3 +64,10 @@ def database_url(leitor: LeitorDeConfiguracao) -> str | None:
     if leitor.em_producao:
         raise ConfiguracaoObrigatoriaAusente("DATABASE_URL")
     return None
+
+
+def google_client_id(leitor: LeitorDeConfiguracao | None = None) -> str | None:
+    """Client ID público do Google OAuth lido da configuração ou de os.getenv('GOOGLE_CLIENT_ID')."""
+    if leitor is not None:
+        return leitor.texto("GOOGLE_CLIENT_ID") or leitor.texto("VITE_GOOGLE_CLIENT_ID")
+    return (os.getenv("GOOGLE_CLIENT_ID") or os.getenv("VITE_GOOGLE_CLIENT_ID") or "").strip() or None

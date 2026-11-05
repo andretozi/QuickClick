@@ -1,18 +1,22 @@
-"""Segurança: JWT com finalidade e validade de 24h, criptografia dos tokens e a trava do banco nos testes."""
+"""Segurança: JWT com finalidade e validade de 24h, Google OAuth, criptografia dos tokens e a trava do banco nos testes."""
 
 from datetime import timedelta
 import unittest
+from unittest.mock import patch
 
+from google.auth import exceptions as google_exceptions
 import jwt
 
 from backend.domain.erros import ServicoIndisponivel, TokenInvalido
 from backend.infrastructure.database import criar_engine
 from backend.infrastructure.seguranca import token_jwt
 from backend.infrastructure.seguranca.cripto_tokens import CifradorDeTokens
+from backend.infrastructure.seguranca.google_oauth import TIMEOUT_GOOGLE_S, VerificadorGoogleOAuth
 from backend.infrastructure.seguranca.token_jwt import DURACAO_PADRAO, FINALIDADE_ESTADO_OAUTH, ServicoJWT
 
 SEGREDO = "segredo-jwt-so-dos-testes-com-mais-de-32-caracteres"
 CHAVE = "nN1Yc8pK0wVQx3vT1o6m2f9W1u0Hq2c5e7Kx8Zl4bD0="
+GOOGLE_CLIENT_ID_TESTE = "1234567890-abc.apps.googleusercontent.com"
 
 
 class TestJWT(unittest.TestCase):
@@ -31,6 +35,12 @@ class TestJWT(unittest.TestCase):
         servico = ServicoJWT(SEGREDO)
         payload = servico.validar_token(servico.gerar_token(7, "A@B.com"))
         self.assertEqual((payload["sub"], payload["email"], payload["fin"]), ("7", "a@b.com", "acesso"))
+
+    def test_create_access_token_emite_jwt_de_acesso_valido(self):
+        servico = ServicoJWT(SEGREDO)
+        token = servico.create_access_token(42, "Loja@Gmail.com")
+        payload = servico.validar_token(token)
+        self.assertEqual((payload["sub"], payload["email"], payload["fin"]), ("42", "loja@gmail.com", "acesso"))
 
     def test_estado_do_oauth_nao_serve_como_login(self):
         servico = ServicoJWT(SEGREDO)
@@ -53,6 +63,85 @@ class TestJWT(unittest.TestCase):
         outro = ServicoJWT("outro-segredo-qualquer-com-mais-de-32-caracteres").gerar_token(7, "a@b.com")
         with self.assertRaises(TokenInvalido):
             ServicoJWT(SEGREDO).validar_token(outro)
+
+
+class TestVerificadorGoogleOAuth(unittest.TestCase):
+    def test_sem_client_id_levanta_servico_indisponivel(self):
+        verificador = VerificadorGoogleOAuth(None)
+        self.assertEqual(verificador.client_id, "")
+        with self.assertRaises(ServicoIndisponivel):
+            verificador.verificar_id_token("token_qualquer")
+
+    def test_token_valido_retorna_identidade_normalizada(self):
+        verificador = VerificadorGoogleOAuth(GOOGLE_CLIENT_ID_TESTE)
+        claims = {
+            "iss": "https://accounts.google.com",
+            "sub": "109876543210",
+            "email": "Vendedor.Google@Gmail.com",
+            "email_verified": True,
+            "name": "Vendedor Google",
+        }
+        with patch(
+            "backend.infrastructure.seguranca.google_oauth.id_token.verify_oauth2_token",
+            return_value=claims,
+        ) as mock_verify:
+            identidade = verificador.verificar_id_token("id_token_google_valido")
+
+        self.assertEqual(identidade.google_id, "109876543210")
+        self.assertEqual(identidade.email, "vendedor.google@gmail.com")
+        self.assertEqual(identidade.nome, "Vendedor Google")
+        args, kwargs = mock_verify.call_args
+        self.assertEqual(args[0], "id_token_google_valido")
+        self.assertEqual(kwargs["audience"], GOOGLE_CLIENT_ID_TESTE)
+        self.assertEqual(TIMEOUT_GOOGLE_S, 10.0)
+
+    def test_assinatura_invalida_ou_expirada_levanta_token_invalido(self):
+        verificador = VerificadorGoogleOAuth(GOOGLE_CLIENT_ID_TESTE)
+        with patch(
+            "backend.infrastructure.seguranca.google_oauth.id_token.verify_oauth2_token",
+            side_effect=ValueError("Wrong recipient"),
+        ):
+            with self.assertRaises(TokenInvalido):
+                verificador.verificar_id_token("token_adulterado")
+
+    def test_emissor_invalido_e_recusado(self):
+        verificador = VerificadorGoogleOAuth(GOOGLE_CLIENT_ID_TESTE)
+        claims = {
+            "iss": "https://atacante.exemplo.com",
+            "sub": "123",
+            "email": "vitima@gmail.com",
+            "email_verified": True,
+        }
+        with patch(
+            "backend.infrastructure.seguranca.google_oauth.id_token.verify_oauth2_token",
+            return_value=claims,
+        ):
+            with self.assertRaises(TokenInvalido):
+                verificador.verificar_id_token("token_emissor_falso")
+
+    def test_email_nao_verificado_e_recusado(self):
+        verificador = VerificadorGoogleOAuth(GOOGLE_CLIENT_ID_TESTE)
+        claims = {
+            "iss": "accounts.google.com",
+            "sub": "123",
+            "email": "naoverificado@gmail.com",
+            "email_verified": False,
+        }
+        with patch(
+            "backend.infrastructure.seguranca.google_oauth.id_token.verify_oauth2_token",
+            return_value=claims,
+        ):
+            with self.assertRaises(TokenInvalido):
+                verificador.verificar_id_token("token_sem_verificacao")
+
+    def test_falha_de_transporte_levanta_servico_indisponivel(self):
+        verificador = VerificadorGoogleOAuth(GOOGLE_CLIENT_ID_TESTE)
+        with patch(
+            "backend.infrastructure.seguranca.google_oauth.id_token.verify_oauth2_token",
+            side_effect=google_exceptions.TransportError("timeout"),
+        ):
+            with self.assertRaises(ServicoIndisponivel):
+                verificador.verificar_id_token("token_google")
 
 
 class TestCifradorDeTokens(unittest.TestCase):

@@ -9,9 +9,11 @@ python-multipart>=0.0.20
 psycopg2-binary>=2.9,<3
 sqlalchemy>=2.0,<3
 alembic>=1.14,<2
-# Autenticação e segurança: JWT e criptografia dos tokens dos marketplaces.
+# Autenticação e segurança: JWT, OAuth Google e criptografia dos tokens dos marketplaces.
 pyjwt>=2.8,<3
 cryptography>=44
+google-auth>=2.35,<3
+requests>=2.31,<3
 # Configuração: Gerenciador de Credenciais do Windows (só no PC) e Azure Key Vault (quando existir).
 keyring>=25
 azure-identity>=1.19
