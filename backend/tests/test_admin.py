@@ -31,6 +31,7 @@ SEGREDO_JWT_TESTE = "segredo-jwt-so-dos-testes-com-mais-de-32-caracteres"
 CHAVE_CRIPTO_TESTE = "nN1Yc8pK0wVQx3vT1o6m2f9W1u0Hq2c5e7Kx8Zl4bD0="
 EMAIL_ADMIN = "superadmin@quickclick.com.br"
 EMAIL_VENDEDOR = "vendedor@loja.com.br"
+EMAIL_NOVO_ADMIN = "novoadmin@quickclick.com.br"
 INDEX_HTML = "<!doctype html><title>Quick Click</title>"
 
 
@@ -45,7 +46,7 @@ class TestPainelAdmin(unittest.TestCase):
         self.leitor = leitor_de_teste(
             QUICKCLICK_JWT_SECRET=SEGREDO_JWT_TESTE,
             TOKENS_CHAVE_CRIPTO=CHAVE_CRIPTO_TESTE,
-            ADMIN_EMAILS=EMAIL_ADMIN,
+            ADMIN_EMAILS=f"{EMAIL_ADMIN},{EMAIL_NOVO_ADMIN}",
         )
         self.config = Config(raiz=raiz, pasta_front=front)
 
@@ -259,6 +260,77 @@ class TestPainelAdmin(unittest.TestCase):
         self.assertGreaterEqual(len(logs), 1)
         self.assertEqual(logs[0]["acao"], "advertir")
         self.assertEqual(logs[0]["alvo_id"], 2)
+
+    # 7. Promoção automática para emails em ADMIN_EMAILS
+    def test_registro_e_login_com_email_em_admin_emails_atribui_papel_admin(self):
+        # Cadastro direto com email configurado na variável ADMIN_EMAILS
+        res_reg = self.client.post(
+            "/api/auth/register",
+            json={
+                "nome": "Novo Admin",
+                "email": EMAIL_NOVO_ADMIN,
+                "loja": "Loja Admin",
+                "senha": "SenhaForteAdmin123",
+                "maior_de_idade": True,
+            },
+        )
+        self.assertEqual(res_reg.status_code, 200)
+        dados_reg = res_reg.json()
+        self.assertEqual(dados_reg["usuario"]["papel"], PAPEL_ADMIN)
+        self.assertIn("token", dados_reg)
+
+        # Login subsequente também retorna papel admin
+        res_login = self.client.post(
+            "/api/auth/login",
+            json={
+                "email": EMAIL_NOVO_ADMIN,
+                "senha": "SenhaForteAdmin123",
+            },
+        )
+        self.assertEqual(res_login.status_code, 200)
+        dados_login = res_login.json()
+        self.assertEqual(dados_login["usuario"]["papel"], PAPEL_ADMIN)
+
+        # Token do novo admin tem acesso imediato às rotas administrativas
+        token_novo = dados_login["token"]
+        res_admin = self.client.get(
+            "/api/admin/overview",
+            headers={"Authorization": f"Bearer {token_novo}"},
+        )
+        self.assertEqual(res_admin.status_code, 200)
+
+    def test_obter_usuario_atual_promove_automaticamente_se_email_em_admin_emails(self):
+        # Cria usuário inicialmente como vendedor
+        with self.SessionLocal() as session:
+            usuario = models.User(
+                id=99,
+                email=EMAIL_NOVO_ADMIN,
+                nome="Admin Pendente",
+                loja="Loja Pendente",
+                store_name="Loja Pendente",
+                password_hash="$2b$12$fakehashforadminpasswordtesting123456789012345",
+                papel=PAPEL_VENDEDOR,
+                status_conta=STATUS_ATIVA,
+                token_versao=1,
+            )
+            vendedor = models.VendedorModel(id=99, nome="Admin Pendente", plano="gratis")
+            session.add_all([usuario, vendedor])
+            session.commit()
+
+        token_pendente = self.servico_jwt.gerar_token(99, EMAIL_NOVO_ADMIN, papel=PAPEL_VENDEDOR, versao=1)
+
+        # Ao chamar /api/auth/me, o caso de uso detecta que o email está em ADMIN_EMAILS e atualiza o papel
+        res_me = self.client.get(
+            "/api/auth/me",
+            headers={"Authorization": f"Bearer {token_pendente}"},
+        )
+        self.assertEqual(res_me.status_code, 200)
+        self.assertEqual(res_me.json()["papel"], PAPEL_ADMIN)
+
+        # Verifica persistência no banco
+        with self.SessionLocal() as session:
+            usuario_db = session.get(models.User, 99)
+            self.assertEqual(usuario_db.papel, PAPEL_ADMIN)
 
 
 if __name__ == "__main__":

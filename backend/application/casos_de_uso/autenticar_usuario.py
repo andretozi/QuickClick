@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 
 from backend.application.portas import RepositorioUsuarios, ServicoHashSenha, ServicoToken
 from backend.domain.erros import ContaBanida, ContaSuspensa, CredenciaisInvalidas
-from backend.domain.usuario import STATUS_BANIDA, STATUS_SUSPENSA, Usuario
+from backend.domain.usuario import PAPEL_ADMIN, STATUS_BANIDA, STATUS_SUSPENSA, Usuario
 
 
 @dataclass(frozen=True)
@@ -24,11 +24,13 @@ class AutenticarUsuario:
         hasher: ServicoHashSenha,
         token_service: ServicoToken,
         relogio: Callable[[], datetime] = lambda: datetime.now(UTC),
+        emails_admin: frozenset[str] = frozenset(),
     ):
         self._usuarios = usuarios
         self._hasher = hasher
         self._token_service = token_service
         self._relogio = relogio
+        self._emails_admin = emails_admin
         self._hash_falso = self._hasher.gerar_hash("senha_falsa_para_tempo_constante")
 
     def executar(self, email: str, senha: str) -> ResultadoAutenticacao:
@@ -56,6 +58,10 @@ class AutenticarUsuario:
             raise ContaBanida(usuario.motivo_moderacao)
         if status == STATUS_SUSPENSA:
             raise ContaSuspensa(usuario.suspensa_ate, usuario.motivo_moderacao)
+
+        email_norm = usuario.email.strip().lower()
+        if email_norm in self._emails_admin and usuario.papel != PAPEL_ADMIN:
+            usuario = self._usuarios.atribuir_papel(usuario.id, PAPEL_ADMIN)
 
         self._usuarios.registrar_login(usuario.id, agora)
         token = self._token_service.gerar_token(

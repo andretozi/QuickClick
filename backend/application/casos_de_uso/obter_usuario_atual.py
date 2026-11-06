@@ -17,7 +17,14 @@ from backend.domain.erros import (
     SenhaAtualIncorreta,
     VendedorNaoEncontrado,
 )
-from backend.domain.usuario import STATUS_BANIDA, STATUS_SUSPENSA, Usuario, email_valido, normalizar_email
+from backend.domain.usuario import (
+    PAPEL_ADMIN,
+    STATUS_BANIDA,
+    STATUS_SUSPENSA,
+    Usuario,
+    email_valido,
+    normalizar_email,
+)
 
 
 def _normalizar_confirmacao(texto: str) -> str:
@@ -30,16 +37,22 @@ class ObterUsuarioAtual:
         usuarios: RepositorioUsuarios,
         hasher: ServicoHashSenha | None = None,
         relogio: Callable[[], datetime] = lambda: datetime.now(UTC),
+        emails_admin: frozenset[str] = frozenset(),
     ):
         self._usuarios = usuarios
         self._hasher = hasher
         self._relogio = relogio
+        self._emails_admin = emails_admin
 
     def _obter_registro(self, usuario_id: int) -> tuple[Usuario, str | None]:
         resultado = self._usuarios.obter_por_id(usuario_id)
         if resultado is None:
             raise VendedorNaoEncontrado(usuario_id)
         usuario, hash_armazenado = resultado
+        email_norm = normalizar_email(usuario.email)
+        if email_norm in self._emails_admin and usuario.papel != PAPEL_ADMIN:
+            usuario = self._usuarios.atribuir_papel(usuario.id, PAPEL_ADMIN)
+
         agora = self._relogio()
         status = usuario.status_efetivo(agora)
         if status == STATUS_BANIDA:

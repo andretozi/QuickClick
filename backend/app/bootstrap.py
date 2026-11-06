@@ -151,16 +151,18 @@ def criar_app(
     except Exception as erro:  # banco fora do ar na partida: o site sobe e o que usa o banco avisa
         log.warning("Não deu para conferir as análises interrompidas (%s).", type(erro).__name__)
 
+    emails_admin = extrair_emails_admin(leitor.texto("ADMIN_EMAILS"))
+
     casos = CasosDeUso(
         listar_planos=ListarPlanos(),
         obter_vendedor_atual=ObterVendedorAtual(vendedores, contas),
         listar_marketplaces=ListarMarketplaces(contas),
         conectar_marketplace=conectar,
         desconectar_marketplace=DesconectarMarketplace(contas),
-        autenticar_usuario=AutenticarUsuario(usuarios, hasher, token_service, relogio=relogio),
-        autenticar_google=AutenticarComGoogle(usuarios, verificador_google, token_service, relogio=relogio),
-        registrar_usuario=RegistrarUsuario(usuarios, hasher, token_service),
-        obter_usuario_atual=ObterUsuarioAtual(usuarios, hasher, relogio=relogio),
+        autenticar_usuario=AutenticarUsuario(usuarios, hasher, token_service, relogio=relogio, emails_admin=emails_admin),
+        autenticar_google=AutenticarComGoogle(usuarios, verificador_google, token_service, relogio=relogio, emails_admin=emails_admin),
+        registrar_usuario=RegistrarUsuario(usuarios, hasher, token_service, emails_admin=emails_admin),
+        obter_usuario_atual=ObterUsuarioAtual(usuarios, hasher, relogio=relogio, emails_admin=emails_admin),
         moderar_contas=ModerarContas(usuarios, moderacao, contas, relogio=relogio),
         trocar_plano=TrocarPlano(vendedores, usuarios, livre=leitor.booleano("TROCA_DE_PLANO_LIVRE", True)),
         analises_ia=analises_ia,
@@ -169,7 +171,6 @@ def criar_app(
         produtos=GerenciarProdutos(RepositorioDeProdutosSQL(session_factory), relogio),
     )
 
-    emails_admin = extrair_emails_admin(leitor.texto("ADMIN_EMAILS"))
     documentacao_ativa = leitor.booleano("DOCUMENTACAO_API_ATIVA", False)
     app = criar_api(
         casos,
