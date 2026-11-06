@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
 from backend.application.casos_de_uso import CasosDeUso
-from backend.application.portas import ServicoToken
+from backend.application.portas import RepositorioUsuarios, ServicoToken
 from backend.domain.erros import CredenciaisInvalidas, ErroDeDominio, MuitasTentativas, TokenInvalido
 from backend.presentation.http.autenticacao import dependencia_do_vendedor
 from backend.presentation.http.esquemas import (
@@ -133,10 +133,13 @@ def criar_rotas(
     identificar_vendedor: Callable[..., int] | None = None,
     servico_token: ServicoToken | None = None,
     limitador: LimitadorDeTentativas | None = None,
+    usuarios: RepositorioUsuarios | None = None,
 ) -> APIRouter:
     rotas = APIRouter()
     limitador = limitador or LimitadorDeTentativas()
-    VendedorAtual = Annotated[int, Depends(dependencia_do_vendedor(servico_token, identificar_vendedor))]
+    VendedorAtual = Annotated[
+        int, Depends(dependencia_do_vendedor(servico_token, identificar_vendedor, usuarios=usuarios))
+    ]
 
     # -----------------------------------------------------------------------
     # Sistema

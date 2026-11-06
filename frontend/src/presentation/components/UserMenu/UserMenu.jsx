@@ -46,6 +46,22 @@ function MenuPanel({ menu, menuId, account, closing, onSignOut, signingOut }) {
             </a>
           </li>
         ))}
+        {account?.role === 'admin' && (
+          <li role="none" className="user-menu__entry">
+            <a
+              role="menuitem"
+              tabIndex={-1}
+              data-menu-item
+              data-part="item"
+              href="#/admin"
+              className="user-menu__item user-menu__item--admin"
+              onClick={closeAfterChoice}
+            >
+              <Icon name="shield" size={18} className="user-menu__item-icon" />
+              Painel de moderação
+            </a>
+          </li>
+        )}
         <li role="separator" className="user-menu__separator" />
         <li role="none" className="user-menu__entry">
           <button

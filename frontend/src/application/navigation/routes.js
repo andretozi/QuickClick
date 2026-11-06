@@ -7,6 +7,10 @@
  *
  * Rotas privadas exigem conta logada: sem sessão, viram "#/login?volta=..." e,
  * depois de entrar, o vendedor volta para onde queria ir.
+ *
+ * Rotas de administrador (adminOnly) são estritamente sigilosas: usuários sem papel
+ * de administrador não são redirecionados para o login nem avisados de permissão;
+ * a aplicação entrega diretamente a página 404 não encontrada.
  */
 export const ROUTES = {
   LANDING: 'landing',
@@ -18,6 +22,7 @@ export const ROUTES = {
   EDIT_LISTING: 'edit-listing',
   MARKETPLACES: 'marketplaces',
   SETTINGS: 'settings',
+  ADMIN: 'admin',
   NOT_FOUND: 'not-found'
 };
 
@@ -31,7 +36,8 @@ const ROUTE_TABLE = [
   { route: ROUTES.EDIT_LISTING, path: '/anuncios/:id/editar', private: true },
   { route: ROUTES.LISTING, path: '/anuncios/:id', private: true },
   { route: ROUTES.MARKETPLACES, path: '/marketplaces', private: true },
-  { route: ROUTES.SETTINGS, path: '/configuracoes', private: true }
+  { route: ROUTES.SETTINGS, path: '/configuracoes', private: true },
+  { route: ROUTES.ADMIN, path: '/admin', private: true, adminOnly: true }
 ];
 
 const RETURN_PARAM = 'volta';
@@ -46,6 +52,11 @@ const definitionOf = (route) => ROUTE_TABLE.find((item) => item.route === route)
 /** A rota exige conta logada? */
 export function isPrivateRoute(route) {
   return Boolean(definitionOf(route)?.private);
+}
+
+/** A rota é exclusiva de administradores? */
+export function isAdminOnlyRoute(route) {
+  return Boolean(definitionOf(route)?.adminOnly);
 }
 
 /** A rota é só para quem ainda não entrou (login e cadastro)? */
@@ -123,13 +134,13 @@ export function loginHrefFor(returnPath) {
 
 /**
  * Para onde ir depois de entrar. Só aceita caminhos de páginas conhecidas que exigem
- * login; qualquer outra coisa (ou nada) leva ao painel.
+ * login e não são admin; qualquer outra coisa (ou nada) leva ao painel.
  */
 export function returnHrefFrom(query) {
   const target = query?.[RETURN_PARAM];
   if (target && target.startsWith('/')) {
     const { route } = matchPath(target.split('?')[0]);
-    if (isPrivateRoute(route)) return `#${target}`;
+    if (isPrivateRoute(route) && !isAdminOnlyRoute(route)) return `#${target}`;
   }
   return ROUTE_HASH[ROUTES.DASHBOARD];
 }

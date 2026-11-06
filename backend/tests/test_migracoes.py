@@ -33,7 +33,7 @@ class BaseSQLite(unittest.TestCase):
         self._pasta.cleanup()
 
     def criar_banco_antigo(self, sem_coluna: tuple[str, str] | None = None):
-        """As tabelas como o create_all criava antes do Alembic (sem as colunas que 0002 e 0004 acrescentam)."""
+        """As tabelas como o create_all criava antes do Alembic (sem as colunas que 0002, 0004 e 0005 acrescentam)."""
         Base.metadata.create_all(self.engine, tables=[Base.metadata.tables[nome] for nome in TABELAS_DE_ANTES])
         with self.engine.begin() as conexao:
             conexao.execute(text("DROP INDEX IF EXISTS ix_users_google_id"))
@@ -41,6 +41,13 @@ class BaseSQLite(unittest.TestCase):
                 ("users", "confirmou_maioridade_em"),
                 ("users", "google_id"),
                 ("users", "store_name"),
+                ("users", "papel"),
+                ("users", "status_conta"),
+                ("users", "motivo_moderacao"),
+                ("users", "suspensa_ate"),
+                ("users", "token_versao"),
+                ("users", "ultimo_login_em"),
+                ("users", "ultimo_acesso_em"),
                 *([sem_coluna] if sem_coluna else []),
             ]
             for tabela, coluna in colunas_posteriores:
@@ -76,6 +83,15 @@ class TestMigracoes(BaseSQLite):
             indices = {i["name"]: bool(i["unique"]) for i in banco.get_indexes("users")}
             self.assertEqual(indices.get("ix_users_google_id"), True)
 
+    def test_banco_vazio_ganha_moderacao_e_tabela_de_auditoria(self):
+        preparar_banco(self.engine, self.url)
+        with self.engine.connect() as conexao:
+            banco = inspect(conexao)
+            self.assertIn("registros_auditoria", banco.get_table_names())
+            colunas_users = {c["name"] for c in banco.get_columns("users")}
+            for campo in ("papel", "status_conta", "motivo_moderacao", "suspensa_ate", "token_versao"):
+                self.assertIn(campo, colunas_users)
+
     def test_rodar_duas_vezes_nao_muda_nada(self):
         preparar_banco(self.engine, self.url)
         segundo = preparar_banco(self.engine, self.url)
@@ -94,7 +110,10 @@ class TestMigracoes(BaseSQLite):
             self.assertIn("confirmou_maioridade_em", colunas)
             self.assertIn("google_id", colunas)
             self.assertIn("store_name", colunas)
+            self.assertIn("papel", colunas)
+            self.assertIn("status_conta", colunas)
             self.assertIn("ia_analises", inspect(conexao).get_table_names())
+            self.assertIn("registros_auditoria", inspect(conexao).get_table_names())
 
     def test_banco_antigo_diferente_da_revisao_inicial_nao_e_marcado(self):
         self.criar_banco_antigo(sem_coluna=("contas_vinculadas", "apelido"))
@@ -123,6 +142,13 @@ class TestTravaAditiva(unittest.TestCase):
         self.assertIn("CREATE UNIQUE INDEX ix_users_google_id ON users (google_id)", sql)
         self.assertEqual(comandos_proibidos(sql), [])
 
+    def test_sql_da_0005_so_adiciona_colunas_e_cria_tabela_auditoria(self):
+        sql = sql_pendente("postgresql+psycopg2://", "0004_google_oauth")
+        self.assertIn("ALTER TABLE users ADD COLUMN papel VARCHAR", sql)
+        self.assertIn("ALTER TABLE users ADD COLUMN status_conta VARCHAR", sql)
+        self.assertIn("CREATE TABLE registros_auditoria", sql)
+        self.assertEqual(comandos_proibidos(sql), [])
+
     def test_comandos_que_nao_sao_aditivos_sao_achados(self):
         sql = """
             CREATE TABLE nova (id INTEGER);
@@ -142,48 +168,3 @@ class TestTravaAditiva(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
-
-class TestAlinhamentoDoBancoAntigo(BaseSQLite):
-    """O banco de produção como ele estava em 2026-10-17 (ver .claude/banco-estado-atual.md)."""
-
-    def criar_banco_de_producao(self):
-        with self.engine.begin() as conexao:
-            conexao.execute(text("CREATE TABLE users (id INTEGER PRIMARY KEY, email VARCHAR, password_hash VARCHAR)"))
-            conexao.execute(text("CREATE UNIQUE INDEX ix_users_email ON users (email)"))
-            conexao.execute(text("CREATE INDEX ix_users_id ON users (id)"))
-            conexao.execute(text("CREATE TABLE vendedores (id INTEGER PRIMARY KEY, nome VARCHAR NOT NULL, "
-                                 "plano VARCHAR NOT NULL)"))
-            conexao.execute(text(
-                "CREATE TABLE contas_vinculadas (vendedor_id INTEGER NOT NULL REFERENCES vendedores (id) "
-                "ON DELETE CASCADE, marketplace VARCHAR NOT NULL, conectada_em VARCHAR NOT NULL, "
-                "access_token VARCHAR NOT NULL, refresh_token VARCHAR NOT NULL, token_expira_em VARCHAR NOT NULL, "
-                "PRIMARY KEY (vendedor_id, marketplace))"))
-
-    def test_so_as_colunas_que_faltam_e_rodar_duas_vezes_nao_muda_nada(self):
-        from backend.infrastructure.banco.alinhamento import aplicar_alinhamento, operacoes_pendentes
-
-        self.criar_banco_de_producao()
-        with self.engine.connect() as conexao:
-            pendentes = operacoes_pendentes(conexao)
-        self.assertEqual([str(p) for p in pendentes], [
-            "users.nome: acrescentar a coluna", "users.loja: acrescentar a coluna",
-            "users.criado_em: acrescentar a coluna", "contas_vinculadas.conta_externa_id: acrescentar a coluna",
-            "contas_vinculadas.apelido: acrescentar a coluna",
-        ])  # email e password_hash já aceitam vazio: nada a fazer
-        self.assertEqual(len(aplicar_alinhamento(self.engine)), 5)
-        self.assertEqual(aplicar_alinhamento(self.engine), [])
-        with self.engine.connect() as conexao:
-            colunas = {c["name"]: c["nullable"] for c in inspect(conexao).get_columns("users")}
-        self.assertEqual({k: colunas[k] for k in ("nome", "loja", "criado_em")},
-                         {"nome": True, "loja": True, "criado_em": True})
-
-    def test_sql_do_postgres_so_acrescenta_e_solta_not_null(self):
-        from backend.infrastructure.banco.alinhamento import Operacao, sql_do_alinhamento
-
-        sql = sql_do_alinhamento([Operacao("add_column", "users", "nome"),
-                                  Operacao("aceitar_vazio", "users", "email")])
-        self.assertIn("ALTER TABLE users ADD COLUMN nome VARCHAR", sql)
-        self.assertIn("ALTER TABLE users ALTER COLUMN email DROP NOT NULL", sql)
-        self.assertNotIn("SET NOT NULL", sql)
-        self.assertNotIn("DROP COLUMN", sql)

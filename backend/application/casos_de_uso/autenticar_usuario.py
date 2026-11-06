@@ -2,11 +2,13 @@
 Aplicação · Caso de uso: Autenticar usuário (Login).
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 from backend.application.portas import RepositorioUsuarios, ServicoHashSenha, ServicoToken
-from backend.domain.erros import CredenciaisInvalidas
-from backend.domain.usuario import Usuario
+from backend.domain.erros import ContaBanida, ContaSuspensa, CredenciaisInvalidas
+from backend.domain.usuario import STATUS_BANIDA, STATUS_SUSPENSA, Usuario
 
 
 @dataclass(frozen=True)
@@ -21,10 +23,12 @@ class AutenticarUsuario:
         usuarios: RepositorioUsuarios,
         hasher: ServicoHashSenha,
         token_service: ServicoToken,
+        relogio: Callable[[], datetime] = lambda: datetime.now(UTC),
     ):
         self._usuarios = usuarios
         self._hasher = hasher
         self._token_service = token_service
+        self._relogio = relogio
         self._hash_falso = self._hasher.gerar_hash("senha_falsa_para_tempo_constante")
 
     def executar(self, email: str, senha: str) -> ResultadoAutenticacao:
@@ -46,5 +50,18 @@ class AutenticarUsuario:
         if not self._hasher.verificar(senha, hash_armazenado):
             raise CredenciaisInvalidas()
 
-        token = self._token_service.gerar_token(usuario.id, usuario.email)
+        agora = self._relogio()
+        status = usuario.status_efetivo(agora)
+        if status == STATUS_BANIDA:
+            raise ContaBanida(usuario.motivo_moderacao)
+        if status == STATUS_SUSPENSA:
+            raise ContaSuspensa(usuario.suspensa_ate, usuario.motivo_moderacao)
+
+        self._usuarios.registrar_login(usuario.id, agora)
+        token = self._token_service.gerar_token(
+            usuario.id,
+            usuario.email,
+            versao=usuario.token_versao,
+            papel=usuario.papel,
+        )
         return ResultadoAutenticacao(usuario=usuario, token=token)

@@ -8,6 +8,7 @@ from backend.application.casos_de_uso.conectar_marketplace import ConectarMarket
 from backend.application.casos_de_uso.desconectar_marketplace import DesconectarMarketplace
 from backend.application.casos_de_uso.listar_marketplaces import ListarMarketplaces
 from backend.application.casos_de_uso.listar_planos import ListarPlanos
+from backend.application.casos_de_uso.moderar_contas import ModerarContas
 from backend.application.casos_de_uso.obter_usuario_atual import ObterUsuarioAtual
 from backend.application.casos_de_uso.obter_vendedor_atual import ObterVendedorAtual
 from backend.application.casos_de_uso.produtos import GerenciarProdutos
@@ -30,6 +31,7 @@ class CasosDeUso:
     autenticar_google: AutenticarComGoogle | None = None
     registrar_usuario: RegistrarUsuario | None = None
     obter_usuario_atual: ObterUsuarioAtual | None = None
+    moderar_contas: ModerarContas | None = None
     analises_ia: ServicoDeAnalises | None = None
     publicar_no_mercado_livre: PublicarNoMercadoLivre | None = None
     trocar_plano: TrocarPlano | None = None

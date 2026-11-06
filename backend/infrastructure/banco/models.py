@@ -39,6 +39,35 @@ class User(Base):
     loja = Column(String, nullable=True)
     criado_em = Column(String, nullable=True)
     confirmou_maioridade_em = Column(String, nullable=True)  # ISO, gravado no cadastro
+    papel = Column(String(30), nullable=False, default="vendedor")  # vendedor | admin
+    status_conta = Column(String(30), nullable=False, default="ativa")  # ativa | advertida | suspensa | banida
+    motivo_moderacao = Column(Text, nullable=True)
+    suspensa_ate = Column(DateTime(timezone=True), nullable=True)
+    token_versao = Column(Integer, nullable=False, default=0)
+    ultimo_login_em = Column(DateTime(timezone=True), nullable=True)
+    ultimo_acesso_em = Column(DateTime(timezone=True), nullable=True)
+
+
+class RegistroAuditoriaModel(Base):
+    """Trilha de auditoria imutável para ações administrativas e de moderação (ISO 27001 / LGPD)."""
+
+    __tablename__ = "registros_auditoria"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    admin_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    admin_email = Column(String(254), nullable=False)
+    alvo_id = Column(Integer, nullable=True)
+    alvo_identificador = Column(String(254), nullable=False)
+    acao = Column(String(60), nullable=False)
+    motivo = Column(Text, nullable=True)
+    detalhes = Column(Json, nullable=True)
+    criado_em = Column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        Index("ix_registros_auditoria_criado", "criado_em"),
+        Index("ix_registros_auditoria_acao", "acao"),
+        Index("ix_registros_auditoria_alvo", "alvo_id"),
+    )
 
 
 class MarketplaceToken(Base):

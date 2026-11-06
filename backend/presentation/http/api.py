@@ -12,11 +12,13 @@ from typing import Annotated
 from fastapi import Depends, FastAPI, Request
 
 from backend.application.casos_de_uso import CasosDeUso
-from backend.application.portas import ServicoToken
-from backend.presentation.http.autenticacao import dependencia_do_vendedor
+from backend.application.portas import RepositorioUsuarios, ServicoToken
+from backend.domain.usuario import Usuario
+from backend.presentation.http.autenticacao import dependencia_do_admin, dependencia_do_vendedor
 from backend.presentation.http.erros import registrar_tratamento_de_erros
 from backend.presentation.http.limite_do_corpo import LimiteDoCorpo
 from backend.presentation.http.rotas import criar_rotas
+from backend.presentation.http.rotas_admin import criar_rotas_admin
 from backend.presentation.http.rotas_anuncios import criar_rotas_anuncios
 from backend.presentation.http.rotas_ia import criar_rotas_ia
 from backend.presentation.http.rotas_produtos import MAX_BYTES_DO_PRODUTO, criar_rotas_produtos
@@ -63,6 +65,8 @@ def criar_api(
     identificar_vendedor: Callable[..., int] | None = None,
     servico_token: ServicoToken | None = None,
     documentacao_ativa: bool = False,
+    usuarios: RepositorioUsuarios | None = None,
+    emails_admin: frozenset[str] = frozenset(),
 ) -> FastAPI:
     """`identificar_vendedor` é um fallback opcional para testes ou modo sem token."""
     app = FastAPI(
@@ -77,9 +81,17 @@ def criar_api(
     app.add_middleware(LimiteDoCorpo, prefixo=f"{PREFIXO}/produtos", maximo_bytes=MAX_BYTES_DO_PRODUTO)
     registrar_cabecalhos_de_seguranca(app)
     registrar_tratamento_de_erros(app)
-    app.include_router(criar_rotas(casos, identificar_vendedor, servico_token=servico_token), prefix=PREFIXO)
-    vendedor_atual = Annotated[int, Depends(dependencia_do_vendedor(servico_token, identificar_vendedor))]
+    app.include_router(criar_rotas(casos, identificar_vendedor, servico_token=servico_token, usuarios=usuarios), prefix=PREFIXO)
+
+    vendedor_atual = Annotated[
+        int, Depends(dependencia_do_vendedor(servico_token, identificar_vendedor, usuarios=usuarios))
+    ]
     app.include_router(criar_rotas_ia(casos, vendedor_atual), prefix=PREFIXO)
     app.include_router(criar_rotas_anuncios(casos, vendedor_atual), prefix=PREFIXO)
     app.include_router(criar_rotas_produtos(casos, vendedor_atual), prefix=PREFIXO)
+
+    if usuarios is not None:
+        dep_admin = Depends(dependencia_do_admin(servico_token, usuarios, emails_admin=emails_admin))
+        app.include_router(criar_rotas_admin(casos, dep_admin), prefix=PREFIXO)
+
     return app

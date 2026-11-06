@@ -29,13 +29,22 @@ class ServicoJWT:
         self._segredo = segredo
         self._duracao = duracao
 
-    def gerar_token(self, user_id: int, email: str, finalidade: str = FINALIDADE_ACESSO) -> str:
+    def gerar_token(
+        self,
+        user_id: int,
+        email: str,
+        finalidade: str = FINALIDADE_ACESSO,
+        versao: int = 0,
+        papel: str = "vendedor",
+    ) -> str:
         agora = datetime.now(UTC)
         duracao = self._duracao if finalidade == FINALIDADE_ACESSO else DURACAO_ESTADO_OAUTH
         payload = {
             "sub": str(user_id),
             "email": email.strip().lower(),
             "fin": finalidade,
+            "ver": versao,
+            "papel": papel,
             "iat": agora,
             "exp": agora + duracao,
         }

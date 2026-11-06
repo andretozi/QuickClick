@@ -9,6 +9,7 @@ sem traço e sem barra.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -20,6 +21,13 @@ def juntar_nomes(nomes: Sequence[str]) -> str:
     if len(nomes) <= 1:
         return "".join(nomes)
     return f"{', '.join(nomes[:-1])} e {nomes[-1]}"
+
+
+def _limpar_texto_regra(texto: str | None) -> str:
+    if not texto:
+        return ""
+    limpo = texto.replace("—", ",").replace("–", ",").replace("/", " ")
+    return " ".join(limpo.split()).strip(" .")
 
 
 class ErroDeDominio(Exception):
@@ -82,6 +90,51 @@ class CredenciaisInvalidas(ErroDeDominio):
     codigo = "credenciais_invalidas"
 
     def __init__(self, mensagem: str = "Email ou senha incorretos."):
+        super().__init__(mensagem)
+
+
+class ContaSuspensa(ErroDeDominio):
+    codigo = "conta_suspensa"
+
+    def __init__(self, suspensa_ate: datetime | None = None, motivo: str | None = None):
+        partes = ["Sua conta está suspensa temporariamente pela moderação."]
+        motivo_limpo = _limpar_texto_regra(motivo)
+        if motivo_limpo:
+            partes.append(f"Motivo registrado: {motivo_limpo}.")
+        super().__init__(" ".join(partes))
+        self.suspensa_ate = suspensa_ate
+        self.motivo = motivo_limpo or None
+
+    @property
+    def extras(self) -> dict:
+        dados = {}
+        if self.suspensa_ate is not None:
+            dados["suspensa_ate"] = self.suspensa_ate.isoformat()
+        if self.motivo:
+            dados["motivo"] = self.motivo
+        return dados
+
+
+class ContaBanida(ErroDeDominio):
+    codigo = "conta_banida"
+
+    def __init__(self, motivo: str | None = None):
+        partes = ["Esta conta foi desativada permanentemente pela moderação."]
+        motivo_limpo = _limpar_texto_regra(motivo)
+        if motivo_limpo:
+            partes.append(f"Motivo registrado: {motivo_limpo}.")
+        super().__init__(" ".join(partes))
+        self.motivo = motivo_limpo or None
+
+    @property
+    def extras(self) -> dict:
+        return {"motivo": self.motivo} if self.motivo else {}
+
+
+class OperacaoModeracaoInvalida(ErroDeDominio):
+    codigo = "moderacao_invalida"
+
+    def __init__(self, mensagem: str):
         super().__init__(mensagem)
 
 
