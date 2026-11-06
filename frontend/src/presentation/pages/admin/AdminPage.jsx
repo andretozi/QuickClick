@@ -130,36 +130,42 @@ export default function AdminPage() {
         />
       </ul>
 
-      {/* Navegação entre Contas e Auditoria */}
+      {/* Navegação entre Contas e Auditoria com indicador de mola funcional */}
       <div className="admin-page__tabs-bar">
         <SegmentedControl
+          mode="tabs"
+          tone="paper"
           value={tab}
           onChange={setTab}
           options={[
-            { id: ADMIN_TABS.USERS, label: 'Contas e Vendedores' },
-            { id: ADMIN_TABS.AUDIT, label: 'Trilha de Auditoria' }
+            { value: ADMIN_TABS.USERS, label: 'Contas e Vendedores', icon: 'user' },
+            { value: ADMIN_TABS.AUDIT, label: 'Trilha de Auditoria', icon: 'shield' }
           ]}
         />
       </div>
 
       {tab === ADMIN_TABS.USERS && (
         <Panel tone="paper" className="admin-page__main-panel">
-          {/* Barra de Filtros e Busca */}
+          {/* Barra de Filtros de Alto Contraste e Busca */}
           <div className="admin-page__toolbar">
-            <div className="admin-page__filters">
-              {ADMIN_PAGE.filters.options.map((opt) => (
-                <button
-                  key={opt.id}
-                  type="button"
-                  className={cx(
-                    'admin-page__filter-pill',
-                    statusFilter === opt.id && 'admin-page__filter-pill--active'
-                  )}
-                  onClick={() => setStatusFilter(opt.id)}
-                >
-                  {opt.label}
-                </button>
-              ))}
+            <div className="admin-page__filters" role="group" aria-label={ADMIN_PAGE.filters.statusLabel}>
+              {ADMIN_PAGE.filters.options.map((opt) => {
+                const active = statusFilter === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    className={cx(
+                      'admin-page__filter-pill',
+                      active && 'admin-page__filter-pill--active'
+                    )}
+                    aria-pressed={active}
+                    onClick={() => setStatusFilter(opt.id)}
+                  >
+                    <span>{opt.label}</span>
+                  </button>
+                );
+              })}
             </div>
 
             <div className="admin-page__search-box">
@@ -261,11 +267,12 @@ export default function AdminPage() {
                             c.marketplaces_conectados.map((m) => (
                               <span key={m.slug} className="admin-page__channel-badge">
                                 <Icon name="link" size={12} />
-                                {m.nome}
+                                <span>{m.nome}</span>
                                 <button
                                   type="button"
                                   className="admin-page__channel-unbind"
-                                  title={`Desvincular ${m.nome}`}
+                                  title={`Desvincular canal ${m.nome}`}
+                                  aria-label={`Desvincular ${m.nome}`}
                                   onClick={() => handleOpenModal('disconnect', c, m)}
                                 >
                                   ×
@@ -281,68 +288,78 @@ export default function AdminPage() {
 
                       {/* Ações Administrativas */}
                       <td className="admin-page__td-actions">
-                        <div className="admin-page__action-buttons">
-                          {c.status_conta === 'ativa' && (
-                            <>
+                        {c.papel === 'admin' ? (
+                          <div className="admin-page__admin-badge" title="Contas administrativas têm imunidade a punições operacionais">
+                            <Icon name="shield" size={13} />
+                            <span>Administrador</span>
+                          </div>
+                        ) : (
+                          <div className="admin-page__action-buttons">
+                            {c.status_conta === 'ativa' && (
+                              <>
+                                <button
+                                  type="button"
+                                  className="admin-page__btn admin-page__btn--warn"
+                                  onClick={() => handleOpenModal('advertir', c)}
+                                  title="Aplicar advertência formal"
+                                >
+                                  {ADMIN_PAGE.actions.warn}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="admin-page__btn admin-page__btn--suspend"
+                                  onClick={() => handleOpenModal('suspender', c)}
+                                  title="Suspender temporariamente o acesso"
+                                >
+                                  {ADMIN_PAGE.actions.suspend}
+                                </button>
+                              </>
+                            )}
+
+                            {c.status_conta !== 'banida' && (
                               <button
                                 type="button"
-                                className="admin-page__btn admin-page__btn--warn"
-                                onClick={() => handleOpenModal('advertir', c)}
-                                title="Aplicar advertência"
+                                className="admin-page__btn admin-page__btn--ban"
+                                onClick={() => handleOpenModal('banir', c)}
+                                title="Banir vendedor permanentemente"
                               >
-                                {ADMIN_PAGE.actions.warn}
+                                {ADMIN_PAGE.actions.ban}
                               </button>
+                            )}
+
+                            {c.status_conta !== 'ativa' && (
                               <button
                                 type="button"
-                                className="admin-page__btn admin-page__btn--suspend"
-                                onClick={() => handleOpenModal('suspender', c)}
-                                title="Suspender temporariamente"
+                                className="admin-page__btn admin-page__btn--reactivate"
+                                onClick={() => handleOpenModal('reativar', c)}
+                                title="Reativar conta regularizada"
                               >
-                                {ADMIN_PAGE.actions.suspend}
+                                <Icon name="check" size={12} />
+                                <span>{ADMIN_PAGE.actions.reactivate}</span>
                               </button>
-                            </>
-                          )}
+                            )}
 
-                          {c.status_conta !== 'banida' && (
                             <button
                               type="button"
-                              className="admin-page__btn admin-page__btn--ban"
-                              onClick={() => handleOpenModal('banir', c)}
-                              title="Banir vendedor"
+                              className="admin-page__btn admin-page__btn--kill"
+                              onClick={() => handleOpenModal('killSessions', c)}
+                              title="Derrubar todas as sessões ativas do vendedor"
                             >
-                              {ADMIN_PAGE.actions.ban}
+                              <Icon name="logout" size={13} />
+                              <span>Sessões</span>
                             </button>
-                          )}
 
-                          {c.status_conta !== 'ativa' && (
                             <button
                               type="button"
-                              className="admin-page__btn admin-page__btn--reactivate"
-                              onClick={() => handleOpenModal('reativar', c)}
-                              title="Reativar conta"
+                              className="admin-page__btn admin-page__btn--delete"
+                              onClick={() => handleOpenModal('delete', c)}
+                              title="Excluir conta e expurgar dados definitivamente"
                             >
-                              {ADMIN_PAGE.actions.reactivate}
+                              <Icon name="trash" size={13} />
+                              <span>Excluir</span>
                             </button>
-                          )}
-
-                          <button
-                            type="button"
-                            className="admin-page__btn admin-page__btn--kill"
-                            onClick={() => handleOpenModal('killSessions', c)}
-                            title="Derrubar todas as sessões ativas"
-                          >
-                            <Icon name="logout" size={14} />
-                          </button>
-
-                          <button
-                            type="button"
-                            className="admin-page__btn admin-page__btn--delete"
-                            onClick={() => handleOpenModal('delete', c)}
-                            title="Excluir conta definitivamente"
-                          >
-                            <Icon name="trash" size={14} />
-                          </button>
-                        </div>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -400,7 +417,7 @@ export default function AdminPage() {
         </Panel>
       )}
 
-      {/* Modais de Ação */}
+      {/* Modais de Ação Formatados */}
       {activeModal && (
         <Modal
           open={Boolean(activeModal)}
@@ -460,7 +477,13 @@ export default function AdminPage() {
                 variant={activeModal.type === 'delete' || activeModal.type === 'banir' ? 'danger' : 'primary'}
                 size="md"
                 onClick={handleConfirmModal}
-                disabled={executing || (activeModal.type === 'delete' && modalEmailConfirm.trim().toLowerCase() !== activeModal.account.email.toLowerCase())}
+                disabled={
+                  executing ||
+                  (activeModal.type === 'delete' &&
+                    modalEmailConfirm.trim().toLowerCase() !== activeModal.account?.email.toLowerCase()) ||
+                  (['advertir', 'suspender', 'banir', 'delete'].includes(activeModal.type) &&
+                    modalReason.trim().length < 3)
+                }
               >
                 {executing ? 'Processando…' : 'Confirmar ação'}
               </Button>
@@ -469,65 +492,121 @@ export default function AdminPage() {
         >
           <form className="admin-page__modal-form" onSubmit={handleConfirmModal}>
             {activeModal.account && (
-              <div className="admin-page__modal-target">
-                Conta alvo: <strong>{activeModal.account.nome}</strong> ({activeModal.account.email})
+              <div className="admin-page__modal-target-card">
+                <Avatar name={activeModal.account.nome} size="md" />
+                <div className="admin-page__modal-target-details">
+                  <div className="admin-page__modal-target-name">{activeModal.account.nome}</div>
+                  <div className="admin-page__modal-target-sub">
+                    <span className="admin-page__modal-target-email">{activeModal.account.email}</span>
+                    <span className="admin-page__modal-target-dot">·</span>
+                    <span className="admin-page__modal-target-store">Loja: {activeModal.account.loja}</span>
+                  </div>
+                </div>
+                <StatusPill
+                  tone={ADMIN_PAGE.statusTones[activeModal.account.status_conta] || 'muted'}
+                  size="sm"
+                >
+                  {ADMIN_PAGE.statusLabels[activeModal.account.status_conta] || activeModal.account.status_conta}
+                </StatusPill>
               </div>
             )}
 
             {activeModal.channel && (
-              <div className="admin-page__modal-target">
-                Marketplace: <strong>{activeModal.channel.nome}</strong>
+              <div className="admin-page__modal-channel-card">
+                <Icon name="link" size={16} />
+                <span>Canal selecionado: <strong>{activeModal.channel.nome}</strong></span>
               </div>
             )}
 
             {activeModal.type === 'suspender' && (
-              <div className="admin-page__form-group">
-                <label htmlFor="admin-suspension-days" className="admin-page__label">
+              <div className="admin-page__form-field">
+                <label htmlFor="admin-suspension-days" className="admin-page__field-label">
                   {ADMIN_PAGE.modals.suspend.daysLabel}
                 </label>
-                <input
-                  id="admin-suspension-days"
-                  type="number"
-                  min="1"
-                  max="365"
-                  className="admin-page__input"
-                  value={modalDays}
-                  onChange={(e) => setModalDays(e.target.value)}
-                  required
-                />
+                <div className="admin-page__days-control">
+                  <input
+                    id="admin-suspension-days"
+                    type="number"
+                    min="1"
+                    max="365"
+                    className="admin-page__input admin-page__input--days"
+                    value={modalDays}
+                    onChange={(e) => setModalDays(e.target.value)}
+                    required
+                  />
+                  <span className="admin-page__days-suffix">dias corridos</span>
+                </div>
+                <span className="admin-page__field-hint">
+                  Durante este período, o acesso do vendedor à plataforma e operações ficará suspenso.
+                </span>
               </div>
             )}
 
             {['advertir', 'suspender', 'banir', 'reativar', 'delete'].includes(activeModal.type) && (
-              <div className="admin-page__form-group">
-                <label htmlFor="admin-reason" className="admin-page__label">
-                  Motivo da ação (registrado na auditoria)
-                </label>
+              <div className="admin-page__reason-block">
+                <div className="admin-page__reason-header">
+                  <label htmlFor="admin-reason" className="admin-page__reason-label">
+                    Motivo da ação {activeModal.type !== 'reativar' && <span className="admin-page__required-mark">*</span>}
+                  </label>
+                  <span className="admin-page__reason-hint">
+                    {activeModal.type === 'reativar' ? 'Opcional' : 'Mínimo de 3 caracteres'}
+                  </span>
+                </div>
                 <textarea
                   id="admin-reason"
-                  rows="3"
-                  className="admin-page__textarea"
-                  placeholder="Justifique a decisão para controle interno…"
+                  rows="4"
+                  className="admin-page__reason-textarea"
+                  placeholder={
+                    activeModal.type === 'advertir'
+                      ? 'Ex.: Anúncios fora dos padrões de qualidade ou violação leve das diretrizes...'
+                      : activeModal.type === 'suspender'
+                      ? 'Ex.: Atividade suspeita de automação sem autorização prévia...'
+                      : activeModal.type === 'banir'
+                      ? 'Ex.: Tentativa confirmada de fraude ou violação recorrente dos termos...'
+                      : activeModal.type === 'delete'
+                      ? 'Ex.: Solicitação expressa do titular via suporte...'
+                      : 'Justifique a reativação desta conta...'
+                  }
                   value={modalReason}
                   onChange={(e) => setModalReason(e.target.value)}
                   required={activeModal.type !== 'reativar'}
+                  data-autofocus
                 />
+                <div className="admin-page__reason-footer">
+                  <span className="admin-page__reason-counter">
+                    {modalReason.trim().length < 3 && activeModal.type !== 'reativar'
+                      ? 'Preencha o motivo para habilitar a confirmação'
+                      : `${modalReason.trim().length} caracteres digitados`}
+                  </span>
+                  <span className="admin-page__reason-notice">
+                    <Icon name="shield" size={13} />
+                    Ficará registrado na auditoria
+                  </span>
+                </div>
               </div>
             )}
 
             {activeModal.type === 'delete' && (
-              <div className="admin-page__form-group admin-page__form-group--danger">
-                <label htmlFor="admin-email-confirm" className="admin-page__label">
-                  {ADMIN_PAGE.modals.deleteAccount.confirmationLabel}
+              <div className="admin-page__danger-box">
+                <div className="admin-page__danger-box-title">
+                  <Icon name="alert" size={16} />
+                  <span>Atenção: Ação irreversível de expurgo</span>
+                </div>
+                <p className="admin-page__danger-box-desc">
+                  Todos os produtos, anúncios, conexões de marketplaces e históricos desta conta serão permanentemente apagados da base.
+                </p>
+                <label htmlFor="admin-email-confirm" className="admin-page__danger-label">
+                  Para confirmar o expurgo definitivo, digite <strong>{activeModal.account.email}</strong>:
                 </label>
                 <input
                   id="admin-email-confirm"
                   type="email"
-                  className="admin-page__input"
+                  className="admin-page__input admin-page__input--danger"
                   placeholder={activeModal.account.email}
                   value={modalEmailConfirm}
                   onChange={(e) => setModalEmailConfirm(e.target.value)}
                   required
+                  autoComplete="off"
                 />
               </div>
             )}
