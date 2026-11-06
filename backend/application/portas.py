@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import Any, Never, Protocol
 
 from backend.domain.conta_vinculada import ContaVinculada, CredenciaisOAuth
+from backend.domain.moderacao import PainelModeracao, RegistroAuditoria
 from backend.domain.produto import Produto
 from backend.domain.usuario import Usuario
 from backend.domain.vendedor import Vendedor
@@ -67,6 +68,23 @@ class RepositorioUsuarios(Protocol):
 
     def atualizar_senha(self, user_id: int, password_hash: str) -> None: ...
 
+    def registrar_login(self, user_id: int, agora: datetime) -> None: ...
+
+    def registrar_acesso(self, user_id: int, agora: datetime) -> None: ...
+
+    def incrementar_token_versao(self, user_id: int) -> int: ...
+
+    def atualizar_status(
+        self,
+        user_id: int,
+        status: str,
+        motivo: str | None = None,
+        suspensa_ate: datetime | None = None,
+        incrementar_token: bool = False,
+    ) -> Usuario: ...
+
+    def atribuir_papel(self, user_id: int, papel: str) -> Usuario: ...
+
     def remover(self, user_id: int) -> None: ...
 
     def salvar(
@@ -78,13 +96,45 @@ class RepositorioUsuarios(Protocol):
         plano: str = "gratis",
         confirmou_maioridade_em: str | None = None,
         google_id: str | None = None,
+        papel: str = "vendedor",
     ) -> Usuario: ...
+
+
+class RepositorioModeracao(Protocol):
+    def registrar_auditoria(
+        self,
+        admin_id: int | None,
+        admin_email: str,
+        alvo_id: int | None,
+        alvo_identificador: str,
+        acao: str,
+        motivo: str | None = None,
+        detalhes: dict[str, Any] | None = None,
+        criado_em: datetime | None = None,
+    ) -> RegistroAuditoria: ...
+
+    def listar_auditoria(self, limite: int = 50) -> list[RegistroAuditoria]: ...
+
+    def obter_painel(
+        self,
+        filtro_status: str = "todos",
+        busca: str = "",
+        limite: int = 100,
+        agora: datetime | None = None,
+    ) -> PainelModeracao: ...
 
 
 class ServicoToken(Protocol):
     """Tokens com finalidade: "acesso" (login na API) ou "estado_oauth" (volta do marketplace)."""
 
-    def gerar_token(self, user_id: int, email: str, finalidade: str = "acesso") -> str: ...
+    def gerar_token(
+        self,
+        user_id: int,
+        email: str,
+        finalidade: str = "acesso",
+        versao: int = 0,
+        papel: str = "vendedor",
+    ) -> str: ...
 
     def validar_token(self, token: str, finalidade: str = "acesso") -> dict[str, Any]: ...
 

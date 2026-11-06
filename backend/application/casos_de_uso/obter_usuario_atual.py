@@ -6,9 +6,18 @@ leitura dos dados atuais, edição do perfil, troca da senha local (apenas quand
 a conta possui senha exclusiva local) e exclusão definitiva mediante confirmação do nome da loja.
 """
 
+from collections.abc import Callable
+from datetime import UTC, datetime
+
 from backend.application.portas import RepositorioUsuarios, ServicoHashSenha
-from backend.domain.erros import ConfirmacaoExclusaoInvalida, SenhaAtualIncorreta, VendedorNaoEncontrado
-from backend.domain.usuario import Usuario, email_valido, normalizar_email
+from backend.domain.erros import (
+    ConfirmacaoExclusaoInvalida,
+    ContaBanida,
+    ContaSuspensa,
+    SenhaAtualIncorreta,
+    VendedorNaoEncontrado,
+)
+from backend.domain.usuario import STATUS_BANIDA, STATUS_SUSPENSA, Usuario, email_valido, normalizar_email
 
 
 def _normalizar_confirmacao(texto: str) -> str:
@@ -16,18 +25,32 @@ def _normalizar_confirmacao(texto: str) -> str:
 
 
 class ObterUsuarioAtual:
-    def __init__(self, usuarios: RepositorioUsuarios, hasher: ServicoHashSenha | None = None):
+    def __init__(
+        self,
+        usuarios: RepositorioUsuarios,
+        hasher: ServicoHashSenha | None = None,
+        relogio: Callable[[], datetime] = lambda: datetime.now(UTC),
+    ):
         self._usuarios = usuarios
         self._hasher = hasher
+        self._relogio = relogio
 
     def _obter_registro(self, usuario_id: int) -> tuple[Usuario, str | None]:
         resultado = self._usuarios.obter_por_id(usuario_id)
         if resultado is None:
             raise VendedorNaoEncontrado(usuario_id)
-        return resultado
+        usuario, hash_armazenado = resultado
+        agora = self._relogio()
+        status = usuario.status_efetivo(agora)
+        if status == STATUS_BANIDA:
+            raise ContaBanida(usuario.motivo_moderacao)
+        if status == STATUS_SUSPENSA:
+            raise ContaSuspensa(usuario.suspensa_ate, usuario.motivo_moderacao)
+        return usuario, hash_armazenado
 
     def executar(self, usuario_id: int) -> Usuario:
         usuario, _ = self._obter_registro(usuario_id)
+        self._usuarios.registrar_acesso(usuario.id, self._relogio())
         return usuario
 
     def atualizar_perfil(self, usuario_id: int, nome: str, email: str, loja: str) -> Usuario:

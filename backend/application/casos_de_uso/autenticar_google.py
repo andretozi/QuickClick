@@ -2,13 +2,15 @@
 Aplicação · Caso de uso: Autenticar e concluir cadastro via Google OAuth.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Literal
 
 from backend.application.casos_de_uso.autenticar_usuario import ResultadoAutenticacao
 from backend.application.portas import RepositorioUsuarios, ServicoToken, VerificadorGoogleToken
-from backend.domain.erros import EmailJaCadastrado, TokenInvalido
-from backend.domain.usuario import Usuario, email_valido, normalizar_email
+from backend.domain.erros import ContaBanida, ContaSuspensa, EmailJaCadastrado, TokenInvalido
+from backend.domain.usuario import STATUS_BANIDA, STATUS_SUSPENSA, Usuario, email_valido, normalizar_email
 
 
 @dataclass(frozen=True)
@@ -26,10 +28,12 @@ class AutenticarComGoogle:
         usuarios: RepositorioUsuarios,
         verificador_google: VerificadorGoogleToken,
         token_service: ServicoToken,
+        relogio: Callable[[], datetime] = lambda: datetime.now(UTC),
     ):
         self._usuarios = usuarios
         self._verificador_google = verificador_google
         self._token_service = token_service
+        self._relogio = relogio
 
     @property
     def client_id(self) -> str:
@@ -47,8 +51,21 @@ class AutenticarComGoogle:
 
         if registro is not None:
             usuario, _ = registro
+            agora = self._relogio()
+            status = usuario.status_efetivo(agora)
+            if status == STATUS_BANIDA:
+                raise ContaBanida(usuario.motivo_moderacao)
+            if status == STATUS_SUSPENSA:
+                raise ContaSuspensa(usuario.suspensa_ate, usuario.motivo_moderacao)
+
             self._usuarios.vincular_google_id(usuario.id, identidade.google_id)
-            jwt_token = self._token_service.gerar_token(usuario.id, usuario.email)
+            self._usuarios.registrar_login(usuario.id, agora)
+            jwt_token = self._token_service.gerar_token(
+                usuario.id,
+                usuario.email,
+                versao=usuario.token_versao,
+                papel=usuario.papel,
+            )
             return ResultadoLoginGoogle(
                 status="login",
                 access_token=jwt_token,
@@ -93,5 +110,12 @@ class AutenticarComGoogle:
             plano="gratis",
             google_id=google_id_limpo,
         )
-        jwt_token = self._token_service.gerar_token(usuario.id, usuario.email)
+        agora = self._relogio()
+        self._usuarios.registrar_login(usuario.id, agora)
+        jwt_token = self._token_service.gerar_token(
+            usuario.id,
+            usuario.email,
+            versao=usuario.token_versao,
+            papel=usuario.papel,
+        )
         return ResultadoAutenticacao(usuario=usuario, token=jwt_token)

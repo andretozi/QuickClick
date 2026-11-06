@@ -24,6 +24,7 @@ from backend.application.casos_de_uso import (
     GerenciarProdutos,
     ListarMarketplaces,
     ListarPlanos,
+    ModerarContas,
     ObterUsuarioAtual,
     ObterVendedorAtual,
     PublicarNoMercadoLivre,
@@ -38,6 +39,7 @@ from backend.application.ia.portas import Executor, FontePrecosMarketplace
 from backend.application.ia.servico import ServicoDeAnalises
 from backend.application.portas import VerificadorGoogleToken
 from backend.domain.ia.capacidade import ORCAMENTO_DIARIO_PADRAO_USD
+from backend.domain.usuario import extrair_emails_admin
 from backend.infrastructure.banco import models  # noqa: F401
 from backend.infrastructure.banco.repositorio_contas import RepositorioContasVinculadasSQL
 from backend.infrastructure.banco.repositorio_ia import (
@@ -46,6 +48,7 @@ from backend.infrastructure.banco.repositorio_ia import (
     RegistroDeUsoSQL,
     RepositorioDeAnalisesSQL,
 )
+from backend.infrastructure.banco.repositorio_moderacao import RepositorioModeracaoSQL
 from backend.infrastructure.banco.repositorio_produtos import RepositorioDeProdutosSQL
 from backend.infrastructure.banco.repositorio_usuarios import RepositorioUsuariosSQL
 from backend.infrastructure.banco.repositorio_vendedores import RepositorioVendedoresSQL
@@ -108,6 +111,7 @@ def criar_app(
     vendedores = RepositorioVendedoresSQL(session_factory)
     contas = RepositorioContasVinculadasSQL(session_factory, cifrador)
     usuarios = RepositorioUsuariosSQL(session_factory)
+    moderacao = RepositorioModeracaoSQL(session_factory)
 
     hasher = HasherPBKDF2()
     token_service = ServicoJWT(segredo_jwt(leitor))
@@ -153,10 +157,11 @@ def criar_app(
         listar_marketplaces=ListarMarketplaces(contas),
         conectar_marketplace=conectar,
         desconectar_marketplace=DesconectarMarketplace(contas),
-        autenticar_usuario=AutenticarUsuario(usuarios, hasher, token_service),
-        autenticar_google=AutenticarComGoogle(usuarios, verificador_google, token_service),
+        autenticar_usuario=AutenticarUsuario(usuarios, hasher, token_service, relogio=relogio),
+        autenticar_google=AutenticarComGoogle(usuarios, verificador_google, token_service, relogio=relogio),
         registrar_usuario=RegistrarUsuario(usuarios, hasher, token_service),
-        obter_usuario_atual=ObterUsuarioAtual(usuarios, hasher),
+        obter_usuario_atual=ObterUsuarioAtual(usuarios, hasher, relogio=relogio),
+        moderar_contas=ModerarContas(usuarios, moderacao, contas, relogio=relogio),
         trocar_plano=TrocarPlano(vendedores, usuarios, livre=leitor.booleano("TROCA_DE_PLANO_LIVRE", True)),
         analises_ia=analises_ia,
         publicar_no_mercado_livre=PublicarNoMercadoLivre(conectar, gateways["mercado-livre"], fonte_ml, analises,
@@ -164,12 +169,15 @@ def criar_app(
         produtos=GerenciarProdutos(RepositorioDeProdutosSQL(session_factory), relogio),
     )
 
+    emails_admin = extrair_emails_admin(leitor.texto("ADMIN_EMAILS"))
     documentacao_ativa = leitor.booleano("DOCUMENTACAO_API_ATIVA", False)
     app = criar_api(
         casos,
         identificar_vendedor=identificar_vendedor,
         servico_token=token_service,
         documentacao_ativa=documentacao_ativa,
+        usuarios=usuarios,
+        emails_admin=emails_admin,
     )
     if executor_padrao:
         app.router.on_shutdown.append(lambda: executor.shutdown(wait=False, cancel_futures=True))

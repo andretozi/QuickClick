@@ -1,5 +1,5 @@
 /**
- * Infraestrutura · Cache local de contas autenticadas (localStorage)
+ * Domínio · Entidades e mapeamento de contas autenticadas (localStorage)
  *
  * Sincroniza no navegador os dados retornados pela API (/api/auth/me, /api/me/plano)
  * junto com preferências visuais locais da conta (telefone e cor do avatar), sem
@@ -11,16 +11,19 @@ import { STORAGE_KEYS, clearUser, nowIso, readJson, writeJson } from './localSto
 export const ACCOUNT_ERRORS = {
   EMAIL_TAKEN: 'email_em_uso',
   INVALID_CREDENTIALS: 'credenciais_invalidas',
+  ACCOUNT_SUSPENDED: 'conta_suspensa',
+  ACCOUNT_BANNED: 'conta_banida',
   WRONG_PASSWORD: 'senha_atual_incorreta',
   CONFIRMATION_MISMATCH: 'confirmacao_incorreta',
   NOT_FOUND: 'conta_nao_encontrada'
 };
 
 export class AccountError extends Error {
-  constructor(code) {
+  constructor(code, extras = {}) {
     super(code);
     this.name = 'AccountError';
     this.code = code;
+    this.extras = extras;
   }
 }
 
@@ -36,6 +39,9 @@ const toAccount = (conta) =>
         phone: conta.telefone ?? '',
         store: conta.loja,
         plan: conta.plano,
+        role: conta.papel ?? 'vendedor',
+        status: conta.status_conta ?? 'ativa',
+        warning: conta.advertencia ?? null,
         hasPassword: conta.tem_senha !== undefined ? Boolean(conta.tem_senha) : true,
         avatarColor: conta.cor_avatar ?? 'coral',
         createdAt: conta.criada_em,
@@ -58,8 +64,8 @@ export function purgeLocalAccount(id) {
 
 /**
  * Ponto único de conversão e persistência local da conta autenticada na API.
- * Aceita tanto os campos em português da API (nome, loja, plano, tem_senha)
- * quanto campos já normalizados do front (name, store, plan, hasPassword, phone, avatarColor).
+ * Aceita tanto os campos em português da API (nome, loja, plano, papel, status_conta, tem_senha)
+ * quanto campos já normalizados do front (name, store, plan, role, status, hasPassword, phone, avatarColor).
  */
 export function upsertAccount(contaData) {
   const contas = load();
@@ -72,6 +78,9 @@ export function upsertAccount(contaData) {
   const rawName = String(contaData.name ?? contaData.nome ?? existing?.nome ?? '').trim();
   const nome = rawName || loja || normalizedEmail;
   const temSenha = contaData.hasPassword ?? contaData.tem_senha ?? existing?.tem_senha ?? true;
+  const papel = contaData.role ?? contaData.papel ?? existing?.papel ?? 'vendedor';
+  const statusConta = contaData.status ?? contaData.status_conta ?? existing?.status_conta ?? 'ativa';
+  const advertencia = contaData.warning ?? contaData.advertencia ?? existing?.advertencia ?? null;
 
   const conta = {
     id,
@@ -80,6 +89,9 @@ export function upsertAccount(contaData) {
     telefone: String(contaData.phone ?? contaData.telefone ?? existing?.telefone ?? '').trim(),
     loja,
     plano: contaData.plan ?? contaData.plano ?? existing?.plano ?? 'gratis',
+    papel,
+    status_conta: statusConta,
+    advertencia,
     tem_senha: Boolean(temSenha),
     cor_avatar: contaData.avatarColor ?? contaData.cor_avatar ?? existing?.cor_avatar ?? 'coral',
     criada_em: existing?.criada_em ?? now,

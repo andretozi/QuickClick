@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field, field_validator
 from backend.application.casos_de_uso.comum import MarketplaceDoVendedor
 from backend.application.casos_de_uso.obter_vendedor_atual import ResumoDoVendedor
 from backend.domain.marketplace import CATALOGO, StatusMarketplace
+from backend.domain.moderacao import ContaMonitorada, PainelModeracao, RegistroAuditoria, ResumoModeracao
 from backend.domain.plano import Plano
 from backend.domain.produto import Produto, Publicacao
 from backend.domain.usuario import Usuario
@@ -102,6 +103,9 @@ class UsuarioSaida(BaseModel):
     loja: str
     plano: str
     tem_senha: bool = True
+    papel: str = "vendedor"
+    status_conta: str = "ativa"
+    advertencia: str | None = None
 
 
 class RespostaAutenticacao(BaseModel):
@@ -153,6 +157,83 @@ class RequisicaoCadastro(BaseModel):
 class RequisicaoLogin(BaseModel):
     email: str = Field(max_length=254, examples=["vendedor@quickclick.com.br"])
     senha: str = Field(max_length=256, description="Senha do usuário")
+
+
+# ---------------------------------------------------------------------------
+# Moderação e Backoffice Administrativo
+# ---------------------------------------------------------------------------
+
+class ConexaoResumoSaida(BaseModel):
+    marketplace: str
+    apelido: str | None
+    conectada_em: str
+
+
+class ContaMonitoradaSaida(BaseModel):
+    id: int
+    email: str
+    nome: str
+    loja: str
+    plano: str
+    papel: str
+    status_conta: str
+    motivo_moderacao: str | None = None
+    suspensa_ate: datetime | None = None
+    sessao_ativa: bool
+    usa_google: bool
+    criado_em: str | None = None
+    ultimo_login_em: datetime | None = None
+    ultimo_acesso_em: datetime | None = None
+    marketplaces_conectados: list[ConexaoResumoSaida]
+    total_produtos: int
+    total_analises_ia: int
+
+
+class ResumoModeracaoSaida(BaseModel):
+    total_contas: int
+    sessoes_ativas: int
+    contas_advertidas: int
+    contas_suspensas: int
+    contas_banidas: int
+    conexoes_ativas: int
+
+
+class PainelModeracaoSaida(BaseModel):
+    resumo: ResumoModeracaoSaida
+    contas: list[ContaMonitoradaSaida]
+    total_filtrado: int
+
+
+class RegistroAuditoriaSaida(BaseModel):
+    id: int
+    admin_id: int | None
+    admin_email: str
+    alvo_id: int | None
+    alvo_identificador: str
+    acao: str
+    motivo: str | None = None
+    detalhes: dict[str, Any] | None = None
+    criado_em: datetime
+
+
+class RequisicaoPunicaoConta(BaseModel):
+    tipo: Literal["advertir", "suspender", "banir", "reativar"] = Field(
+        description="advertir, suspender, banir ou reativar"
+    )
+    motivo: str = Field(min_length=3, max_length=500, description="Justificativa da ação de moderação")
+    dias_suspensao: int | None = Field(default=None, ge=1, le=365, description="Dias para suspensão temporária")
+
+
+class RequisicaoExcluirContaAdmin(BaseModel):
+    motivo: str = Field(min_length=3, max_length=500, description="Justificativa administrativa da exclusão")
+    confirmacao_email: str = Field(min_length=3, max_length=254, description="Email da conta para dupla confirmação")
+
+
+class RespostaAcaoModeracao(BaseModel):
+    ok: bool = True
+    acao: str
+    alvo_id: int | None = None
+    mensagem: str
 
 
 class AtributoEntrada(BaseModel):
@@ -299,7 +380,8 @@ def marketplace_saida(item: MarketplaceDoVendedor) -> MarketplaceSaida:
     )
 
 
-def usuario_saida(usuario: Usuario) -> UsuarioSaida:
+def usuario_saida(usuario: Usuario, agora: datetime | None = None) -> UsuarioSaida:
+    momento = agora or datetime.now(usuario.suspensa_ate.tzinfo if usuario.suspensa_ate else None)
     return UsuarioSaida(
         id=usuario.id,
         email=usuario.email,
@@ -307,6 +389,9 @@ def usuario_saida(usuario: Usuario) -> UsuarioSaida:
         loja=usuario.loja,
         plano=usuario.plano,
         tem_senha=usuario.tem_senha,
+        papel=usuario.papel,
+        status_conta=usuario.status_efetivo(momento) if momento else usuario.status_conta,
+        advertencia=usuario.advertencia_ativa(momento) if momento else None,
     )
 
 

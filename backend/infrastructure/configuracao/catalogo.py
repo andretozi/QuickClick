@@ -50,6 +50,8 @@ ITENS: tuple[ItemDeConfiguracao, ...] = (
     ItemDeConfiguracao("GEMINI_API_KEY_PAGO", True, "tratamento de foto (versão final)",
                        "Google AI Studio, projeto quickclick-pago (sem saldo ainda)", usada_no_mvp=False),
     # Configurações comuns (não são segredo)
+    ItemDeConfiguracao("ADMIN_EMAILS", False, "emails com acesso ao painel de moderação (separados por vírgula)",
+                       "variável de ambiente ou Key Vault"),
     ItemDeConfiguracao("GOOGLE_CLIENT_ID", False, "login com Google OAuth (ID do cliente público)",
                        "Google Cloud Console, APIs e Serviços > Credenciais (ID do cliente OAuth 2.0)"),
     ItemDeConfiguracao("MERCADO_LIVRE_REDIRECT_URI", False, "retorno do login do Mercado Livre",

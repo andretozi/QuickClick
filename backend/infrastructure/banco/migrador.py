@@ -34,6 +34,13 @@ COLUNAS_NOVAS_NAS_TABELAS_DE_ANTES = {
     ("users", "confirmou_maioridade_em"),
     ("users", "google_id"),
     ("users", "store_name"),
+    ("users", "papel"),
+    ("users", "status_conta"),
+    ("users", "motivo_moderacao"),
+    ("users", "suspensa_ate"),
+    ("users", "token_versao"),
+    ("users", "ultimo_login_em"),
+    ("users", "ultimo_acesso_em"),
 }
 
 _COMANDO_PROIBIDO = re.compile(

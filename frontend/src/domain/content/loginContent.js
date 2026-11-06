@@ -8,9 +8,7 @@ export const BRAND_PANEL = {
 };
 
 export const SOCIAL_PROVIDERS = [
-  { id: 'google', name: 'Google', label: 'Continuar com Google', icon: 'google', iconSize: 21, variant: 'light' },
-  { id: 'apple', name: 'Apple', label: 'Continuar com Apple', icon: 'apple', iconSize: 18, variant: 'dark' },
-  { id: 'facebook', name: 'Facebook', label: 'Continuar com Facebook', icon: 'facebook', iconSize: 18, variant: 'dark' }
+  { id: 'google', name: 'Google', label: 'Continuar com Google', icon: 'google', iconSize: 21, variant: 'light' }
 ];
 
 export const LOGIN_FORM = {

@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from backend.domain.erros import CredenciaisInvalidas, EmailJaCadastrado, VendedorNaoEncontrado
-from backend.domain.usuario import Usuario, normalizar_email
+from backend.domain.usuario import PAPEL_ADMIN, PAPEL_VENDEDOR, STATUS_ATIVA, Usuario, normalizar_email
 from backend.infrastructure.banco.models import (
     AiUsage,
     AnaliseIAModel,
@@ -16,6 +16,7 @@ from backend.infrastructure.banco.models import (
     MarketplaceToken,
     ProdutoModel,
     PublicacaoModel,
+    RegistroAuditoriaModel,
     User,
     UsoIAModel,
     VendedorModel,
@@ -37,6 +38,13 @@ def _montar_usuario(session: Session, user: User | None) -> tuple[Usuario, str |
         loja=loja,
         plano=plano,
         tem_senha=tem_senha_local,
+        papel=user.papel or PAPEL_VENDEDOR,
+        status_conta=user.status_conta or STATUS_ATIVA,
+        motivo_moderacao=user.motivo_moderacao,
+        suspensa_ate=user.suspensa_ate,
+        token_versao=user.token_versao or 0,
+        ultimo_login_em=user.ultimo_login_em,
+        ultimo_acesso_em=user.ultimo_acesso_em,
     )
     return usuario, user.password_hash
 
@@ -57,15 +65,15 @@ class RepositorioUsuariosSQL:
             return _montar_usuario(session, user)
 
     def obter_por_google_id(self, google_id: str) -> tuple[Usuario, str | None] | None:
-        google_id_limpo = google_id.strip()
-        if not google_id_limpo:
+        limpo = (google_id or "").strip()
+        if not limpo:
             return None
         with self._session_factory() as session:
-            user = session.query(User).filter_by(google_id=google_id_limpo).first()
+            user = session.query(User).filter_by(google_id=limpo).first()
             return _montar_usuario(session, user)
 
     def vincular_google_id(self, user_id: int, google_id: str) -> None:
-        google_id_limpo = google_id.strip()
+        google_id_limpo = (google_id or "").strip()
         if not google_id_limpo:
             return
         with self._session_factory() as session:
@@ -73,14 +81,14 @@ class RepositorioUsuariosSQL:
             if user is None:
                 return
             if user.google_id and user.google_id != google_id_limpo:
-                raise CredenciaisInvalidas("Esta conta já está vinculada a outro login do Google.")
+                raise CredenciaisInvalidas("Esta conta j? est? vinculada a outro login do Google.")
             if not user.google_id:
                 user.google_id = google_id_limpo
                 try:
                     session.commit()
                 except IntegrityError as erro:
                     session.rollback()
-                    raise CredenciaisInvalidas("Este login do Google já está vinculado a outra conta.") from erro
+                    raise CredenciaisInvalidas("Este login do Google j? est? vinculado a outra conta.") from erro
 
     def atualizar_perfil(self, user_id: int, nome: str, email: str, loja: str) -> Usuario:
         email_normalizado = normalizar_email(email)
@@ -90,9 +98,8 @@ class RepositorioUsuariosSQL:
             user = session.query(User).filter_by(id=user_id).first()
             if user is None:
                 raise VendedorNaoEncontrado(user_id)
-
-            conflito = session.query(User).filter(User.email == email_normalizado, User.id != user_id).first()
-            if conflito is not None:
+            outro = session.query(User).filter(User.email == email_normalizado, User.id != user_id).first()
+            if outro is not None:
                 raise EmailJaCadastrado()
 
             user.email = email_normalizado
@@ -120,7 +127,66 @@ class RepositorioUsuariosSQL:
             if user is None:
                 raise VendedorNaoEncontrado(user_id)
             user.password_hash = password_hash
+            user.token_versao = (user.token_versao or 0) + 1  # invalida sessões antigas
             session.commit()
+
+    def registrar_login(self, user_id: int, agora: datetime) -> None:
+        with self._session_factory() as session:
+            user = session.query(User).filter_by(id=user_id).first()
+            if user:
+                user.ultimo_login_em = agora
+                user.ultimo_acesso_em = agora
+                session.commit()
+
+    def registrar_acesso(self, user_id: int, agora: datetime) -> None:
+        with self._session_factory() as session:
+            user = session.query(User).filter_by(id=user_id).first()
+            if user:
+                user.ultimo_acesso_em = agora
+                session.commit()
+
+    def incrementar_token_versao(self, user_id: int) -> int:
+        with self._session_factory() as session:
+            user = session.query(User).filter_by(id=user_id).first()
+            if user is None:
+                raise VendedorNaoEncontrado(user_id)
+            user.token_versao = (user.token_versao or 0) + 1
+            session.commit()
+            return user.token_versao
+
+    def atualizar_status(
+        self,
+        user_id: int,
+        status: str,
+        motivo: str | None = None,
+        suspensa_ate: datetime | None = None,
+        incrementar_token: bool = False,
+    ) -> Usuario:
+        with self._session_factory() as session:
+            user = session.query(User).filter_by(id=user_id).first()
+            if user is None:
+                raise VendedorNaoEncontrado(user_id)
+            user.status_conta = status
+            user.motivo_moderacao = motivo
+            user.suspensa_ate = suspensa_ate
+            if incrementar_token:
+                user.token_versao = (user.token_versao or 0) + 1
+            session.commit()
+            montado = _montar_usuario(session, user)
+            assert montado is not None
+            return montado[0]
+
+    def atribuir_papel(self, user_id: int, papel: str) -> Usuario:
+        with self._session_factory() as session:
+            user = session.query(User).filter_by(id=user_id).first()
+            if user is None:
+                raise VendedorNaoEncontrado(user_id)
+            user.papel = papel
+            user.token_versao = (user.token_versao or 0) + 1
+            session.commit()
+            montado = _montar_usuario(session, user)
+            assert montado is not None
+            return montado[0]
 
     def remover(self, user_id: int) -> None:
         """Elimina definitivamente o usuário e seus registros vinculados (conformidade LGPD)."""
@@ -147,6 +213,7 @@ class RepositorioUsuariosSQL:
         plano: str = "gratis",
         confirmou_maioridade_em: str | None = None,
         google_id: str | None = None,
+        papel: str = PAPEL_VENDEDOR,
     ) -> Usuario:
         email_normalizado = normalizar_email(email)
         nome_limpo = nome.strip()
@@ -160,6 +227,8 @@ class RepositorioUsuariosSQL:
                 user = User(
                     email=email_normalizado,
                     criado_em=agora,
+                    papel=papel,
+                    status_conta=STATUS_ATIVA,
                 )
                 session.add(user)
 
@@ -167,6 +236,7 @@ class RepositorioUsuariosSQL:
             user.nome = nome_limpo
             user.loja = loja_limpa
             user.store_name = loja_limpa or None
+            user.papel = papel or user.papel or PAPEL_VENDEDOR
             if google_id_limpo is not None:
                 user.google_id = google_id_limpo
             if confirmou_maioridade_em:
