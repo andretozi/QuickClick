@@ -10,7 +10,15 @@ from typing import Literal
 from backend.application.casos_de_uso.autenticar_usuario import ResultadoAutenticacao
 from backend.application.portas import RepositorioUsuarios, ServicoToken, VerificadorGoogleToken
 from backend.domain.erros import ContaBanida, ContaSuspensa, EmailJaCadastrado, TokenInvalido
-from backend.domain.usuario import STATUS_BANIDA, STATUS_SUSPENSA, Usuario, email_valido, normalizar_email
+from backend.domain.usuario import (
+    PAPEL_ADMIN,
+    PAPEL_VENDEDOR,
+    STATUS_BANIDA,
+    STATUS_SUSPENSA,
+    Usuario,
+    email_valido,
+    normalizar_email,
+)
 
 
 @dataclass(frozen=True)
@@ -29,11 +37,13 @@ class AutenticarComGoogle:
         verificador_google: VerificadorGoogleToken,
         token_service: ServicoToken,
         relogio: Callable[[], datetime] = lambda: datetime.now(UTC),
+        emails_admin: frozenset[str] = frozenset(),
     ):
         self._usuarios = usuarios
         self._verificador_google = verificador_google
         self._token_service = token_service
         self._relogio = relogio
+        self._emails_admin = emails_admin
 
     @property
     def client_id(self) -> str:
@@ -57,6 +67,10 @@ class AutenticarComGoogle:
                 raise ContaBanida(usuario.motivo_moderacao)
             if status == STATUS_SUSPENSA:
                 raise ContaSuspensa(usuario.suspensa_ate, usuario.motivo_moderacao)
+
+            email_norm = usuario.email.strip().lower()
+            if email_norm in self._emails_admin and usuario.papel != PAPEL_ADMIN:
+                usuario = self._usuarios.atribuir_papel(usuario.id, PAPEL_ADMIN)
 
             self._usuarios.vincular_google_id(usuario.id, identidade.google_id)
             self._usuarios.registrar_login(usuario.id, agora)
@@ -102,6 +116,7 @@ class AutenticarComGoogle:
         if self._usuarios.obter_por_google_id(google_id_limpo) is not None:
             raise EmailJaCadastrado()
 
+        papel = PAPEL_ADMIN if email_normalizado in self._emails_admin else PAPEL_VENDEDOR
         usuario = self._usuarios.salvar(
             email=email_normalizado,
             password_hash=None,
@@ -109,6 +124,7 @@ class AutenticarComGoogle:
             loja=loja_limpa,
             plano="gratis",
             google_id=google_id_limpo,
+            papel=papel,
         )
         agora = self._relogio()
         self._usuarios.registrar_login(usuario.id, agora)
