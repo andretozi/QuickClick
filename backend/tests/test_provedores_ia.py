@@ -93,6 +93,16 @@ def chamar(cliente):
 
 
 class TestClienteAnthropic(unittest.TestCase):
+    def test_uso_da_chave_paga_sai_como_paga_e_o_da_gratis_como_gratis(self):
+        """O orçamento do dia soma só a chave paga: se o tipo sair errado, o teto nunca dispara."""
+        for variavel, esperado in (("ANTHROPIC_API_KEY_PAGO", "paga"), ("ANTHROPIC_API_KEY_GRATIS", "gratis")):
+            with self.subTest(variavel=variavel):
+                registro = RegistroEmMemoria()
+                cliente = ClienteAnthropic(variavel, CHAVE_FALSA, registro, "5m", relogio=lambda: AGORA,
+                                           dormir=lambda s: None, cliente=SDKFalso(resposta_anthropic()))
+                chamar(cliente)
+                self.assertEqual(registro.usos[0].chave, esperado)
+
     def test_sucesso_registra_uso_com_custo(self):
         cliente, _, registro, _ = cliente_anthropic(resposta_anthropic())
         chamar(cliente)
@@ -190,7 +200,8 @@ class GeminiFalso:
 
 class TestClienteGemini(unittest.TestCase):
     def _cliente(self, *respostas):
-        return ClienteGemini("GEMINI_API_KEY_GRATIS", CHAVE_FALSA, RegistroEmMemoria(), relogio=lambda: AGORA,
+        self.registro = RegistroEmMemoria()
+        return ClienteGemini("GEMINI_API_KEY_GRATIS", CHAVE_FALSA, self.registro, relogio=lambda: AGORA,
                              dormir=lambda s: None, cliente=GeminiFalso(*respostas))
 
     def _gerar(self, cliente):
@@ -202,6 +213,7 @@ class TestClienteGemini(unittest.TestCase):
                                cached_content_token_count=0)
         cliente = self._cliente(SimpleNamespace(text='{"titulo": "x"}', usage_metadata=meta))
         self.assertEqual(self._gerar(cliente), {"titulo": "x"})
+        self.assertEqual(self.registro.usos[0].chave, "gratis")
 
     def test_429_vira_falha_e_a_reserva_assume(self):
         from google.genai import errors

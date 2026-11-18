@@ -244,6 +244,17 @@ class OrcamentoFalso:
         return self.gasto
 
 
+class TestNivelDaAnalise(unittest.TestCase):
+    def test_o_nivel_vem_do_plano_gravado_e_plano_pago_nunca_roda_no_gratis(self):
+        from backend.domain.ia.analise import Nivel
+
+        casos = (("gratis", "pro", Nivel.PAGO),  # análise antiga, gravada como grátis quando o orçamento estourava
+                 ("pago", "essencial", Nivel.PAGO), ("gratis", "gratis", Nivel.GRATIS), ("pago", None, Nivel.PAGO))
+        for gravado, plano, esperado in casos:
+            with self.subTest(gravado=gravado, plano=plano):
+                self.assertIs(ProcessoDaAnalise._nivel({"nivel": gravado, "plano_no_momento": plano}), esperado)
+
+
 class TestProcessoComExigencias(unittest.TestCase):
     def processar(self, conectados=(ML, SHOPEE), fonte_ml=None, shopee=None, nivel="gratis", orcamento=None,
                   falha_na_releitura=False):

@@ -333,8 +333,9 @@ class TestPlanoPago(BaseIA):
                                                                    for p in (14000, 15000, 16000, 17000, 15500)]}})
         self.fonte = FonteMLFalsa()
         self.gemini = Falso("gemini", leitores())
+        self.orientado = Falso("orientado", {"pesquisar": self.sonnet.respostas["pesquisar"]})
         self.montar(ProvedoresDeIA(leitor_visao_pago=self.opus, pesquisador_pago=self.sonnet,
-                                   precificador_pago=self.opus, precos_na_web_pago=self.sonnet, redator_pago=self.sonnet,
+                                   pesquisador_orientado_pago=self.orientado, precificador_pago=self.opus, precos_na_web_pago=self.sonnet, redator_pago=self.sonnet,
                                    leitor_gemini_gratis=self.gemini),
                     fonte_ml=self.fonte)
 
@@ -360,7 +361,8 @@ class TestPlanoPago(BaseIA):
         for _ in range(2):
             analise_id = self.criar().json()["id"]
             self.confirmar(analise_id)
-        self.assertEqual(self.sonnet.chamadas.count("pesquisar"), 1)
+        self.assertEqual(self.orientado.chamadas.count("pesquisar"), 1)  # o Pro usa o orientador
+        self.assertNotIn("pesquisar", self.sonnet.chamadas)
 
     def test_preco_da_ia_fora_dos_dados_reais_fica_o_da_regra(self):
         self.opus.respostas["precificar"]["preco_sugerido_centavos"] = 99_000_00
@@ -441,8 +443,10 @@ class TestPlanoEssencial(BaseIA):
                                        "buscar_precos": {"itens": [{"preco_centavos": p, "frete_gratis": True, "url": "x"}
                                                                    for p in (14000, 15000, 16000, 17000, 15500)]}})
         self.gemini = Falso("gemini", leitores())
+        self.orientado = Falso("orientado", {"pesquisar": self.sonnet.respostas["pesquisar"]})
         self.montar(ProvedoresDeIA(leitor_visao_pago=self.opus, leitor_texto_pago=self.sonnet,
-                                   pesquisador_pago=self.sonnet, precificador_pago=self.opus,
+                                   pesquisador_pago=self.sonnet, pesquisador_orientado_pago=self.orientado,
+                                   precificador_pago=self.opus,
                                    precificador_texto_pago=self.sonnet, precos_na_web_pago=self.sonnet,
                                    redator_pago=self.sonnet, leitor_gemini_gratis=self.gemini),
                     fonte_ml=FonteMLFalsa())
@@ -459,6 +463,8 @@ class TestPlanoEssencial(BaseIA):
         self.assertIn("precificar", self.sonnet.chamadas)
         self.assertIn("escrever", self.sonnet.chamadas)
         self.assertEqual((self.opus.chamadas, self.gemini.chamadas), ([], []))
+        self.assertIn("pesquisar", self.sonnet.chamadas)
+        self.assertEqual(self.orientado.chamadas, [])  # o orientador é só do Pro e do Business
 
 
 class TestPagoSemChavePaga(BaseIA):
