@@ -439,6 +439,18 @@ class TestPagoSemChavePaga(BaseIA):
         self.assertEqual((resposta.status_code, resposta.json()["erro"]["codigo"]), (503, "ia_indisponivel"))
         self.assertEqual(self.gemini.chamadas, [])
 
+    def test_orcamento_estourado_tambem_nao_leva_ao_gemini(self):
+        # O gasto do dia soma o uso da chave grátis; sem a chave paga, o pago não pode descer para o grátis
+        with self.Session() as sessao:
+            sessao.add(models.UsoIAModel(etapa="leitura", provedor="anthropic", modelo="claude-haiku-5-5",
+                                         tokens_entrada=0, tokens_saida=0, cache_lido=0, cache_gravado=0, buscas_web=0,
+                                         custo_estimado_usd=Decimal("0.50"), duracao_ms=1, criado_em=self.agora))
+            sessao.commit()
+        cota = self.cliente.get("/api/ia/cota").json()
+        self.assertEqual((cota["nivel_agora"], cota["disponivel"]), ("gratis", False))
+        self.assertEqual(self.criar().json()["erro"]["codigo"], "ia_indisponivel")
+        self.assertEqual(self.gemini.chamadas, [])
+
 
 class TestSemIA(BaseIA):
     def setUp(self):

@@ -78,6 +78,11 @@ class ServicoDeAnalises:
         gasto = self._orcamento.gasto_de_hoje_usd(self.d.relogio())
         return nivel_efetivo(capacidade.nivel, gasto, self.d.config.orcamento_diario_usd)
 
+    def _sem_leitor(self, capacidade: CapacidadeIA, nivel) -> bool:
+        """Sem a chave paga, o plano pago não cai no grátis nem quando o orçamento do dia estoura."""
+        return any(not escolha.leitores(self.d.provedores, n, ponta=capacidade.modelo_de_ponta)
+                   for n in {capacidade.nivel, nivel})
+
     def _da_conta(self, vendedor_id: int, analise_id: str) -> dict[str, Any]:
         analise = self.d.analises.obter(analise_id)
         if analise is None or analise["vendedor_id"] != vendedor_id:
@@ -93,7 +98,7 @@ class ServicoDeAnalises:
         motivo = None
         if not self.d.config.ia_ativa:
             motivo = "ia_desligada"
-        elif not escolha.leitores(self.d.provedores, nivel, ponta=capacidade.modelo_de_ponta):
+        elif self._sem_leitor(capacidade, nivel):
             motivo = "provedor_indisponivel"
         elif sobram <= 0:
             motivo = "cota_esgotada"
@@ -130,7 +135,7 @@ class ServicoDeAnalises:
                 na_ultima_hora=self.d.analises.criadas_desde(vendedor_id, agora - timedelta(hours=1)),
             )
             nivel, estourou = self._nivel_agora(capacidade)
-            if not escolha.leitores(self.d.provedores, nivel, ponta=capacidade.modelo_de_ponta):
+            if self._sem_leitor(capacidade, nivel):
                 raise IAIndisponivel()
             analise_id = str(uuid.uuid4())
             self.d.analises.criar({
