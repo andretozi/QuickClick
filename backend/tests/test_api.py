@@ -15,6 +15,7 @@ from sqlalchemy.pool import StaticPool
 from backend.app.bootstrap import criar_app
 from backend.application.ia.escolha import ProvedoresDeIA
 from backend.domain.marketplace import Marketplace, StatusMarketplace
+from backend.domain.plano import GRATIS_CONECTA_VARIOS_PROVISORIO
 from backend.infrastructure.banco import models
 from backend.infrastructure.configuracao import Config
 from backend.infrastructure.database import Base
@@ -695,14 +696,16 @@ class TestApiConsultas(BaseApi):
         self.assertEqual([p["nome"] for p in planos], ["Grátis", "Essencial", "Pro", "Business"])
         self.assertEqual(planos[0]["preco_mensal_centavos"], 0)
         self.assertIsNone(planos[2]["preco_mensal_centavos"])
-        self.assertEqual([p["limite_marketplaces"] for p in planos], [1, 1, None, None])
+        self.assertEqual([p["limite_marketplaces"] for p in planos],
+                         [None if GRATIS_CONECTA_VARIOS_PROVISORIO else 1, 1, None, None])
 
     def test_me_retorna_dados_do_vendedor_no_plano_gratis(self):
         eu = self.cliente.get("/api/me").json()
         self.assertEqual(eu["plano"]["slug"], "gratis")
         self.assertEqual(eu["marketplaces_conectados"], 0)
         self.assertTrue(eu["pode_conectar_mais"])
-        self.assertEqual(eu["plano_para_mais_marketplaces"]["nome"], "Pro")
+        sugerido = eu["plano_para_mais_marketplaces"]
+        self.assertEqual(sugerido and sugerido["nome"], None if GRATIS_CONECTA_VARIOS_PROVISORIO else "Pro")
 
     def test_marketplaces_lista_o_catalogo_inteiro(self):
         marketplaces = self.cliente.get("/api/marketplaces").json()["marketplaces"]
@@ -774,7 +777,8 @@ class TestApiConexoes(BaseApi):
         self.assertEqual(pub_resp.status_code, 405)
 
     @patch("backend.domain.marketplace.CATALOGO", CATALOGO_TESTE)
-    def test_limite_do_plano_gratis_responde_403_dizendo_o_plano(self):
+    def test_limite_do_plano_essencial_responde_403_dizendo_o_plano(self):
+        self.cliente.put("/api/me/plano", json={"plano": "essencial"})
         self.conectar("mercado-livre")
 
         resposta = self.conectar("shopee")
@@ -784,7 +788,7 @@ class TestApiConexoes(BaseApi):
         self.assertEqual(erro["codigo"], "limite_do_plano")
         self.assertEqual(erro["plano_sugerido"], "pro")
         self.assertEqual(
-            erro["mensagem"], "No plano Grátis você conecta 1 marketplace. Pra conectar mais, mude para o plano Pro."
+            erro["mensagem"], "No plano Essencial você conecta 1 marketplace. Pra conectar mais, mude para o plano Pro."
         )
         eu = self.cliente.get("/api/me").json()
         self.assertEqual((eu["marketplaces_conectados"], eu["pode_conectar_mais"]), (1, False))
@@ -845,8 +849,9 @@ class TestApiTrocarPlano(BaseApi):
 
     def test_gratis_pro_business_gratis_muda_selo_limite_e_cota(self):
         self.conectar("mercado-livre")
-        esperado = {"pro": (True, 120), "business": (True, 400), "gratis": (False, 5)}
-        for plano in ("pro", "business", "gratis"):
+        esperado = {"pro": (True, 120), "business": (True, 400), "gratis": (GRATIS_CONECTA_VARIOS_PROVISORIO, 5),
+                    "essencial": (False, 40)}
+        for plano in ("pro", "business", "essencial", "gratis"):
             resposta = self.trocar(plano)
             self.assertEqual((resposta.status_code, resposta.json()["plano"]), (200, plano))
             self.assertEqual(resposta.json()["email"], "teste@quickclick.com.br")
@@ -857,6 +862,16 @@ class TestApiTrocarPlano(BaseApi):
                              (plano, *esperado[plano][:1], plano, esperado[plano][1]))
         with self.Session() as session:
             self.assertEqual(session.query(models.VendedorModel).filter_by(id=1).one().plano, "gratis")
+
+    def test_troca_entre_os_quatro_planos_em_qualquer_ordem(self):
+        planos = ("gratis", "essencial", "pro", "business")
+        for de in planos:
+            for para in planos:
+                with self.subTest(de=de, para=para):
+                    self.assertEqual(self.trocar(de).status_code, 200)
+                    resposta = self.trocar(para)
+                    self.assertEqual((resposta.status_code, resposta.json()["plano"]), (200, para))
+                    self.assertEqual(self.cliente.get("/api/me").json()["plano"]["slug"], para)
 
     def test_plano_que_nao_existe_e_400_sem_mudar_nada(self):
         resposta = self.trocar("ouro")

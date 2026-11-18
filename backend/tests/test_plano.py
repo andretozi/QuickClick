@@ -4,20 +4,45 @@ import re
 import unittest
 
 from backend.domain.erros import LimiteDoPlanoAtingido
-from backend.domain.plano import BUSINESS, ESSENCIAL, GRATIS, PLANOS, PRO, buscar_plano, plano_para_mais_marketplaces
+from pathlib import Path
+
+from backend.domain.plano import (
+    BUSINESS,
+    ESSENCIAL,
+    GRATIS,
+    GRATIS_CONECTA_VARIOS_PROVISORIO,
+    PLANOS,
+    PRO,
+    buscar_plano,
+    plano_para_mais_marketplaces,
+)
+
+RAIZ = Path(__file__).resolve().parents[2]
+CONTEUDO_DA_LANDING = "frontend/src/domain/content/landingContent.js"
 
 # Regra de escrita dos textos de tela: sem travessão, meia risca, barra ou hífen (exceto NF-e)
 FORA_DA_REGRA = re.compile(r"[—–/]|\s-\s|\w-\w")
 
 
 class TestLimiteDoPlano(unittest.TestCase):
-    def test_gratis_e_essencial_conectam_um_marketplace(self):
-        for plano in (GRATIS, ESSENCIAL):
-            with self.subTest(plano=plano.nome):
-                self.assertEqual(plano.limite_marketplaces, 1)
-                self.assertTrue(plano.permite_conectar(0))
-                self.assertFalse(plano.permite_conectar(1))
-                self.assertFalse(plano.multicanal)
+    def test_essencial_conecta_um_marketplace(self):
+        self.assertEqual(ESSENCIAL.limite_marketplaces, 1)
+        self.assertTrue(ESSENCIAL.permite_conectar(0))
+        self.assertFalse(ESSENCIAL.permite_conectar(1))
+        self.assertFalse(ESSENCIAL.multicanal)
+
+    def test_gratis_segue_a_regra_provisoria(self):
+        """Provisório: o Grátis conecta vários. Voltar ao limite de 1 é trocar a constante (e o card, e o front)."""
+        self.assertEqual(GRATIS.limite_marketplaces, None if GRATIS_CONECTA_VARIOS_PROVISORIO else 1)
+        self.assertEqual(GRATIS.permite_conectar(5), GRATIS_CONECTA_VARIOS_PROVISORIO)
+
+    def test_front_espelha_a_regra_provisoria_do_gratis(self):
+        regras = (RAIZ / "frontend/src/domain/plans/planRules.js").read_text(encoding="utf-8")
+        valor = re.search(r"const FREE_CONNECTS_MANY = (true|false);", regras).group(1)
+        self.assertEqual(valor == "true", GRATIS_CONECTA_VARIOS_PROVISORIO)
+        cartao = re.search(r"id: 'gratis'.*?features: \[(.*?)\]", (RAIZ / CONTEUDO_DA_LANDING).read_text(encoding="utf-8"),
+                           re.S).group(1)
+        self.assertEqual("1 marketplace" in cartao, not GRATIS_CONECTA_VARIOS_PROVISORIO)
 
     def test_pro_e_business_conectam_varios(self):
         for plano in (PRO, BUSINESS):
@@ -27,7 +52,7 @@ class TestLimiteDoPlano(unittest.TestCase):
                 self.assertTrue(plano.multicanal)
 
     def test_multicanal_comeca_no_pro(self):
-        self.assertEqual(plano_para_mais_marketplaces(GRATIS), PRO)
+        self.assertEqual(plano_para_mais_marketplaces(GRATIS), None if GRATIS_CONECTA_VARIOS_PROVISORIO else PRO)
         self.assertEqual(plano_para_mais_marketplaces(ESSENCIAL), PRO)
         self.assertIsNone(plano_para_mais_marketplaces(PRO))
         self.assertIsNone(plano_para_mais_marketplaces(BUSINESS))
@@ -39,7 +64,7 @@ class TestLimiteDoPlano(unittest.TestCase):
         BUSINESS.garantir_vaga(10)
 
     def test_limite_atingido_diz_em_qual_plano_da_pra_conectar_mais(self):
-        for plano in (GRATIS, ESSENCIAL):
+        for plano in (p for p in (GRATIS, ESSENCIAL) if p.limite_marketplaces == 1):
             with self.subTest(plano=plano.nome):
                 with self.assertRaises(LimiteDoPlanoAtingido) as contexto:
                     plano.garantir_vaga(1)

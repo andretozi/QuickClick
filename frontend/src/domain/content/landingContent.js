@@ -135,7 +135,7 @@ export const PLANS = {
       price: 'R$ 0',
       period: 'pra sempre',
       tagline: 'Pra começar a vender',
-      features: ['1 marketplace', '5 análises de IA por mês'],
+      features: ['5 análises de IA por mês', 'Publicação no Mercado Livre'],
       cta: { label: 'Começar grátis', href: '#/cadastro' }
     },
     {

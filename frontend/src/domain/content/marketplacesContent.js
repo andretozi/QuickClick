@@ -91,7 +91,7 @@ export const MARKETPLACES_PAGE = {
 export const PLAN_NOTICE = {
   limited: 'No Grátis você conecta 1 marketplace. Multicanal a partir do Pro.',
   limitedOther: (planName) => `No ${planName} você conecta 1 marketplace. Multicanal a partir do Pro.`,
-  unlimited: (planName) => `No ${planName} você conecta vários marketplaces e vende em todos ao mesmo tempo.`,
+  unlimited: (planName) => `No ${planName} você conecta vários marketplaces.`,
   link: { label: 'Ver os planos', href: '#planos' }
 };
 
