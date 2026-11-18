@@ -115,8 +115,11 @@ class MockMeliClient:
 
 
 class BaseApi(unittest.TestCase):
+    ambiente_extra: dict[str, str] = {}  # variáveis a mais no leitor da classe de teste
+
     def setUp(self):
         self.leitor = leitor_de_teste(
+            **self.ambiente_extra,
             MERCADO_LIVRE_CLIENT_ID="1234567890123456",
             MERCADO_LIVRE_CLIENT_SECRET="secret_teste",
             MERCADO_LIVRE_REDIRECT_URI="https://quickclick.azurewebsites.net/api/marketplaces/mercado-livre/callback",
@@ -777,7 +780,9 @@ class TestApiConexoes(BaseApi):
 
     @patch("backend.domain.marketplace.CATALOGO", CATALOGO_TESTE)
     def test_limite_do_plano_essencial_responde_403_dizendo_o_plano(self):
-        self.cliente.put("/api/me/plano", json={"plano": "essencial"})
+        with self.Session() as session:
+            session.query(models.VendedorModel).filter_by(id=1).update({"plano": "essencial"})
+            session.commit()
         self.conectar("mercado-livre")
 
         resposta = self.conectar("shopee")
@@ -843,6 +848,8 @@ class TestApiPlanoPro(BaseApi):
 
 
 class TestApiTrocarPlano(BaseApi):
+    ambiente_extra = {"TROCA_DE_PLANO_LIVRE": "true"}  # ligada de forma explícita, como no desenvolvimento
+
     def trocar(self, plano, **kwargs):
         return self.cliente.put("/api/me/plano", json={"plano": plano}, **kwargs)
 
@@ -888,25 +895,30 @@ class TestApiTrocarPlano(BaseApi):
         self.trocar("business", headers={"Authorization": f"Bearer {outro}"})
         self.assertEqual(self.cliente.get("/api/auth/me").json()["plano"], "gratis")
 
-    def test_plans_avisa_que_a_troca_e_livre(self):
+    def test_plans_avisa_que_a_troca_e_livre_quando_a_variavel_esta_ligada(self):
         self.assertTrue(self.cliente.get("/api/plans").json()["troca_de_plano_livre"])
 
 
 class TestApiTrocaDePlanoDesligada(BaseApi):
-    def setUp(self):
-        super().setUp()
-        self.leitor = leitor_de_teste(QUICKCLICK_JWT_SECRET=SEGREDO_JWT_TESTE, TOKENS_CHAVE_CRIPTO=CHAVE_CRIPTO_TESTE,
-                                      TROCA_DE_PLANO_LIVRE="false")
-        self.cliente.close()
-        self.cliente = TestClient(criar_app(self.config, session_factory=self.Session, leitor=self.leitor,
-                                            provedores=ProvedoresDeIA()))
-        self.cliente.headers["Authorization"] = f"Bearer {self.token}"
+    """Sem a variável TROCA_DE_PLANO_LIVRE, que é o padrão: nenhum dos quatro planos aceita a troca."""
 
-    def test_responde_402_e_o_plano_fica(self):
-        resposta = self.cliente.put("/api/me/plano", json={"plano": "pro"})
-        self.assertEqual((resposta.status_code, resposta.json()["erro"]["codigo"]), (402, "troca_de_plano_indisponivel"))
-        self.assertEqual(self.cliente.get("/api/auth/me").json()["plano"], "gratis")
+    def test_sem_a_variavel_a_troca_responde_402_nos_quatro_planos_e_o_plano_fica(self):
+        for plano in ("gratis", "essencial", "pro", "business"):
+            with self.subTest(plano=plano):
+                resposta = self.cliente.put("/api/me/plano", json={"plano": plano})
+                self.assertEqual((resposta.status_code, resposta.json()["erro"]["codigo"]),
+                                 (402, "troca_de_plano_indisponivel"))
+                self.assertEqual(self.cliente.get("/api/auth/me").json()["plano"], "gratis")
         self.assertFalse(self.cliente.get("/api/plans").json()["troca_de_plano_livre"])
+
+    def test_valor_que_nao_e_verdadeiro_nem_falso_continua_desligada(self):
+        leitor = leitor_de_teste(QUICKCLICK_JWT_SECRET=SEGREDO_JWT_TESTE, TOKENS_CHAVE_CRIPTO=CHAVE_CRIPTO_TESTE,
+                                 TROCA_DE_PLANO_LIVRE="talvez")
+        with self.assertLogs("quickclick.config", "WARNING"):  # o aviso sai ao montar o app
+            cliente = TestClient(criar_app(self.config, session_factory=self.Session, leitor=leitor,
+                                           provedores=ProvedoresDeIA()))
+        cliente.headers["Authorization"] = f"Bearer {self.token}"
+        self.assertEqual(cliente.put("/api/me/plano", json={"plano": "pro"}).status_code, 402)
 
 
 if __name__ == "__main__":

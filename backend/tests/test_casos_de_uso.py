@@ -275,23 +275,23 @@ class TestTrocarPlano(unittest.TestCase):
             Usuario(2, "leo@exemplo.com", "Leo", "Loja", "gratis"))
 
     def test_troca_e_devolve_o_usuario_atualizado(self):
-        usuario = TrocarPlano(self.vendedores, self.usuarios).executar(VENDEDOR_ID, " PRO ")
+        usuario = TrocarPlano(self.vendedores, self.usuarios, livre=True).executar(VENDEDOR_ID, " PRO ")
         self.assertEqual((usuario.plano, self.vendedores.obter(VENDEDOR_ID).plano), ("pro", PRO))
 
     def test_conta_antiga_sem_linha_em_vendedores_ganha_a_linha(self):
-        usuario = TrocarPlano(self.vendedores, self.usuarios).executar(2, "business")
+        usuario = TrocarPlano(self.vendedores, self.usuarios, livre=True).executar(2, "business")
         self.assertEqual((usuario.plano, self.vendedores.obter(2).nome), ("business", "Leo"))
 
     def test_plano_que_nao_existe(self):
         with self.assertRaises(PlanoInvalido):
-            TrocarPlano(self.vendedores, self.usuarios).executar(VENDEDOR_ID, "ouro")
+            TrocarPlano(self.vendedores, self.usuarios, livre=True).executar(VENDEDOR_ID, "ouro")
         self.assertEqual(self.vendedores.obter(VENDEDOR_ID).plano, GRATIS)
 
     def test_troca_desligada_nao_mexe_no_plano(self):
         with self.assertRaises(TrocaDePlanoIndisponivel):
-            TrocarPlano(self.vendedores, self.usuarios, livre=False).executar(VENDEDOR_ID, "pro")
+            TrocarPlano(self.vendedores, self.usuarios).executar(VENDEDOR_ID, "pro")  # sem livre: desligada
         self.assertEqual(self.vendedores.obter(VENDEDOR_ID).plano, GRATIS)
 
     def test_usuario_que_nao_existe(self):
         with self.assertRaises(VendedorNaoEncontrado):
-            TrocarPlano(self.vendedores, self.usuarios).executar(99, "pro")
+            TrocarPlano(self.vendedores, self.usuarios, livre=True).executar(99, "pro")

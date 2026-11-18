@@ -57,7 +57,7 @@ export const SECURITY_SECTION = {
 
 export const PLAN_SECTION = {
   title: 'Seu plano',
-  lead: 'Nenhum plano cobra comissão sobre as suas vendas. Troque quando quiser.',
+  lead: 'Nenhum plano cobra comissão sobre as suas vendas.',
   current: 'Seu plano',
   recommended: 'Recomendado',
   change: 'Mudar para este plano',
