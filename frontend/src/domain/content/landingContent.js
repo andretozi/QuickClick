@@ -17,7 +17,7 @@ export const NAV = {
 
 export const HERO = {
   titleLines: ['Clicou…', 'vendeu.'],
-  lead: 'Tire uma foto e a nossa IA cria o anúncio, sugere o preço e publica nos marketplaces certos. Vendeu em um canal, sai de todos.',
+  lead: 'Tire uma foto e a nossa IA cria o anúncio, sugere o preço e publica no Mercado Livre. Outros marketplaces em breve.',
   cta: { label: 'Começar grátis', href: '#planos' },
   secondary: { label: 'Ver como funciona', href: '#como' },
   finePrint: 'Grátis pra sempre. Sem comissão sobre as suas vendas.'
@@ -39,20 +39,20 @@ export const HOW_IT_WORKS = {
       number: '02',
       scene: 'photo',
       title: 'Tire as fotos.',
-      description: 'A IA reconhece o produto, você confirma os detalhes e o anúncio sai pronto pra cada canal.'
+      description: 'A IA reconhece o produto, você confirma os detalhes e o anúncio sai pronto pro Mercado Livre.'
     },
     {
       number: '03',
       scene: 'ai',
-      title: 'A IA acha o melhor preço e o melhor canal.',
-      description: 'Ela compara com o mercado e indica onde o item vende mais rápido. Você aprova ou recusa.'
+      title: 'A IA sugere o preço.',
+      description: 'Ela compara com os anúncios parecidos do Mercado Livre, quando houver, e sugere o preço. Você aprova ou recusa.'
     },
     {
       number: '04',
       scene: 'sale',
-      title: 'Vendeu em um canal, sai de todos.',
+      title: 'Vendeu em um canal, sai de todos (em breve).',
       description:
-        'O estoque baixa sozinho em todos os marketplaces. Nada de venda duplicada, cancelamento ou punição na sua reputação.'
+        'Hoje o anúncio sai no Mercado Livre. A baixa de estoque entre vários marketplaces é um recurso em breve.'
     }
   ]
 };
@@ -84,13 +84,13 @@ export const BENEFITS = {
       icon: 'camera',
       tone: 'honey',
       title: 'Da foto ao anúncio pronto.',
-      description: 'A IA escreve título, descrição e atributos pra cada canal. Horas de cadastro viram minutos.'
+      description: 'A IA escreve título, descrição e atributos pro Mercado Livre. Horas de cadastro viram minutos.'
     },
     {
       icon: 'sync',
       tone: 'green',
-      title: 'Vendeu em um canal, sai de todos.',
-      description: 'Sem venda duplicada e sem cancelamento. A sua reputação nos marketplaces agradece.'
+      title: 'Vários marketplaces (em breve).',
+      description: 'Hoje você publica no Mercado Livre. O estoque sincronizado entre marketplaces é um recurso em breve.'
     }
   ]
 };
@@ -112,7 +112,7 @@ export const COMPARISON = {
     title: 'Quick Click',
     items: [
       'Anúncio pronto a partir de uma foto',
-      'A IA indica o melhor canal pra cada item',
+      'Publicação direta no Mercado Livre',
       'Preço sugerido com dados do mercado',
       'Plano Grátis pra sempre e zero comissão'
     ]
