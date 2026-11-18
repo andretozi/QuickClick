@@ -43,15 +43,6 @@
   font-weight: 800;
 }
 
-.analysis-step__notice {
-  margin: 0;
-  padding: 10px 14px;
-  border-radius: var(--radius-md);
-  background: rgb(var(--rgb-honey) / 0.16);
-  color: var(--color-ink);
-  font-weight: 700;
-}
-
 .analysis-step__tips {
   display: grid;
   gap: 8px;

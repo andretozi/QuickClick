@@ -365,18 +365,32 @@ class TestPlanoPago(BaseIA):
         self.assertFalse(preco["por_ia"])
         self.assertLess(preco["sugerido_centavos"], 20000)
 
-    def test_orcamento_do_dia_estourado_cai_no_gratis_com_aviso(self):
+    def gastar(self, custo, chave):
         with self.Session() as sessao:
             sessao.add(models.UsoIAModel(etapa="leitura", provedor="anthropic", modelo="claude-opus-5-5",
                                          tokens_entrada=0, tokens_saida=0, cache_lido=0, cache_gravado=0, buscas_web=0,
-                                         custo_estimado_usd=Decimal("0.50"), duracao_ms=1, criado_em=self.agora))
+                                         custo_estimado_usd=Decimal(custo), duracao_ms=1, criado_em=self.agora,
+                                         chave=chave))
             sessao.commit()
+
+    def test_orcamento_da_chave_paga_esgotado_deixa_a_ia_indisponivel_hoje_sem_cair_no_gemini(self):
+        self.gastar("0.50", "paga")
         cota = self.cliente.get("/api/ia/cota").json()
-        self.assertEqual((cota["orcamento_do_dia_estourado"], cota["nivel"], cota["nivel_agora"]), (True, "pago", "gratis"))
-        analise = self.analise(self.criar().json()["id"])
-        self.assertEqual(analise["nivel"], "gratis")
-        self.assertIn("orcamento_do_dia", [a["codigo"] for a in analise["avisos"]])
-        self.assertEqual((self.gemini.chamadas, self.opus.chamadas), (["ler"], []))
+        self.assertEqual((cota["orcamento_do_dia_estourado"], cota["disponivel"], cota["motivo_indisponivel"]),
+                         (True, False, "orcamento_do_dia"))
+        resposta = self.criar()
+        self.assertEqual((resposta.status_code, resposta.json()["erro"]["codigo"], resposta.json()["erro"]["mensagem"]),
+                         (503, "ia_indisponivel_hoje", "IA indisponível hoje."))
+        self.assertEqual((self.gemini.chamadas, self.opus.chamadas), ([], []))
+
+    def test_uso_da_chave_gratis_nao_entra_no_orcamento_da_paga(self):
+        self.gastar("0.50", "gratis")
+        self.assertFalse(self.cliente.get("/api/ia/cota").json()["orcamento_do_dia_estourado"])
+        self.assertEqual(self.criar().status_code, 202)
+
+    def test_linha_de_uso_sem_chave_conta_como_paga(self):
+        self.gastar("0.50", None)  # anterior à migração 0006
+        self.assertTrue(self.cliente.get("/api/ia/cota").json()["orcamento_do_dia_estourado"])
 
     def test_interrompida_na_partida_e_retomada_sem_fotos_depois_da_leitura(self):
         analise_id = self.criar().json()["id"]
@@ -437,18 +451,6 @@ class TestPagoSemChavePaga(BaseIA):
         self.assertEqual((cota["disponivel"], cota["motivo_indisponivel"]), (False, "provedor_indisponivel"))
         resposta = self.criar()
         self.assertEqual((resposta.status_code, resposta.json()["erro"]["codigo"]), (503, "ia_indisponivel"))
-        self.assertEqual(self.gemini.chamadas, [])
-
-    def test_orcamento_estourado_tambem_nao_leva_ao_gemini(self):
-        # O gasto do dia soma o uso da chave grátis; sem a chave paga, o pago não pode descer para o grátis
-        with self.Session() as sessao:
-            sessao.add(models.UsoIAModel(etapa="leitura", provedor="anthropic", modelo="claude-haiku-5-5",
-                                         tokens_entrada=0, tokens_saida=0, cache_lido=0, cache_gravado=0, buscas_web=0,
-                                         custo_estimado_usd=Decimal("0.50"), duracao_ms=1, criado_em=self.agora))
-            sessao.commit()
-        cota = self.cliente.get("/api/ia/cota").json()
-        self.assertEqual((cota["nivel_agora"], cota["disponivel"]), ("gratis", False))
-        self.assertEqual(self.criar().json()["erro"]["codigo"], "ia_indisponivel")
         self.assertEqual(self.gemini.chamadas, [])
 
 

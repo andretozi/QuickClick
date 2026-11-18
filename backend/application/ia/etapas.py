@@ -422,7 +422,8 @@ class ProcessoDaAnalise:
             atributos=_fatos(confirmacao),
             com_web=nivel is Nivel.PAGO and self.d.config.pesquisa_web_ativa,
         )
-        resultado = escolha.tentar_em_ordem(escolha.pesquisadores(self.d.provedores, nivel),
+        resultado = escolha.tentar_em_ordem(escolha.pesquisadores(self.d.provedores, nivel,
+                                                                           ponta=self._ponta(analise)),
                                             lambda p: p.pesquisar(entrada, self._contexto(analise, "pesquisa")))
         if resultado is None:
             return None, None

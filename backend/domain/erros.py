@@ -205,6 +205,15 @@ class IAIndisponivel(ErroDeDominio):
         super().__init__(mensagem)
 
 
+class OrcamentoDaIAEsgotado(IAIndisponivel):
+    """O gasto do dia da chave paga chegou no teto: o plano pago espera amanhã, sem cair na IA grátis."""
+
+    codigo = "ia_indisponivel_hoje"
+
+    def __init__(self):
+        super().__init__("IA indisponível hoje.")
+
+
 class FotoInvalida(ErroDeDominio):
     codigo = "foto_invalida"
 

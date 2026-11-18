@@ -4,6 +4,7 @@ import ListingPreview from '@/presentation/components/ListingPreview/ListingPrev
 import MarketplaceLogo from '@/presentation/components/MarketplaceLogo/MarketplaceLogo.jsx';
 import StatusPill from '@/presentation/components/StatusPill/StatusPill.jsx';
 import Toggle from '@/presentation/components/Toggle/Toggle.jsx';
+import UpgradeInvite from '@/presentation/components/UpgradeInvite/UpgradeInvite.jsx';
 import { formatMoney } from '@/domain/format/format.js';
 import { PRIMARY_CHANNEL, coverPhoto } from '@/domain/listings/listingRules.js';
 import { MARKETPLACE_CATALOG, getMarketplaceInfo } from '@/domain/content/marketplacesContent.js';
@@ -13,11 +14,13 @@ import './ChannelsStep.css';
 /**
  * Passo 6: "Suas contas" (as conectadas, na ordem em que o vendedor conectou) e "Vale abrir conta"
  * (os marketplaces que combinam com o produto, com o motivo e o link de cadastro).
- * Só o Mercado Livre publica por enquanto.
+ * Só o Mercado Livre publica por enquanto. A análise de mercado (Pro e Business) reaproveita os anúncios parecidos
+ * do preço, só do Mercado Livre; nos outros planos, o convite para trocar de plano.
  */
 export default function ChannelsStep({ editor }) {
-  const { draft, update, connection, canPublishMl, priceCents, ai } = editor;
+  const { draft, update, connection, canPublishMl, priceCents, ai, quota, editing } = editor;
   const texts = LISTING_WIZARD.channels;
+  const market = ai.analysis?.price?.market;
   const stock = Number(draft.stock) || 0;
   const fromAnalysis = ai.analysis?.channels;
   const others = (fromAnalysis ?? MARKETPLACE_CATALOG.map((m) => ({ slug: m.slug, connected: false, reason: null })))
@@ -31,6 +34,21 @@ export default function ChannelsStep({ editor }) {
         <h2 className="heading channels-step__title">{texts.title}</h2>
         <p className="channels-step__lead">{texts.lead}</p>
       </header>
+
+      {!editing && quota && !quota.features.marketAnalysis && (
+        <UpgradeInvite title={texts.market.title} text={texts.market.locked} action={texts.market.upgrade} />
+      )}
+      {!editing && quota?.features.marketAnalysis && (
+        <section className="channels-step__market" aria-labelledby="analise-mercado">
+          <h3 id="analise-mercado" className="channels-step__group">
+            {texts.market.title}
+          </h3>
+          <p className="channels-step__market-text">
+            {market?.count ? texts.market.found(market.count, formatMoney(market.min), formatMoney(market.max)) : texts.market.noData}
+          </p>
+          <p className="channels-step__market-note">{texts.market.onlyMl}</p>
+        </section>
+      )}
 
       <div className="channels-step__layout">
         <div className="channels-step__list">

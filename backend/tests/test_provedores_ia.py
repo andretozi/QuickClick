@@ -403,6 +403,20 @@ class TestFabrica(unittest.TestCase):
                 self.assertEqual(modelos(escolha.redatores(provedores, cap.nivel)), texto)
                 self.assertEqual(modelos(escolha.precos_na_web(provedores, cap.nivel)), web)
 
+    def test_orientador_so_no_pro_e_no_business(self):
+        chaves = dict(ANTHROPIC_API_KEY_PAGO="x", ANTHROPIC_API_KEY_GRATIS="y", GEMINI_API_KEY_GRATIS="z")
+        com = criar_provedores(leitor_de_teste(ADVISOR_ATIVO="true", **chaves), RegistroEmMemoria())
+        sem = criar_provedores(leitor_de_teste(**chaves), RegistroEmMemoria())
+
+        def primeiro(provedores, plano):
+            cap = capacidade_do_plano(plano)
+            return escolha.pesquisadores(provedores, cap.nivel, ponta=cap.modelo_de_ponta)[0].nome
+
+        for plano, orientado in (("gratis", False), ("essencial", False), ("pro", True), ("business", True)):
+            with self.subTest(plano=plano):
+                self.assertEqual("com orientador" in primeiro(com, plano), orientado)
+                self.assertNotIn("com orientador", primeiro(sem, plano))  # ADVISOR_ATIVO desligado: ninguém
+
     def test_plano_pago_sem_chave_paga_nao_cai_no_gemini(self):
         with self.assertLogs("quickclick.ia", "WARNING"):
             provedores = criar_provedores(leitor_de_teste(ANTHROPIC_API_KEY_GRATIS="y", GEMINI_API_KEY_GRATIS="z"),

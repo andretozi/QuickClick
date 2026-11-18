@@ -114,6 +114,7 @@ class TestMigracoes(BaseSQLite):
             self.assertIn("status_conta", colunas)
             self.assertIn("ia_analises", inspect(conexao).get_table_names())
             self.assertIn("registros_auditoria", inspect(conexao).get_table_names())
+            self.assertIn("chave", {c["name"] for c in inspect(conexao).get_columns("ia_uso")})
 
     def test_banco_antigo_diferente_da_revisao_inicial_nao_e_marcado(self):
         self.criar_banco_antigo(sem_coluna=("contas_vinculadas", "apelido"))
@@ -147,6 +148,12 @@ class TestTravaAditiva(unittest.TestCase):
         self.assertIn("ALTER TABLE users ADD COLUMN papel VARCHAR", sql)
         self.assertIn("ALTER TABLE users ADD COLUMN status_conta VARCHAR", sql)
         self.assertIn("CREATE TABLE registros_auditoria", sql)
+        self.assertEqual(comandos_proibidos(sql), [])
+
+    def test_sql_da_0006_so_acrescenta_a_coluna_chave_em_ia_uso(self):
+        sql = sql_pendente("postgresql+psycopg2://", "0005_moderacao_e_auditoria")
+        self.assertIn("ALTER TABLE ia_uso ADD COLUMN chave VARCHAR(10)", sql)
+        self.assertNotIn("NOT NULL", sql.split("ALTER TABLE ia_uso")[1].split(";")[0])  # as linhas antigas ficam sem chave
         self.assertEqual(comandos_proibidos(sql), [])
 
     def test_comandos_que_nao_sao_aditivos_sao_achados(self):

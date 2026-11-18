@@ -64,7 +64,7 @@ ITENS: tuple[ItemDeConfiguracao, ...] = (
                        "interruptor (desligado por padrão para segurança)", padrao="false"),
     ItemDeConfiguracao("IA_ATIVA", False, "liga e desliga toda a IA", "interruptor", padrao="true"),
     ItemDeConfiguracao("PESQUISA_WEB_ATIVA", False, "busca na web da pesquisa de mercado", "interruptor", padrao="true"),
-    ItemDeConfiguracao("ADVISOR_ATIVO", False, "orientador (Opus) na pesquisa de mercado", "interruptor",
+    ItemDeConfiguracao("ADVISOR_ATIVO", False, "orientador (Opus) na pesquisa de mercado, só no Pro e no Business", "interruptor",
                        padrao="false"),
     ItemDeConfiguracao("IA_ORCAMENTO_DIARIO_USD", False, "teto de gasto diário da IA paga", "em dólar", padrao="0.30"),
     ItemDeConfiguracao("IA_CACHE_TTL", False, "tempo do cache de prompt (5m ou 1h)", "5m ou 1h", padrao="5m"),

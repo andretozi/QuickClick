@@ -10,8 +10,8 @@ Aplicação · IA · Escolha do provedor por plano (nível) e a ordem de reserva
     correção    Haiku (paga)                           Haiku (grátis)
 
 Decisão: a reserva do pago fica na chave paga da Anthropic (as fotos de quem paga não vão para a
-camada grátis do Google por causa de uma falha). Quando o orçamento do dia estoura, o nível
-efetivo vira grátis de propósito, com aviso na tela.
+camada grátis do Google, nem por falha nem por orçamento do dia: o serviço barra antes, ver servico.py).
+O orientador da pesquisa (ADVISOR_ATIVO) só entra no Pro e no Business.
 Um provedor sem chave, ou com a chave recusada há menos de 10 minutos, é pulado.
 """
 
@@ -45,6 +45,7 @@ class ProvedoresDeIA:
     leitor_gemini_gratis: LeitorDeProduto | None = None
     leitor_rapido_gratis: LeitorDeProduto | None = None
     pesquisador_pago: PesquisadorDeMercado | None = None
+    pesquisador_orientado_pago: PesquisadorDeMercado | None = None  # com o orientador (Opus), só Pro e Business
     pesquisador_rapido_pago: PesquisadorDeMercado | None = None
     pesquisador_gratis: PesquisadorDeMercado | None = None
     precificador_pago: Precificador | None = None
@@ -68,9 +69,10 @@ def leitores(p: ProvedoresDeIA, nivel: Nivel, *, ponta: bool) -> list[LeitorDePr
     return _disponiveis([p.leitor_gemini_gratis, p.leitor_rapido_gratis])
 
 
-def pesquisadores(p: ProvedoresDeIA, nivel: Nivel) -> list[PesquisadorDeMercado]:
+def pesquisadores(p: ProvedoresDeIA, nivel: Nivel, *, ponta: bool) -> list[PesquisadorDeMercado]:
     if nivel is Nivel.PAGO:
-        return _disponiveis([p.pesquisador_pago, p.pesquisador_rapido_pago])
+        return _disponiveis([p.pesquisador_orientado_pago if ponta else None, p.pesquisador_pago,
+                             p.pesquisador_rapido_pago])
     return _disponiveis([p.pesquisador_gratis])
 
 
