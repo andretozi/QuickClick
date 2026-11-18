@@ -73,7 +73,14 @@ class ServicoDeAnalises:
     def _capacidade(self, vendedor_id: int) -> CapacidadeIA:
         return capacidade_do_plano(obter_vendedor(self._vendedores, vendedor_id).plano.slug)
 
+    def _garantir_orcamento(self, vendedor_id: int) -> None:
+        """Foto extra e retomada também gastam a chave paga: o teto do dia vale para elas."""
+        if self._orcamento_esgotado(self._capacidade(vendedor_id)):
+            raise OrcamentoDaIAEsgotado()
+
     def _orcamento_esgotado(self, capacidade: CapacidadeIA) -> bool:
+        # shortcut: conferido ao começar, ao pedir foto extra e ao retomar; análises já em andamento terminam e
+        # várias começando juntas passam juntas pelo teto. Preciso só com trava no registro do gasto.
         gasto = self._orcamento.gasto_de_hoje_usd(self.d.relogio())
         return orcamento_esgotado(capacidade, gasto, self.d.config.orcamento_diario_usd)
 
@@ -154,6 +161,7 @@ class ServicoDeAnalises:
         analise = self._da_conta(vendedor_id, analise_id)
         if not pode_receber_foto_extra(StatusAnalise(analise["status"])):
             raise EstadoDaAnaliseInvalido("Essa análise não está esperando uma foto extra agora.")
+        self._garantir_orcamento(vendedor_id)
         tipo = tipo if tipo in TIPOS_DE_FOTO_EXTRA else "detalhe"
         foto = self.d.preparador.preparar([arquivo], primeiro_indice=len(analise.get("fotos_meta") or []))[0]
         self.d.analises.atualizar(analise_id, {"status": StatusAnalise.LENDO_PRODUTO.value,
@@ -179,6 +187,7 @@ class ServicoDeAnalises:
         analise = self._da_conta(vendedor_id, analise_id)
         if not pode_retomar(StatusAnalise(analise["status"])):
             raise EstadoDaAnaliseInvalido("Essa análise não precisa ser retomada.")
+        self._garantir_orcamento(vendedor_id)
         try:
             etapa = StatusAnalise(analise.get("etapa_atual"))
         except ValueError:

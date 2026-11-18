@@ -387,6 +387,20 @@ class TestPlanoPago(BaseIA):
                          (503, "ia_indisponivel_hoje", "IA indisponível hoje."))
         self.assertEqual((self.gemini.chamadas, self.opus.chamadas), ([], []))
 
+    def test_foto_extra_e_retomada_tambem_respeitam_o_orcamento_da_chave_paga(self):
+        analise_id = self.criar().json()["id"]
+        self.gastar("0.50", "paga")
+        self.gemini.chamadas.clear()
+        extra = self.cliente.post(f"/api/ia/analises/{analise_id}/fotos", data={"tipo": "etiqueta"},
+                                  files=self.fotos(1, campo="foto"))
+        self.assertEqual((extra.status_code, extra.json()["erro"]["codigo"]), (503, "ia_indisponivel_hoje"))
+        with self.Session() as sessao:
+            sessao.query(models.AnaliseIAModel).filter_by(id=analise_id).update({"status": "interrompida"})
+            sessao.commit()
+        retomada = self.cliente.post(f"/api/ia/analises/{analise_id}/retomar", files=self.fotos(2))
+        self.assertEqual((retomada.status_code, retomada.json()["erro"]["codigo"]), (503, "ia_indisponivel_hoje"))
+        self.assertEqual((self.gemini.chamadas, self.opus.chamadas[2:]), ([], []))
+
     def test_uso_da_chave_gratis_nao_entra_no_orcamento_da_paga(self):
         self.gastar("0.50", "gratis")
         self.assertFalse(self.cliente.get("/api/ia/cota").json()["orcamento_do_dia_estourado"])
