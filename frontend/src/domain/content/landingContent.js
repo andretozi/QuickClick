@@ -119,6 +119,9 @@ export const COMPARISON = {
   }
 };
 
+/** Os preços são provisórios (ver backend/domain/plano.py): a cobrança ainda não está ativada. */
+const BILLING_NOTE = 'Cobrança ainda não ativada';
+
 /**
  * Só entra no card o que existe no código hoje (ou fica marcado como "em breve"). As análises por mês
  * espelham ANALISES_POR_MES em backend/domain/ia/capacidade.py (o test_plano.py confere).
@@ -141,7 +144,8 @@ export const PLANS = {
     {
       id: 'essencial',
       name: 'Essencial',
-      price: 'R$ __',
+      price: 'R$ 99,90',
+      billingNote: BILLING_NOTE,
       period: 'por mês',
       tagline: 'Pra vender mais rápido',
       features: ['1 marketplace', '40 análises de IA por mês', 'Preço sugerido quando houver anúncios parecidos'],
@@ -150,7 +154,8 @@ export const PLANS = {
     {
       id: 'pro',
       name: 'Pro',
-      price: 'R$ __',
+      price: 'R$ 549,90',
+      billingNote: BILLING_NOTE,
       period: 'por mês',
       tagline: 'Pra vender com dados do mercado',
       features: ['Vários marketplaces (em breve)', '120 análises de IA por mês', 'Análise de mercado no Mercado Livre'],
@@ -160,7 +165,8 @@ export const PLANS = {
     {
       id: 'business',
       name: 'Business',
-      price: 'R$ __',
+      price: 'R$ 1.499,90',
+      billingNote: BILLING_NOTE,
       period: 'por mês',
       tagline: 'Pra quem vende em escala',
       features: ['Tudo do Pro', '400 análises de IA por mês'],

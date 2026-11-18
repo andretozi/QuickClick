@@ -694,8 +694,7 @@ class TestApiConsultas(BaseApi):
     def test_plans(self):
         planos = self.cliente.get("/api/plans").json()["planos"]
         self.assertEqual([p["nome"] for p in planos], ["Grátis", "Essencial", "Pro", "Business"])
-        self.assertEqual(planos[0]["preco_mensal_centavos"], 0)
-        self.assertIsNone(planos[2]["preco_mensal_centavos"])
+        self.assertEqual([p["preco_mensal_centavos"] for p in planos], [0, 9990, 54990, 149990])  # provisórios
         self.assertEqual([p["limite_marketplaces"] for p in planos],
                          [None if GRATIS_CONECTA_VARIOS_PROVISORIO else 1, 1, None, None])
 

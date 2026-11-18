@@ -44,6 +44,7 @@ export default function PlanSection({ planId, plan }) {
               <p className="plan-section__price">
                 {item.price} <span className="plan-section__period">{item.period}</span>
               </p>
+              {item.billingNote && <p className="plan-section__billing">{item.billingNote}</p>}
               <p className="plan-section__tagline">{item.tagline}</p>
               <ul className="plan-section__features">
                 {item.features.map((feature) => (

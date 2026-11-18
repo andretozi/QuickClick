@@ -19,7 +19,7 @@ class Plano:
     slug: str
     nome: str
     limite_marketplaces: int | None  # None: conecta vários marketplaces (sem limite fixo)
-    preco_mensal_centavos: int | None  # None: preço ainda não definido pela equipe
+    preco_mensal_centavos: int | None  # None: sem preço definido (hoje todos têm)
 
     @property
     def multicanal(self) -> bool:
@@ -42,9 +42,12 @@ GRATIS_CONECTA_VARIOS_PROVISORIO = True
 
 GRATIS = Plano("gratis", "Grátis", limite_marketplaces=None if GRATIS_CONECTA_VARIOS_PROVISORIO else 1,
                preco_mensal_centavos=0)
-ESSENCIAL = Plano("essencial", "Essencial", limite_marketplaces=1, preco_mensal_centavos=None)
-PRO = Plano("pro", "Pro", limite_marketplaces=None, preco_mensal_centavos=None)
-BUSINESS = Plano("business", "Business", limite_marketplaces=None, preco_mensal_centavos=None)
+# PREÇOS PROVISÓRIOS (nov 2026): estimados pelo custo de IA e pela pesquisa de mercado, ver docs/precos-planos.md.
+# A cobrança ainda não está ativada: a troca de plano é livre (TROCA_DE_PLANO_LIVRE). Os cards da landing e do
+# Seu plano repetem estes valores em frontend/src/domain/content/landingContent.js (o test_plano.py confere).
+ESSENCIAL = Plano("essencial", "Essencial", limite_marketplaces=1, preco_mensal_centavos=9990)
+PRO = Plano("pro", "Pro", limite_marketplaces=None, preco_mensal_centavos=54990)
+BUSINESS = Plano("business", "Business", limite_marketplaces=None, preco_mensal_centavos=149990)
 
 # Do mais simples para o mais completo
 PLANOS: tuple[Plano, ...] = (GRATIS, ESSENCIAL, PRO, BUSINESS)

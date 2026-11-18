@@ -4,6 +4,7 @@ import re
 import unittest
 
 from backend.domain.erros import LimiteDoPlanoAtingido
+from backend.domain.ia.capacidade import ANALISES_POR_MES
 from pathlib import Path
 
 from backend.domain.plano import (
@@ -83,10 +84,25 @@ class TestCatalogoDePlanos(unittest.TestCase):
         self.assertEqual([plano.slug for plano in PLANOS], ["gratis", "essencial", "pro", "business"])
         self.assertEqual([plano.nome for plano in PLANOS], ["Grátis", "Essencial", "Pro", "Business"])
 
-    def test_gratis_custa_zero_e_os_pagos_ainda_nao_tem_preco(self):
+    def test_gratis_custa_zero_e_os_pagos_tem_preco_crescente(self):
         self.assertEqual(GRATIS.preco_mensal_centavos, 0)
-        for plano in (ESSENCIAL, PRO, BUSINESS):
-            self.assertIsNone(plano.preco_mensal_centavos)
+        precos = [plano.preco_mensal_centavos for plano in (ESSENCIAL, PRO, BUSINESS)]
+        for preco in precos:
+            self.assertGreater(preco, 0)
+        self.assertEqual(precos, sorted(set(precos)))  # Essencial < Pro < Business, sem empate
+
+    def test_cards_do_front_repetem_preco_e_analises_do_back(self):
+        conteudo = (RAIZ / CONTEUDO_DA_LANDING).read_text(encoding="utf-8")
+        self.assertNotIn("R$ __", conteudo)
+        self.assertIn("const BILLING_NOTE = 'Cobrança ainda não ativada';", conteudo)
+        for plano in PLANOS:
+            with self.subTest(plano=plano.nome):
+                card = re.search(rf"id: '{plano.slug}',(.*?)cta:", conteudo, re.S).group(1)
+                texto = re.search(r"price: 'R\$ ([\d.]+),(\d{2})'", card)
+                centavos = int(texto.group(1).replace(".", "")) * 100 + int(texto.group(2)) if texto else 0
+                self.assertEqual(centavos, plano.preco_mensal_centavos)
+                self.assertEqual("billingNote: BILLING_NOTE" in card, plano.preco_mensal_centavos > 0)
+                self.assertIn(f"{ANALISES_POR_MES[plano.slug]} análises de IA por mês", card)
 
     def test_buscar_plano(self):
         self.assertEqual(buscar_plano("pro"), PRO)

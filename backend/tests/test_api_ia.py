@@ -189,6 +189,7 @@ class TestPlanoGratis(BaseIA):
         cota = self.cliente.get("/api/ia/cota").json()
         self.assertEqual((cota["plano"], cota["nivel"], cota["restantes"], cota["disponivel"]), ("gratis", "gratis", 5, True))
         self.assertFalse(cota["tem"]["pesquisa_de_mercado"])
+        self.assertFalse(cota["tem"]["analise_de_mercado"])
         self.assertTrue(cota["aviso_de_dados_no_gratis"])
 
     def test_fluxo_completo_no_gratis_usa_gemini_e_preco_so_por_regra(self):
@@ -337,6 +338,9 @@ class TestPlanoPago(BaseIA):
                                    leitor_gemini_gratis=self.gemini),
                     fonte_ml=self.fonte)
 
+    def test_pro_tem_a_analise_de_mercado(self):
+        self.assertTrue(self.cliente.get("/api/ia/cota").json()["tem"]["analise_de_mercado"])
+
     def test_fluxo_pago_com_releitura_da_etiqueta_pesquisa_preco_pela_web_e_canais(self):
         analise_id = self.criar().json()["id"]
         analise = self.analise(analise_id)
@@ -428,6 +432,10 @@ class TestPlanoEssencial(BaseIA):
                                    precificador_texto_pago=self.sonnet, precos_na_web_pago=self.sonnet,
                                    redator_pago=self.sonnet, leitor_gemini_gratis=self.gemini),
                     fonte_ml=FonteMLFalsa())
+
+    def test_essencial_nao_tem_a_analise_de_mercado(self):
+        cota = self.cliente.get("/api/ia/cota").json()
+        self.assertEqual((cota["tem"]["analise_de_mercado"], cota["tem"]["pesquisa_de_mercado"]), (False, True))
 
     def test_essencial_usa_o_sonnet_na_foto_no_preco_e_no_texto(self):
         pronta = self.confirmar(self.criar().json()["id"]).json()
