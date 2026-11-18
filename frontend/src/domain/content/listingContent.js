@@ -278,7 +278,7 @@ export const LISTING_WIZARD = {
       noData: 'Ainda não temos dados suficientes para comparar.',
       onlyMl: 'Hoje só analisamos o Mercado Livre.',
       locked: 'Disponível no Pro.',
-      upgrade: { label: 'Trocar de plano', href: '#/configuracoes' }
+      upgrade: { label: 'Ver planos', href: '#/configuracoes' }
     }
   },
   publish: {

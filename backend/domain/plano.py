@@ -43,7 +43,7 @@ GRATIS_CONECTA_VARIOS_PROVISORIO = True
 GRATIS = Plano("gratis", "Grátis", limite_marketplaces=None if GRATIS_CONECTA_VARIOS_PROVISORIO else 1,
                preco_mensal_centavos=0)
 # PREÇOS PROVISÓRIOS (nov 2026): estimados pelo custo de IA e pela pesquisa de mercado, ver docs/precos-planos.md.
-# A cobrança ainda não está ativada: a troca de plano é livre (TROCA_DE_PLANO_LIVRE). Os cards da landing e do
+# A cobrança ainda não está ativada: a troca de plano vem desligada (TROCA_DE_PLANO_LIVRE só liga no desenvolvimento). Os cards da landing e do
 # Seu plano repetem estes valores em frontend/src/domain/content/landingContent.js (o test_plano.py confere).
 ESSENCIAL = Plano("essencial", "Essencial", limite_marketplaces=1, preco_mensal_centavos=9990)
 PRO = Plano("pro", "Pro", limite_marketplaces=None, preco_mensal_centavos=54990)

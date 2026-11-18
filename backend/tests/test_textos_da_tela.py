@@ -10,7 +10,8 @@ CONTEUDO = FRONT / "domain" / "content"
 # Só o Mercado Livre está integrado: promessa que não existe não aparece, nem como promessa
 PROIBIDOS_EM_QUALQUER_TELA = ("Zona de risco", "Poucos anúncios", "Baixa automática", "Emissão automática",
                               "Monitor de preços", "Automação completa", "R$ __", "Preço em breve")
-PROIBIDOS_NA_LANDING = ("melhor canal", "indica o melhor", "baixa sozinho", "baixa automática")
+PROIBIDOS_NA_LANDING = ("melhor canal", "indica o melhor", "baixa sozinho", "baixa automática", "multicanal",
+                        "recommended: true", "você escolhe o canal")
 
 
 def arquivos_do_front():
@@ -44,6 +45,11 @@ class TestTextosDaTela(unittest.TestCase):
         landing = (CONTEUDO / "landingContent.js").read_text(encoding="utf-8")
         self.assertIn("publica no Mercado Livre. Outros marketplaces em breve.", landing)
         self.assertIn("Vários marketplaces (em breve)", landing)
+
+    def test_aviso_do_plano_nao_promete_multicanal_que_nao_existe(self):
+        marketplaces = (CONTEUDO / "marketplacesContent.js").read_text(encoding="utf-8")
+        self.assertNotIn("Multicanal", marketplaces)
+        self.assertIn("Vários marketplaces a partir do Pro (em breve).", marketplaces)
 
 
 if __name__ == "__main__":

@@ -102,7 +102,7 @@ export const COMPARISON = {
     label: 'INTEGRADORES ATUAIS',
     items: [
       'Cadastro manual, item por item',
-      'Você escolhe o canal no chute',
+      'Cada marketplace com o seu cadastro',
       'Preço definido no escuro',
       'Mensalidade desde o primeiro dia'
     ]
@@ -183,7 +183,7 @@ export const FINAL_CTA = {
 };
 
 export const FOOTER = {
-  tagline: 'Clicou, vendeu. Automação de vendas multicanal com IA pra pequenos e grandes vendedores.',
+  tagline: 'Clicou, vendeu. Automação de vendas com IA pra pequenos e grandes vendedores.',
   copyright: '© 2026 Quick Click · MVP'
 };
 
@@ -191,9 +191,9 @@ export const FOOTER = {
 export const SCENES = {
   register: {
     title: 'Conectar lojas',
-    fields: ['Mercado Livre', 'Shopee', 'Amazon'],
+    fields: ['Mercado Livre', 'Shopee (em breve)', 'Amazon (em breve)'],
     button: 'Conectar',
-    done: 'Lojas conectadas'
+    done: 'Loja conectada'
   },
   photo: {
     price: 'R$ 189',
@@ -201,9 +201,9 @@ export const SCENES = {
   },
   ai: {
     channels: [
-      { name: 'Mercado Livre', detail: 'R$189 · vende rápido', tone: 'honey' },
-      { name: 'Shopee', detail: 'R$179 · alta procura', tone: 'coral', recommended: true },
-      { name: 'Amazon', detail: 'R$199 · prazo maior', tone: 'muted' }
+      { name: 'Mercado Livre', detail: 'R$189 · preço sugerido', tone: 'honey' },
+      { name: 'Shopee', detail: 'em breve', tone: 'muted' },
+      { name: 'Amazon', detail: 'em breve', tone: 'muted' }
     ],
     recommendedLabel: 'RECOMENDADO',
     chartLabel: 'de olho no mercado',
