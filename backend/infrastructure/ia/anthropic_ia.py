@@ -155,7 +155,8 @@ class AnthropicPesquisador(_BaseAnthropic):
                               conteudo=[{"type": "text", "text": f"Produto: {produto}"}],
                               esquema=esquemas.PESQUISA_SEM_WEB, effort=self._effort, max_tokens=3000, timeout_s=90)
         ferramentas = [{"type": TIPO_BUSCA_WEB, "name": "web_search", "max_uses": MAX_BUSCAS,
-                        "user_location": LOCAL_DO_COMPRADOR, "response_inclusion": "excluded"}]
+                        "user_location": LOCAL_DO_COMPRADOR, "allowed_domains": DOMINIOS_DE_MARKETPLACES,
+                        "response_inclusion": "excluded"}]
         betas = None
         if self._orientador:
             ferramentas.append({"type": TIPO_ORIENTADOR, "name": "advisor", "model": self._orientador,

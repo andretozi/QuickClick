@@ -15,6 +15,7 @@ from backend.application.ia import escolha
 from backend.application.ia.modelos import (
     ArquivoDeFoto,
     ContextoDaChamada,
+    EntradaDaPesquisa,
     EntradaDaReleitura,
     FalhaDoProvedor,
     FotoPreparada,
@@ -26,7 +27,12 @@ from backend.domain.ia.analise import Nivel
 from backend.domain.ia.capacidade import capacidade_do_plano
 from backend.domain.ia.fotos import QualidadeFoto
 from backend.infrastructure.ia import esquemas
-from backend.infrastructure.ia.anthropic_ia import AnthropicLeitor
+from backend.infrastructure.ia.anthropic_ia import (
+    DOMINIOS_DE_MARKETPLACES,
+    AnthropicLeitor,
+    AnthropicPesquisador,
+    AnthropicPrecosNaWeb,
+)
 from backend.infrastructure.ia.carregador_de_prompts import PASTA_DE_PROMPTS, carregar_prompts
 from backend.infrastructure.ia.cliente_anthropic import ClienteAnthropic, json_da_resposta
 from backend.infrastructure.ia.cliente_gemini import ClienteGemini, esquema_para_gemini
@@ -366,6 +372,36 @@ class TestEscolha(unittest.TestCase):
     def test_todos_falham(self):
         with self.assertLogs("quickclick.ia", "WARNING"):
             self.assertIsNone(escolha.tentar_em_ordem([ProvedorFalso("a", falha=True)], lambda p: p.chamar()))
+
+
+class TestBuscaNaWeb(unittest.TestCase):
+    """Só o Mercado Livre está integrado: nenhuma busca na web (perfil do comprador ou preço) sai dele."""
+
+    def _busca_enviada(self, chamar):
+        sdk = SDKFalso(resposta_anthropic())
+        cliente = ClienteAnthropic("ANTHROPIC_API_KEY_PAGO", CHAVE_FALSA, RegistroEmMemoria(), "5m",
+                                   relogio=lambda: AGORA, dormir=lambda s: None, cliente=sdk)
+        try:
+            chamar(cliente)
+        except FalhaDoProvedor:
+            pass  # a resposta falsa não traz o resultado da ferramenta; só interessa o pedido enviado
+        buscas = [f for f in sdk.pedidos[0]["tools"] if f["name"] == "web_search"]
+        self.assertEqual(len(buscas), 1)
+        return buscas[0]
+
+    def test_dominios_permitidos_sao_so_o_mercado_livre(self):
+        self.assertEqual(DOMINIOS_DE_MARKETPLACES, ["mercadolivre.com.br"])
+
+    def test_pesquisa_do_comprador_busca_so_no_mercado_livre(self):
+        entrada = EntradaDaPesquisa("Tênis de corrida", "calcados", "novo", (), com_web=True)
+        busca = self._busca_enviada(lambda c: AnthropicPesquisador(c, "claude-sonnet-5-5", com_web=True)
+                                    .pesquisar(entrada, CONTEXTO))
+        self.assertEqual(busca["allowed_domains"], ["mercadolivre.com.br"])
+
+    def test_preco_na_web_busca_so_no_mercado_livre(self):
+        busca = self._busca_enviada(lambda c: AnthropicPrecosNaWeb(c, "claude-sonnet-5-5")
+                                    .buscar_precos("Tênis de corrida", "novo", (), CONTEXTO))
+        self.assertEqual(busca["allowed_domains"], ["mercadolivre.com.br"])
 
 
 class TestFabrica(unittest.TestCase):
