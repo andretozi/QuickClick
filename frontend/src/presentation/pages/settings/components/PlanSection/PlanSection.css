@@ -27,6 +27,53 @@
   transform: translateY(-3px);
 }
 
+/* O cartão selecionável: botão com o nome, o preço e a frase; o botão de troca fica fora dele */
+.plan-section__select {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.plan-section__card:has(.plan-section__select[aria-pressed='true']) {
+  box-shadow: 0 0 0 2px rgb(var(--rgb-ink) / 0.55);
+}
+
+.plan-section__card--current:has(.plan-section__select[aria-pressed='true']) {
+  box-shadow:
+    0 0 0 2px rgb(var(--rgb-ink) / 0.55),
+    0 20px 34px -24px rgb(var(--rgb-coral) / 0.8);
+}
+
+/* A explicação completa do plano selecionado */
+.plan-section__detail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px;
+  border: 1px solid rgb(var(--rgb-ink) / 0.08);
+  border-radius: var(--radius-lg);
+  background: rgb(var(--rgb-white) / 0.5);
+}
+
+.plan-section__detail-name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.plan-section__detail .plan-section__features {
+  margin-top: 0;
+}
+
 .plan-section__card--featured {
   border-color: rgb(var(--rgb-honey) / 0.6);
 }
@@ -69,7 +116,7 @@
 }
 
 .plan-section__billing {
-  margin: -6px 0 0;
+  margin: 0;
   color: rgb(var(--rgb-ink) / 0.55);
   font-size: 12.5px;
   font-weight: 700;
