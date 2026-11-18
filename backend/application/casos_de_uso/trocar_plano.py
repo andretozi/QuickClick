@@ -1,8 +1,9 @@
 """
-Aplicação · O próprio vendedor troca o próprio plano (MVP: instantâneo e sem pagamento).
+Aplicação · O próprio vendedor troca o próprio plano (sem pagamento, só quando o interruptor está ligado).
 
-A troca livre fica atrás do interruptor TROCA_DE_PLANO_LIVRE (padrão true no MVP). Quando o
-pagamento entrar, ele vira false: a troca só acontece depois do pagamento confirmado.
+A troca livre fica atrás do interruptor TROCA_DE_PLANO_LIVRE, desligado por padrão: sem ele, a troca responde 402.
+Liga-se de forma explícita só no desenvolvimento. Quando o pagamento entrar, a troca só acontece depois do
+pagamento confirmado.
 """
 
 from backend.application.portas import RepositorioUsuarios, RepositorioVendedores
@@ -13,7 +14,7 @@ from backend.domain.vendedor import Vendedor
 
 
 class TrocarPlano:
-    def __init__(self, vendedores: RepositorioVendedores, usuarios: RepositorioUsuarios, livre: bool = True):
+    def __init__(self, vendedores: RepositorioVendedores, usuarios: RepositorioUsuarios, livre: bool = False):
         self._vendedores = vendedores
         self._usuarios = usuarios
         self.livre = livre

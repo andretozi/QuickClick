@@ -11,17 +11,16 @@ function toQuota(data) {
   return {
     plan: data.plano,
     level: data.nivel,
-    levelNow: data.nivel_agora,
     perMonth: data.analises_por_mes,
     used: data.usadas_no_mes,
     remaining: data.restantes,
-    budgetExceeded: Boolean(data.orcamento_do_dia_estourado),
     available: Boolean(data.disponivel),
     unavailableReason: data.motivo_indisponivel ?? null,
     features: {
       marketResearch: Boolean(data.tem?.pesquisa_de_mercado),
       pricingAnalysis: Boolean(data.tem?.preco_com_analise),
-      webSearch: Boolean(data.tem?.busca_na_web)
+      webSearch: Boolean(data.tem?.busca_na_web),
+      marketAnalysis: Boolean(data.tem?.analise_de_mercado)
     },
     freeDataNotice: Boolean(data.aviso_de_dados_no_gratis)
   };

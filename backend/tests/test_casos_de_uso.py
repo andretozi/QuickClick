@@ -22,7 +22,7 @@ from backend.domain.erros import (
     VendedorNaoEncontrado,
 )
 from backend.domain.marketplace import Marketplace, StatusMarketplace
-from backend.domain.plano import BUSINESS, ESSENCIAL, GRATIS, PRO
+from backend.domain.plano import BUSINESS, ESSENCIAL, GRATIS, GRATIS_CONECTA_VARIOS_PROVISORIO, PRO
 from backend.domain.usuario import Usuario
 from backend.domain.vendedor import Vendedor
 
@@ -134,8 +134,18 @@ class TestConectarMarketplace(BaseCasosDeUso):
         self.assertEqual([tipo for tipo, _ in chamadas], ["token"])
         self.assertEqual(chamadas[0][1], "codigo_oauth")
 
-    def test_gratis_nao_conecta_o_segundo_marketplace(self):
+    def test_gratis_segue_a_regra_provisoria_ao_conectar_o_segundo(self):
         self.montar(GRATIS)
+        self.conectar.executar(VENDEDOR_ID, "mercado-livre", codigo_autorizacao="codigo_oauth")
+        if GRATIS_CONECTA_VARIOS_PROVISORIO:
+            self.conectar.executar(VENDEDOR_ID, "shopee", codigo_autorizacao="codigo_oauth")
+            self.assertEqual(self.conectados(), ["mercado-livre", "shopee"])
+        else:
+            with self.assertRaises(LimiteDoPlanoAtingido):
+                self.conectar.executar(VENDEDOR_ID, "shopee", codigo_autorizacao="codigo_oauth")
+
+    def test_essencial_nao_conecta_o_segundo_marketplace(self):
+        self.montar(ESSENCIAL)
         self.conectar.executar(VENDEDOR_ID, "mercado-livre", codigo_autorizacao="codigo_oauth")
 
         with self.assertRaises(LimiteDoPlanoAtingido) as contexto:
@@ -226,7 +236,7 @@ class TestConsultas(BaseCasosDeUso):
         self.assertEqual([item.marketplace.slug for item in itens if item.conectado], ["shopee"])
 
     def test_resumo_do_vendedor_mostra_o_uso_do_plano(self):
-        self.montar(GRATIS)
+        self.montar(ESSENCIAL)
         obter = ObterVendedorAtual(self.vendedores, self.contas)
 
         antes = obter.executar(VENDEDOR_ID)
@@ -265,23 +275,23 @@ class TestTrocarPlano(unittest.TestCase):
             Usuario(2, "leo@exemplo.com", "Leo", "Loja", "gratis"))
 
     def test_troca_e_devolve_o_usuario_atualizado(self):
-        usuario = TrocarPlano(self.vendedores, self.usuarios).executar(VENDEDOR_ID, " PRO ")
+        usuario = TrocarPlano(self.vendedores, self.usuarios, livre=True).executar(VENDEDOR_ID, " PRO ")
         self.assertEqual((usuario.plano, self.vendedores.obter(VENDEDOR_ID).plano), ("pro", PRO))
 
     def test_conta_antiga_sem_linha_em_vendedores_ganha_a_linha(self):
-        usuario = TrocarPlano(self.vendedores, self.usuarios).executar(2, "business")
+        usuario = TrocarPlano(self.vendedores, self.usuarios, livre=True).executar(2, "business")
         self.assertEqual((usuario.plano, self.vendedores.obter(2).nome), ("business", "Leo"))
 
     def test_plano_que_nao_existe(self):
         with self.assertRaises(PlanoInvalido):
-            TrocarPlano(self.vendedores, self.usuarios).executar(VENDEDOR_ID, "ouro")
+            TrocarPlano(self.vendedores, self.usuarios, livre=True).executar(VENDEDOR_ID, "ouro")
         self.assertEqual(self.vendedores.obter(VENDEDOR_ID).plano, GRATIS)
 
     def test_troca_desligada_nao_mexe_no_plano(self):
         with self.assertRaises(TrocaDePlanoIndisponivel):
-            TrocarPlano(self.vendedores, self.usuarios, livre=False).executar(VENDEDOR_ID, "pro")
+            TrocarPlano(self.vendedores, self.usuarios).executar(VENDEDOR_ID, "pro")  # sem livre: desligada
         self.assertEqual(self.vendedores.obter(VENDEDOR_ID).plano, GRATIS)
 
     def test_usuario_que_nao_existe(self):
         with self.assertRaises(VendedorNaoEncontrado):
-            TrocarPlano(self.vendedores, self.usuarios).executar(99, "pro")
+            TrocarPlano(self.vendedores, self.usuarios, livre=True).executar(99, "pro")

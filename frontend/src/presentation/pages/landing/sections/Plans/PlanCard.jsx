@@ -10,6 +10,7 @@ import './PlanCard.css';
 export default function PlanCard({
   name,
   price,
+  billingNote,
   period,
   tagline,
   features,
@@ -34,6 +35,7 @@ export default function PlanCard({
         <span className="plan-card__amount">{price}</span>
         <span className="plan-card__period">{period}</span>
       </p>
+      {billingNote && <p className="plan-card__billing">{billingNote}</p>}
 
       <ul className="plan-card__features">
         {features.map((feature) => (

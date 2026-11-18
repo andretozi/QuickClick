@@ -76,6 +76,7 @@ class UsoDeIA:
     custo_estimado_usd: Decimal
     duracao_ms: int
     criado_em: datetime
+    chave: str | None = None  # "paga" ou "gratis": só o gasto da paga entra no orçamento do dia
 
 
 @dataclass(frozen=True)

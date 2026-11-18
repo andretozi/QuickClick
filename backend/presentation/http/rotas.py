@@ -373,13 +373,13 @@ def criar_rotas(
     @rotas.put(
         "/me/plano",
         tags=["vendedor"],
-        summary="O vendedor do token troca o próprio plano (MVP: na hora e sem pagamento)",
+        summary="O vendedor do token troca o próprio plano (só com TROCA_DE_PLANO_LIVRE ligada, sem pagamento)",
         response_model=UsuarioSaida,
         responses={
             **ERRO_401,
             **ERRO_404,
             400: {"model": RespostaDeErro, "description": "Plano que não existe"},
-            402: {"model": RespostaDeErro, "description": "Troca livre desligada (TROCA_DE_PLANO_LIVRE=false)"},
+            402: {"model": RespostaDeErro, "description": "Troca livre desligada (padrão; liga com TROCA_DE_PLANO_LIVRE=true)"},
         },
     )
     def trocar_plano(dados: RequisicaoTrocarPlano, vendedor_id: VendedorAtual) -> UsuarioSaida:

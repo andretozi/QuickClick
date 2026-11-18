@@ -89,9 +89,9 @@ export const MARKETPLACES_PAGE = {
 
 /** Aviso do plano, com o link para os planos da landing. */
 export const PLAN_NOTICE = {
-  limited: 'No Grátis você conecta 1 marketplace. Multicanal a partir do Pro.',
-  limitedOther: (planName) => `No ${planName} você conecta 1 marketplace. Multicanal a partir do Pro.`,
-  unlimited: (planName) => `No ${planName} você conecta vários marketplaces e vende em todos ao mesmo tempo.`,
+  limited: 'No Grátis você conecta 1 marketplace. Vários marketplaces a partir do Pro (em breve).',
+  limitedOther: (planName) => `No ${planName} você conecta 1 marketplace. Vários marketplaces a partir do Pro (em breve).`,
+  unlimited: (planName) => `No ${planName} você conecta vários marketplaces.`,
   link: { label: 'Ver os planos', href: '#planos' }
 };
 
@@ -150,7 +150,7 @@ export const CONNECT_DIALOG = {
   },
   limit: {
     title: 'Seu plano chegou no limite.',
-    text: 'No Grátis você conecta 1 marketplace. Multicanal a partir do Pro.',
+    text: 'No Grátis você conecta 1 marketplace. Vários marketplaces a partir do Pro (em breve).',
     link: { label: 'Ver os planos', href: '#planos' }
   }
 };

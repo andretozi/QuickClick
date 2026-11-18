@@ -6,7 +6,7 @@ import { DANGER_SECTION } from '@/domain/content/settingsContent.js';
 import { FIELD_ERRORS } from '@/domain/content/commonContent.js';
 import './DangerSection.css';
 
-/** Zona de risco: excluir a conta, com modal que pede o nome da loja para confirmar. */
+/** Excluir a conta, com modal que pede o nome da loja para confirmar. */
 export default function DangerSection({ danger }) {
   const { modal } = DANGER_SECTION;
   const target = danger.expectedConfirmation || '';

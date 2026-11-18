@@ -10,7 +10,7 @@ from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from backend.application.ia.modelos import UsoDeIA
@@ -120,14 +120,16 @@ class RegistroDeUsoSQL:
                 modelo=uso.modelo, versao_prompt=uso.versao_prompt, tokens_entrada=uso.tokens_entrada,
                 tokens_saida=uso.tokens_saida, cache_lido=uso.cache_lido, cache_gravado=uso.cache_gravado,
                 buscas_web=uso.buscas_web, custo_estimado_usd=uso.custo_estimado_usd, duracao_ms=uso.duracao_ms,
-                criado_em=uso.criado_em,
+                criado_em=uso.criado_em, chave=uso.chave,
             ))
             session.commit()
 
     def gasto_de_hoje_usd(self, agora: datetime) -> Decimal:
         with self._session_factory() as session:
+            # Só a chave paga tem orçamento. Linha sem chave (anterior à 0006) conta como paga: erra para mais
             total = session.query(func.coalesce(func.sum(UsoIAModel.custo_estimado_usd), 0)).filter(
-                UsoIAModel.criado_em >= inicio_do_dia(agora)
+                UsoIAModel.criado_em >= inicio_do_dia(agora),
+                or_(UsoIAModel.chave.is_(None), UsoIAModel.chave == "paga"),
             ).scalar()
             return Decimal(str(total or 0))
 

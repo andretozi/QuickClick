@@ -17,7 +17,7 @@ export const NAV = {
 
 export const HERO = {
   titleLines: ['Clicou…', 'vendeu.'],
-  lead: 'Tire uma foto e a nossa IA cria o anúncio, sugere o preço e publica nos marketplaces certos. Vendeu em um canal, sai de todos.',
+  lead: 'Tire uma foto e a nossa IA cria o anúncio, sugere o preço e publica no Mercado Livre. Outros marketplaces em breve.',
   cta: { label: 'Começar grátis', href: '#planos' },
   secondary: { label: 'Ver como funciona', href: '#como' },
   finePrint: 'Grátis pra sempre. Sem comissão sobre as suas vendas.'
@@ -39,20 +39,20 @@ export const HOW_IT_WORKS = {
       number: '02',
       scene: 'photo',
       title: 'Tire as fotos.',
-      description: 'A IA reconhece o produto, você confirma os detalhes e o anúncio sai pronto pra cada canal.'
+      description: 'A IA reconhece o produto, você confirma os detalhes e o anúncio sai pronto pro Mercado Livre.'
     },
     {
       number: '03',
       scene: 'ai',
-      title: 'A IA acha o melhor preço e o melhor canal.',
-      description: 'Ela compara com o mercado e indica onde o item vende mais rápido. Você aprova ou recusa.'
+      title: 'A IA sugere o preço.',
+      description: 'Ela compara com os anúncios parecidos do Mercado Livre, quando houver, e sugere o preço. Você aprova ou recusa.'
     },
     {
       number: '04',
       scene: 'sale',
-      title: 'Vendeu em um canal, sai de todos.',
+      title: 'Vendeu em um canal, sai de todos (em breve).',
       description:
-        'O estoque baixa sozinho em todos os marketplaces. Nada de venda duplicada, cancelamento ou punição na sua reputação. No Business, a NF-e sai automática.'
+        'Hoje o anúncio sai no Mercado Livre. A baixa de estoque entre vários marketplaces é um recurso em breve.'
     }
   ]
 };
@@ -84,13 +84,13 @@ export const BENEFITS = {
       icon: 'camera',
       tone: 'honey',
       title: 'Da foto ao anúncio pronto.',
-      description: 'A IA escreve título, descrição e atributos pra cada canal. Horas de cadastro viram minutos.'
+      description: 'A IA escreve título, descrição e atributos pro Mercado Livre. Horas de cadastro viram minutos.'
     },
     {
       icon: 'sync',
       tone: 'green',
-      title: 'Vendeu em um canal, sai de todos.',
-      description: 'Sem venda duplicada e sem cancelamento. A sua reputação nos marketplaces agradece.'
+      title: 'Vários marketplaces (em breve).',
+      description: 'Hoje você publica no Mercado Livre. O estoque sincronizado entre marketplaces é um recurso em breve.'
     }
   ]
 };
@@ -102,7 +102,7 @@ export const COMPARISON = {
     label: 'INTEGRADORES ATUAIS',
     items: [
       'Cadastro manual, item por item',
-      'Você escolhe o canal no chute',
+      'Cada marketplace com o seu cadastro',
       'Preço definido no escuro',
       'Mensalidade desde o primeiro dia'
     ]
@@ -112,14 +112,20 @@ export const COMPARISON = {
     title: 'Quick Click',
     items: [
       'Anúncio pronto a partir de uma foto',
-      'A IA indica o melhor canal pra cada item',
+      'Publicação direta no Mercado Livre',
       'Preço sugerido com dados do mercado',
       'Plano Grátis pra sempre e zero comissão'
     ]
   }
 };
 
-/** Os preços dos planos pagos ainda não foram definidos: a equipe preenche o "R$ __". */
+/** Os preços são provisórios (ver backend/domain/plano.py): a cobrança ainda não está ativada. */
+const BILLING_NOTE = 'Cobrança ainda não ativada';
+
+/**
+ * Só entra no card o que existe no código hoje (ou fica marcado como "em breve"). As análises por mês
+ * espelham ANALISES_POR_MES em backend/domain/ia/capacidade.py (o test_plano.py confere).
+ */
 export const PLANS = {
   eyebrow: 'PREÇO HONESTO',
   title: ['Comece grátis.', 'Cresça quando quiser.'],
@@ -132,35 +138,38 @@ export const PLANS = {
       price: 'R$ 0',
       period: 'pra sempre',
       tagline: 'Pra começar a vender',
-      features: ['1 marketplace', 'Poucos anúncios'],
+      features: ['5 análises de IA por mês', 'Publicação no Mercado Livre'],
       cta: { label: 'Começar grátis', href: '#/cadastro' }
     },
     {
       id: 'essencial',
       name: 'Essencial',
-      price: 'R$ __',
+      price: 'R$ 99,90',
+      billingNote: BILLING_NOTE,
       period: 'por mês',
       tagline: 'Pra vender mais rápido',
-      features: ['1 marketplace', 'Anúncios com IA', 'Preço sugerido'],
+      features: ['1 marketplace', '40 análises de IA por mês', 'Preço sugerido quando houver anúncios parecidos'],
       cta: { label: 'Escolher Essencial', href: '#/cadastro' }
     },
     {
       id: 'pro',
       name: 'Pro',
-      price: 'R$ __',
+      price: 'R$ 549,90',
+      billingNote: BILLING_NOTE,
       period: 'por mês',
-      tagline: 'Pra vender em todos os canais',
-      features: ['Vários marketplaces', 'Baixa automática de estoque', 'Monitor de preços'],
+      tagline: 'Pra vender com dados do mercado',
+      features: ['Vários marketplaces (em breve)', '120 análises de IA por mês', 'Análise de mercado no Mercado Livre'],
       featured: true,
       cta: { label: 'Escolher Pro', href: '#/cadastro' }
     },
     {
       id: 'business',
       name: 'Business',
-      price: 'R$ __',
+      price: 'R$ 1.499,90',
+      billingNote: BILLING_NOTE,
       period: 'por mês',
       tagline: 'Pra quem vende em escala',
-      features: ['Automação completa', 'Emissão automática de NF-e'],
+      features: ['Tudo do Pro', '400 análises de IA por mês'],
       cta: { label: 'Escolher Business', href: '#/cadastro' }
     }
   ]
@@ -174,7 +183,7 @@ export const FINAL_CTA = {
 };
 
 export const FOOTER = {
-  tagline: 'Clicou, vendeu. Automação de vendas multicanal com IA pra pequenos e grandes vendedores.',
+  tagline: 'Clicou, vendeu. Automação de vendas com IA pra pequenos e grandes vendedores.',
   copyright: '© 2026 Quick Click · MVP'
 };
 
@@ -182,9 +191,9 @@ export const FOOTER = {
 export const SCENES = {
   register: {
     title: 'Conectar lojas',
-    fields: ['Mercado Livre', 'Shopee', 'Amazon'],
+    fields: ['Mercado Livre', 'Shopee (em breve)', 'Amazon (em breve)'],
     button: 'Conectar',
-    done: 'Lojas conectadas'
+    done: 'Loja conectada'
   },
   photo: {
     price: 'R$ 189',
@@ -192,9 +201,9 @@ export const SCENES = {
   },
   ai: {
     channels: [
-      { name: 'Mercado Livre', detail: 'R$189 · vende rápido', tone: 'honey' },
-      { name: 'Shopee', detail: 'R$179 · alta procura', tone: 'coral', recommended: true },
-      { name: 'Amazon', detail: 'R$199 · prazo maior', tone: 'muted' }
+      { name: 'Mercado Livre', detail: 'R$189 · preço sugerido', tone: 'honey' },
+      { name: 'Shopee', detail: 'em breve', tone: 'muted' },
+      { name: 'Amazon', detail: 'em breve', tone: 'muted' }
     ],
     recommendedLabel: 'RECOMENDADO',
     chartLabel: 'de olho no mercado',

@@ -20,7 +20,6 @@ export default function AnalysisStep({ editor }) {
     label: texts.stages[stage.id]
   }));
   const tips = photoQualityTips(analysis);
-  const budget = analysis?.notices?.some((notice) => notice.code === 'orcamento_do_dia');
   const done = phase === 'waiting' || phase === 'ready';
 
   return (
@@ -79,8 +78,6 @@ export default function AnalysisStep({ editor }) {
           </div>
         </div>
       )}
-
-      {budget && <p className="analysis-step__notice">{LISTING_WIZARD.quota.budget}</p>}
 
       {tips.length > 0 && (
         <ul className="analysis-step__tips">

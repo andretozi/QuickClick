@@ -1,6 +1,6 @@
 /* ==================================================================
    Bloco: settings-section (uma seção das configurações)
-   Tons: --paper (formulários), --glass (conexões, zona de risco)
+   Tons: --paper (formulários), --glass (conexões, excluir conta)
    ================================================================== */
 .settings-section {
   display: flex;

@@ -42,6 +42,7 @@ class ClienteAnthropic:
                  relogio: Callable[[], datetime] = agora_utc, dormir: Callable[[float], None] = time.sleep,
                  cliente: Any = None):
         self.nome_variavel = nome_variavel
+        self.tipo_de_chave = "paga" if nome_variavel.endswith("_PAGO") else "gratis"
         self._chave = chave
         self._registro = registro
         self.ttl_cache = ttl_cache if ttl_cache in ("5m", "1h") else "5m"
@@ -127,7 +128,7 @@ class ClienteAnthropic:
             provedor="anthropic", modelo=modelo, versao_prompt=versao_prompt,
             tokens_entrada=entrada, tokens_saida=saida, cache_lido=lido, cache_gravado=gravado, buscas_web=buscas,
             custo_estimado_usd=custo_anthropic(modelo, entrada, saida, lido, gravado, buscas, self.ttl_cache) + orientador,
-            duracao_ms=duracao_ms, criado_em=self._relogio(),
+            duracao_ms=duracao_ms, criado_em=self._relogio(), chave=self.tipo_de_chave,
         )
         log.info("IA uso: etapa=%s modelo=%s entrada=%d saida=%d cache_lido=%d cache_gravado=%d buscas=%d "
                  "orientador_usd=%s custo_usd=%s tempo_ms=%d", registro.etapa, modelo, entrada, saida, lido, gravado,

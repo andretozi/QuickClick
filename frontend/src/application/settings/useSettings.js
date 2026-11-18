@@ -188,7 +188,7 @@ export default function useSettings() {
   // ---------- Plano (troca na hora, sem pagamento, no MVP) ----------
   const plan = usePlanChange({ mounted });
 
-  // ---------- Zona de risco ----------
+  // ---------- Excluir conta ----------
   const [deleting, setDeleting] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const hasStoreName = Boolean((account?.store || '').trim());

@@ -164,7 +164,7 @@ def criar_app(
         registrar_usuario=RegistrarUsuario(usuarios, hasher, token_service, emails_admin=emails_admin),
         obter_usuario_atual=ObterUsuarioAtual(usuarios, hasher, relogio=relogio, emails_admin=emails_admin),
         moderar_contas=ModerarContas(usuarios, moderacao, contas, relogio=relogio),
-        trocar_plano=TrocarPlano(vendedores, usuarios, livre=leitor.booleano("TROCA_DE_PLANO_LIVRE", True)),
+        trocar_plano=TrocarPlano(vendedores, usuarios, livre=leitor.booleano("TROCA_DE_PLANO_LIVRE", False)),
         analises_ia=analises_ia,
         publicar_no_mercado_livre=PublicarNoMercadoLivre(conectar, gateways["mercado-livre"], fonte_ml, analises,
                                                          preparador),
