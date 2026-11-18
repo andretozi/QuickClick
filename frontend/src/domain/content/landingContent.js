@@ -184,7 +184,7 @@ export const FINAL_CTA = {
 
 export const FOOTER = {
   tagline: 'Clicou, vendeu. Automação de vendas com IA pra pequenos e grandes vendedores.',
-  copyright: '© 2026 Quick Click · MVP'
+  copyright: '© 2026 Quick Click'
 };
 
 /* ---------- Dados fictícios das cenas animadas ---------- */
