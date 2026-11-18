@@ -5,6 +5,7 @@ Aplicação · IA · Escolha do provedor por plano (nível) e a ordem de reserva
     leitura     Opus 5.5 → Haiku 5.5 (chave paga)      Gemini Flash grátis → Haiku 5.5 (chave grátis)
     pesquisa    Sonnet 5.5 (web) → Haiku (paga)        Haiku (grátis), sem web
     preço       Opus 5.5 (sem fotos) → regra Python    só regra Python
+    (Opus só no Pro e no Business: no Essencial, a leitura e o preço usam o Sonnet 5.5, ver capacidade.py)
     texto       Sonnet 5.5 → Haiku (paga)              Gemini Flash grátis → Haiku (grátis)
     correção    Haiku (paga)                           Haiku (grátis)
 
@@ -39,6 +40,7 @@ P = TypeVar("P", bound=ProvedorDeIA)
 @dataclass(frozen=True)
 class ProvedoresDeIA:
     leitor_visao_pago: LeitorDeProduto | None = None
+    leitor_texto_pago: LeitorDeProduto | None = None  # Sonnet, no Essencial
     leitor_rapido_pago: LeitorDeProduto | None = None
     leitor_gemini_gratis: LeitorDeProduto | None = None
     leitor_rapido_gratis: LeitorDeProduto | None = None
@@ -46,6 +48,7 @@ class ProvedoresDeIA:
     pesquisador_rapido_pago: PesquisadorDeMercado | None = None
     pesquisador_gratis: PesquisadorDeMercado | None = None
     precificador_pago: Precificador | None = None
+    precificador_texto_pago: Precificador | None = None  # Sonnet, no Essencial
     precos_na_web_pago: PesquisadorDePrecosNaWeb | None = None
     redator_pago: Redator | None = None
     redator_rapido_pago: Redator | None = None
@@ -59,9 +62,9 @@ def _disponiveis(candidatos: Sequence[P | None]) -> list[P]:
     return [c for c in candidatos if c is not None and c.disponivel()]
 
 
-def leitores(p: ProvedoresDeIA, nivel: Nivel) -> list[LeitorDeProduto]:
+def leitores(p: ProvedoresDeIA, nivel: Nivel, *, ponta: bool) -> list[LeitorDeProduto]:
     if nivel is Nivel.PAGO:
-        return _disponiveis([p.leitor_visao_pago, p.leitor_rapido_pago])
+        return _disponiveis([p.leitor_visao_pago if ponta else p.leitor_texto_pago, p.leitor_rapido_pago])
     return _disponiveis([p.leitor_gemini_gratis, p.leitor_rapido_gratis])
 
 
@@ -71,8 +74,10 @@ def pesquisadores(p: ProvedoresDeIA, nivel: Nivel) -> list[PesquisadorDeMercado]
     return _disponiveis([p.pesquisador_gratis])
 
 
-def precificadores(p: ProvedoresDeIA, nivel: Nivel) -> list[Precificador]:
-    return _disponiveis([p.precificador_pago]) if nivel is Nivel.PAGO else []
+def precificadores(p: ProvedoresDeIA, nivel: Nivel, *, ponta: bool) -> list[Precificador]:
+    if nivel is not Nivel.PAGO:
+        return []
+    return _disponiveis([p.precificador_pago if ponta else p.precificador_texto_pago])
 
 
 def precos_na_web(p: ProvedoresDeIA, nivel: Nivel) -> list[PesquisadorDePrecosNaWeb]:

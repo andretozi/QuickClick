@@ -56,6 +56,7 @@ from backend.domain.ia.atributos_ml import (
     perguntas_dos_obrigatorios,
 )
 from backend.domain.ia.canais import aplicar_motivos, canais_candidatos
+from backend.domain.ia.capacidade import capacidade_do_plano
 from backend.domain.ia.escrita import (
     DESCRICAO_MAX,
     ESPECIFICACOES_MAX,
@@ -125,6 +126,11 @@ class ProcessoDaAnalise:
         campos["atualizado_em"] = self.d.relogio()
         self.d.analises.atualizar(analise_id, campos)
 
+    @staticmethod
+    def _ponta(analise: dict[str, Any]) -> bool:
+        """Opus ou Sonnet na leitura e no preço, pelo plano gravado quando a análise começou."""
+        return capacidade_do_plano(analise.get("plano_no_momento") or "").modelo_de_ponta
+
     def _contexto(self, analise: dict[str, Any], etapa: str) -> ContextoDaChamada:
         return ContextoDaChamada(vendedor_id=analise["vendedor_id"], analise_id=analise["id"], etapa=etapa)
 
@@ -158,7 +164,7 @@ class ProcessoDaAnalise:
 
         nivel = Nivel(analise["nivel"])
         entrada = EntradaDaLeitura(tuple(fotos[:MAX_FOTOS_NA_LEITURA]), CATEGORIAS)
-        resultado = escolha.tentar_em_ordem(escolha.leitores(self.d.provedores, nivel),
+        resultado = escolha.tentar_em_ordem(escolha.leitores(self.d.provedores, nivel, ponta=self._ponta(analise)),
                                             lambda p: p.ler(entrada, self._contexto(analise, "leitura")))
         if resultado is None:
             self._falhar(analise_id, StatusAnalise.LENDO_PRODUTO, IAIndisponivel())
@@ -321,7 +327,7 @@ class ProcessoDaAnalise:
             leitura = normalizar_leitura(atual, len(analise.get("fotos_meta") or []))
             contexto_sem_ml = {k: v for k, v in atual.items() if k not in ("ml", "exigencias")}
             resultado = escolha.tentar_em_ordem(
-                escolha.leitores(self.d.provedores, Nivel(analise["nivel"])),
+                escolha.leitores(self.d.provedores, Nivel(analise["nivel"]), ponta=self._ponta(analise)),
                 lambda p: p.reler(EntradaDaReleitura((), contexto_sem_ml, foto.leitura_jpeg, tipo),
                                   self._contexto(analise, "foto_extra")))
             avisos = analise.get("avisos") or []
@@ -488,7 +494,8 @@ class ProcessoDaAnalise:
                 atributos=_fatos(confirmacao), condicao=condicao,
                 defeitos=confirmacao.defeitos, canais_candidatos=tuple(c.para_dict() for c in candidatos),
             )
-            resultado = escolha.tentar_em_ordem(escolha.precificadores(self.d.provedores, nivel),
+            resultado = escolha.tentar_em_ordem(escolha.precificadores(self.d.provedores, nivel,
+                                                                       ponta=self._ponta(analise)),
                                                 lambda p: p.precificar(entrada, self._contexto(analise, "preco")))
             if resultado is not None:
                 preco, candidatos = _aplicar_preco_da_ia(preco, resultado[0].dados, est, candidatos)

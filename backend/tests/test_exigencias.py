@@ -249,6 +249,7 @@ class TestProcessoComExigencias(unittest.TestCase):
                   falha_na_releitura=False):
         self.leitor = LeitorFalso(falha_na_releitura)
         self.repo = RepositorioDeAnalisesEmMemoria({"id": "a1", "vendedor_id": 1, "nivel": nivel, "avisos": [],
+                                                    "plano_no_momento": "pro" if nivel == "pago" else "gratis",
                                                     "fotos_meta": [{"indice": 0}, {"indice": 1}]})
         self.fotos = tuple(FotoPreparada(i, b"foto%d" % i, b"detalhe") for i in range(2))
         fonte_ml = fonte_ml or FonteMLFalsa()

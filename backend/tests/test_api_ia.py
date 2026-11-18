@@ -395,6 +395,51 @@ class TestPlanoPago(BaseIA):
         self.assertEqual(retomada.json()["status"], "pronta")
 
 
+class TestPlanoEssencial(BaseIA):
+    plano = "essencial"
+
+    def setUp(self):
+        precificar = {"preco_sugerido_centavos": 15990, "faixa": {"min": 14000, "max": 17000},
+                      "estrategia": "equilibrado", "justificativa": "Perto da mediana.", "alertas": [], "canais": []}
+        self.opus = Falso("opus", {**leitores(), "precificar": precificar})
+        self.sonnet = Falso("sonnet", {**leitores({**LEITURA, "etiqueta_ilegivel": [{"foto": 0, "caixa": [100, 100, 400, 300]}]}),
+                                       "precificar": precificar, "escrever": TEXTO,
+                                       "pesquisar": {"perfil_comprador": "Corredor amador.", "o_que_valoriza": [],
+                                                     "objecoes": [], "termos_que_usam": [], "fontes": []},
+                                       "buscar_precos": {"itens": [{"preco_centavos": p, "frete_gratis": True, "url": "x"}
+                                                                   for p in (14000, 15000, 16000, 17000, 15500)]}})
+        self.gemini = Falso("gemini", leitores())
+        self.montar(ProvedoresDeIA(leitor_visao_pago=self.opus, leitor_texto_pago=self.sonnet,
+                                   pesquisador_pago=self.sonnet, precificador_pago=self.opus,
+                                   precificador_texto_pago=self.sonnet, precos_na_web_pago=self.sonnet,
+                                   redator_pago=self.sonnet, leitor_gemini_gratis=self.gemini),
+                    fonte_ml=FonteMLFalsa())
+
+    def test_essencial_usa_o_sonnet_na_foto_no_preco_e_no_texto(self):
+        pronta = self.confirmar(self.criar().json()["id"]).json()
+        self.assertEqual(pronta["status"], "pronta")
+        self.assertTrue(pronta["preco"]["por_ia"])
+        self.assertEqual(self.sonnet.chamadas[:2], ["ler", "reler"])  # a etiqueta é relida pelo mesmo Sonnet
+        self.assertIn("precificar", self.sonnet.chamadas)
+        self.assertIn("escrever", self.sonnet.chamadas)
+        self.assertEqual((self.opus.chamadas, self.gemini.chamadas), ([], []))
+
+
+class TestPagoSemChavePaga(BaseIA):
+    plano = "pro"
+
+    def setUp(self):
+        self.gemini = Falso("gemini", leitores())
+        self.montar(ProvedoresDeIA(leitor_gemini_gratis=self.gemini, leitor_rapido_gratis=Falso("haiku", leitores())))
+
+    def test_ia_indisponivel_sem_cair_no_gemini(self):
+        cota = self.cliente.get("/api/ia/cota").json()
+        self.assertEqual((cota["disponivel"], cota["motivo_indisponivel"]), (False, "provedor_indisponivel"))
+        resposta = self.criar()
+        self.assertEqual((resposta.status_code, resposta.json()["erro"]["codigo"]), (503, "ia_indisponivel"))
+        self.assertEqual(self.gemini.chamadas, [])
+
+
 class TestSemIA(BaseIA):
     def setUp(self):
         self.montar(ProvedoresDeIA())

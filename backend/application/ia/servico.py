@@ -93,7 +93,7 @@ class ServicoDeAnalises:
         motivo = None
         if not self.d.config.ia_ativa:
             motivo = "ia_desligada"
-        elif not escolha.leitores(self.d.provedores, nivel):
+        elif not escolha.leitores(self.d.provedores, nivel, ponta=capacidade.modelo_de_ponta):
             motivo = "provedor_indisponivel"
         elif sobram <= 0:
             motivo = "cota_esgotada"
@@ -130,7 +130,7 @@ class ServicoDeAnalises:
                 na_ultima_hora=self.d.analises.criadas_desde(vendedor_id, agora - timedelta(hours=1)),
             )
             nivel, estourou = self._nivel_agora(capacidade)
-            if not escolha.leitores(self.d.provedores, nivel):
+            if not escolha.leitores(self.d.provedores, nivel, ponta=capacidade.modelo_de_ponta):
                 raise IAIndisponivel()
             analise_id = str(uuid.uuid4())
             self.d.analises.criar({

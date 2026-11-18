@@ -4,7 +4,7 @@ Domínio · IA · O que cada plano tem, cotas e limites
     Plano       Análises por mês   Leitura da foto        Pesquisa de mercado     Preço               Texto
     gratis      5                  Gemini Flash grátis    não (perfil sem web)    só Python           Gemini Flash grátis
                                    (reserva: Haiku)                               (mediana)           (reserva: Haiku)
-    essencial   40                 Opus 5.5               sim, com cache          Python + Opus       Sonnet 5.5
+    essencial   40                 Sonnet 5.5             sim, com cache          Python + Sonnet     Sonnet 5.5
     pro         120                Opus 5.5               sim, com cache          Python + Opus       Sonnet 5.5
     business    400                Opus 5.5               sim, com cache          Python + Opus       Sonnet 5.5
 
@@ -34,6 +34,11 @@ class CapacidadeIA:
     def pesquisa_de_mercado(self) -> bool:
         """Pesquisa com busca na web e cache (o Grátis tem só um perfil do comprador, sem web)."""
         return self.nivel is Nivel.PAGO
+
+    @property
+    def modelo_de_ponta(self) -> bool:
+        """Opus na leitura da foto e no preço só no Pro e no Business (o Essencial usa o Sonnet)."""
+        return self.nivel is Nivel.PAGO and self.plano in ("pro", "business")
 
     @property
     def preco_com_analise(self) -> bool:

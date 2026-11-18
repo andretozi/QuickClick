@@ -23,6 +23,7 @@ from backend.application.ia.modelos import (
 from backend.domain.canais.esquema import TipoDeCampo
 from backend.domain.erros import FotoInvalida
 from backend.domain.ia.analise import Nivel
+from backend.domain.ia.capacidade import capacidade_do_plano
 from backend.domain.ia.fotos import QualidadeFoto
 from backend.infrastructure.ia import esquemas
 from backend.infrastructure.ia.anthropic_ia import AnthropicLeitor
@@ -339,9 +340,10 @@ class TestEscolha(unittest.TestCase):
             leitor_visao_pago=ProvedorFalso("opus"), leitor_rapido_pago=ProvedorFalso("haiku pago"),
             leitor_gemini_gratis=ProvedorFalso("gemini", disponivel=False), leitor_rapido_gratis=ProvedorFalso("haiku"),
         )
-        self.assertEqual([x.nome for x in escolha.leitores(p, Nivel.PAGO)], ["opus", "haiku pago"])
-        self.assertEqual([x.nome for x in escolha.leitores(p, Nivel.GRATIS)], ["haiku"])
-        self.assertEqual(escolha.precificadores(p, Nivel.GRATIS), [])
+        self.assertEqual([x.nome for x in escolha.leitores(p, Nivel.PAGO, ponta=True)], ["opus", "haiku pago"])
+        self.assertEqual([x.nome for x in escolha.leitores(p, Nivel.PAGO, ponta=False)], ["haiku pago"])
+        self.assertEqual([x.nome for x in escolha.leitores(p, Nivel.GRATIS, ponta=False)], ["haiku"])
+        self.assertEqual(escolha.precificadores(p, Nivel.GRATIS, ponta=True), [])
 
     def test_tentar_em_ordem_usa_a_reserva(self):
         primeiro, segundo = ProvedorFalso("a", falha=True), ProvedorFalso("b")
@@ -358,23 +360,57 @@ class TestFabrica(unittest.TestCase):
     def test_ia_desligada_nao_monta_nada(self):
         with self.assertLogs("quickclick.ia", "WARNING"):
             provedores = criar_provedores(leitor_de_teste(IA_ATIVA="false"), RegistroEmMemoria())
-        self.assertEqual(escolha.leitores(provedores, Nivel.PAGO), [])
+        self.assertEqual(escolha.leitores(provedores, Nivel.PAGO, ponta=True), [])
 
     def test_sem_chaves_nenhum_provedor_disponivel_e_o_log_diz_o_que_falta(self):
         with self.assertLogs("quickclick.ia", "WARNING") as logs:
             provedores = criar_provedores(leitor_de_teste(), RegistroEmMemoria())
-        self.assertEqual(escolha.leitores(provedores, Nivel.GRATIS), [])
+        self.assertEqual(escolha.leitores(provedores, Nivel.GRATIS, ponta=False), [])
         self.assertTrue(any("ANTHROPIC_API_KEY_PAGO" in linha for linha in logs.output))
 
     def test_com_chaves_monta_na_ordem(self):
         leitor = leitor_de_teste(ANTHROPIC_API_KEY_PAGO="x", ANTHROPIC_API_KEY_GRATIS="y", GEMINI_API_KEY_GRATIS="z",
                                  PESQUISA_WEB_ATIVA="false")
         provedores = criar_provedores(leitor, RegistroEmMemoria())
-        self.assertEqual([x.nome for x in escolha.leitores(provedores, Nivel.GRATIS)],
+        self.assertEqual([x.nome for x in escolha.leitores(provedores, Nivel.GRATIS, ponta=False)],
                          ["leitura gemini-3.8-flash", "leitura claude-haiku-5-5"])
         self.assertEqual([x.nome for x in escolha.redatores(provedores, Nivel.PAGO)],
                          ["texto claude-sonnet-5-5", "texto claude-haiku-5-5"])
         self.assertEqual(escolha.precos_na_web(provedores, Nivel.PAGO), [])  # busca na web desligada
+
+    def test_modelo_de_cada_etapa_por_plano(self):
+        """Sem rede: as chaves são falsas e nada é chamado, só a escolha dos provedores."""
+        leitor = leitor_de_teste(ANTHROPIC_API_KEY_PAGO="x", ANTHROPIC_API_KEY_GRATIS="y", GEMINI_API_KEY_GRATIS="z")
+        provedores = criar_provedores(leitor, RegistroEmMemoria())
+
+        def modelos(lista):
+            return [x.nome.split()[-1] for x in lista]
+
+        esperado = {
+            "gratis": (["gemini-3.8-flash", "claude-haiku-5-5"], [], ["gemini-3.8-flash", "claude-haiku-5-5"], []),
+            "essencial": (["claude-sonnet-5-5", "claude-haiku-5-5"], ["claude-sonnet-5-5"],
+                          ["claude-sonnet-5-5", "claude-haiku-5-5"], ["claude-sonnet-5-5"]),
+            "pro": (["claude-opus-5-5", "claude-haiku-5-5"], ["claude-opus-5-5"],
+                    ["claude-sonnet-5-5", "claude-haiku-5-5"], ["claude-sonnet-5-5"]),
+            "business": (["claude-opus-5-5", "claude-haiku-5-5"], ["claude-opus-5-5"],
+                         ["claude-sonnet-5-5", "claude-haiku-5-5"], ["claude-sonnet-5-5"]),
+        }
+        for plano, (leitura, preco, texto, web) in esperado.items():
+            with self.subTest(plano=plano):
+                cap = capacidade_do_plano(plano)
+                self.assertEqual(modelos(escolha.leitores(provedores, cap.nivel, ponta=cap.modelo_de_ponta)), leitura)
+                self.assertEqual(modelos(escolha.precificadores(provedores, cap.nivel, ponta=cap.modelo_de_ponta)), preco)
+                self.assertEqual(modelos(escolha.redatores(provedores, cap.nivel)), texto)
+                self.assertEqual(modelos(escolha.precos_na_web(provedores, cap.nivel)), web)
+
+    def test_plano_pago_sem_chave_paga_nao_cai_no_gemini(self):
+        with self.assertLogs("quickclick.ia", "WARNING"):
+            provedores = criar_provedores(leitor_de_teste(ANTHROPIC_API_KEY_GRATIS="y", GEMINI_API_KEY_GRATIS="z"),
+                                          RegistroEmMemoria())
+        for plano in ("essencial", "pro", "business"):
+            cap = capacidade_do_plano(plano)
+            self.assertEqual(escolha.leitores(provedores, cap.nivel, ponta=cap.modelo_de_ponta), [], plano)
+            self.assertEqual(escolha.redatores(provedores, cap.nivel), [], plano)
 
 
 class TestEsquemas(unittest.TestCase):
