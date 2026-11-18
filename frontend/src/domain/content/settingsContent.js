@@ -13,7 +13,7 @@ export const SETTINGS = {
     plan: { label: 'Plano', icon: 'star' },
     connections: { label: 'Conexões', icon: 'link' },
     preferences: { label: 'Preferências', icon: 'bell' },
-    danger: { label: 'Zona de risco', icon: 'alert' }
+    danger: { label: 'Excluir conta', icon: 'alert' }
   },
   save: 'Salvar alterações',
   saving: 'Salvando…',
@@ -94,7 +94,7 @@ export const PREFERENCES_SECTION = {
 };
 
 export const DANGER_SECTION = {
-  title: 'Zona de risco',
+  title: 'Excluir conta',
   lead: 'Excluir a conta apaga definitivamente o seu perfil, os anúncios, as conexões e as preferências. Não dá pra desfazer.',
   button: 'Excluir minha conta',
   modal: {

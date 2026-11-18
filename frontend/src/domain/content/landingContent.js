@@ -52,7 +52,7 @@ export const HOW_IT_WORKS = {
       scene: 'sale',
       title: 'Vendeu em um canal, sai de todos.',
       description:
-        'O estoque baixa sozinho em todos os marketplaces. Nada de venda duplicada, cancelamento ou punição na sua reputação. No Business, a NF-e sai automática.'
+        'O estoque baixa sozinho em todos os marketplaces. Nada de venda duplicada, cancelamento ou punição na sua reputação.'
     }
   ]
 };
@@ -119,7 +119,10 @@ export const COMPARISON = {
   }
 };
 
-/** Os preços dos planos pagos ainda não foram definidos: a equipe preenche o "R$ __". */
+/**
+ * Só entra no card o que existe no código hoje (ou fica marcado como "em breve"). As análises por mês
+ * espelham ANALISES_POR_MES em backend/domain/ia/capacidade.py (o test_plano.py confere).
+ */
 export const PLANS = {
   eyebrow: 'PREÇO HONESTO',
   title: ['Comece grátis.', 'Cresça quando quiser.'],
@@ -132,7 +135,7 @@ export const PLANS = {
       price: 'R$ 0',
       period: 'pra sempre',
       tagline: 'Pra começar a vender',
-      features: ['1 marketplace', 'Poucos anúncios'],
+      features: ['1 marketplace', '5 análises de IA por mês'],
       cta: { label: 'Começar grátis', href: '#/cadastro' }
     },
     {
@@ -141,7 +144,7 @@ export const PLANS = {
       price: 'R$ __',
       period: 'por mês',
       tagline: 'Pra vender mais rápido',
-      features: ['1 marketplace', 'Anúncios com IA', 'Preço sugerido'],
+      features: ['1 marketplace', '40 análises de IA por mês', 'Preço sugerido quando houver anúncios parecidos'],
       cta: { label: 'Escolher Essencial', href: '#/cadastro' }
     },
     {
@@ -149,8 +152,8 @@ export const PLANS = {
       name: 'Pro',
       price: 'R$ __',
       period: 'por mês',
-      tagline: 'Pra vender em todos os canais',
-      features: ['Vários marketplaces', 'Baixa automática de estoque', 'Monitor de preços'],
+      tagline: 'Pra vender com dados do mercado',
+      features: ['Vários marketplaces (em breve)', '120 análises de IA por mês', 'Análise de mercado no Mercado Livre'],
       featured: true,
       cta: { label: 'Escolher Pro', href: '#/cadastro' }
     },
@@ -160,7 +163,7 @@ export const PLANS = {
       price: 'R$ __',
       period: 'por mês',
       tagline: 'Pra quem vende em escala',
-      features: ['Automação completa', 'Emissão automática de NF-e'],
+      features: ['Tudo do Pro', '400 análises de IA por mês'],
       cta: { label: 'Escolher Business', href: '#/cadastro' }
     }
   ]
