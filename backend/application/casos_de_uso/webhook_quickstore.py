@@ -33,6 +33,8 @@ log = logging.getLogger("quickclick.marketplaces")
 
 QUICKSTORE = "quickstore"
 TOPICO_PEDIDOS = "orders_v2"
+TOPICO_ITENS = "items"
+TOPICOS_SUPORTADOS = {TOPICO_PEDIDOS, TOPICO_ITENS}
 STATUS_PEDIDO_VALIDOS = {"paid", "confirmed", "approved", "completed"}
 MAX_PEDIDOS_PROCESSADOS_MEMORIA = 2_000
 
@@ -43,6 +45,28 @@ def _agora_utc() -> datetime:
 
 def _normalizar_titulo(texto: str) -> str:
     return " ".join(str(texto or "").strip().lower().split())
+
+
+def _status_do_item_no_canal(status_externo: str) -> str:
+    limpo = str(status_externo or "").strip().lower()
+    if limpo == "active":
+        return "publicado"
+    if limpo == "paused":
+        return "pausado"
+    return "nao_publicado"
+
+
+def _extrair_item_id(recurso: str) -> str:
+    texto = str(recurso or "").strip()
+    if texto.startswith("/items/"):
+        codigo = texto.removeprefix("/items/").strip("/")
+    elif texto.startswith("items/"):
+        codigo = texto.removeprefix("items/").strip("/")
+    else:
+        codigo = texto.strip("/")
+    if not codigo or len(codigo) > 64 or "/" in codigo or ".." in codigo or not codigo.replace("-", "").replace("_", "").isalnum():
+        raise ValueError("Identificador do item inválido.")
+    return codigo
 
 
 class ProcessarWebhookQuickStore:
@@ -134,6 +158,43 @@ class ProcessarWebhookQuickStore:
                 )
         return sincronizados
 
+    def _propagar_dados_nos_canais(
+        self,
+        vendedor_id: int,
+        produto: Produto,
+        canal_origem: str = QUICKSTORE,
+    ) -> list[str]:
+        sincronizados: list[str] = []
+        for pub in produto.publicacoes:
+            if not pub.id_externo or pub.canal == canal_origem:
+                continue
+            publicador = self._publicadores.get(pub.canal)
+            if publicador is None:
+                continue
+            token = self._conectar.token_ativo(vendedor_id, pub.canal)
+            if not token:
+                continue
+            try:
+                mudancas: dict[str, Any] = {
+                    "price": produto.preco_centavos / 100,
+                    "available_quantity": max(1, produto.estoque) if pub.status == "publicado" else produto.estoque,
+                }
+                if produto.estoque <= 0 and pub.status == "publicado":
+                    publicador.atualizar_anuncio(token, pub.id_externo, {"status": "paused"})
+                else:
+                    publicador.atualizar_anuncio(token, pub.id_externo, mudancas)
+                if produto.descricao and hasattr(publicador, "atualizar_descricao"):
+                    publicador.atualizar_descricao(token, pub.id_externo, produto.descricao)
+                sincronizados.append(pub.canal)
+            except FalhaNoMarketplace as erro:
+                log.warning(
+                    "Não deu para propagar dados do item %s para %s (%s).",
+                    pub.id_externo,
+                    pub.canal,
+                    erro.status or "sem resposta",
+                )
+        return sincronizados
+
     def _abater_item_do_vendedor(
         self,
         vendedor_id: int,
@@ -200,6 +261,215 @@ class ProcessarWebhookQuickStore:
             }
         return None
 
+    def _colocar_item_em_standby_no_vendedor(self, vendedor_id: int, item_id: str) -> dict[str, Any] | None:
+        for _ in range(3):
+            lista = self._produtos.listar(vendedor_id)
+            produto = self._encontrar_produto(lista, item_id, "")
+            if produto is None:
+                return None
+            novas_publicacoes: list[Publicacao] = []
+            for pub in produto.publicacoes:
+                if pub.canal == QUICKSTORE:
+                    novas_publicacoes.append(
+                        replace(pub, status="nao_publicado", id_externo=None, permalink=None)
+                    )
+                else:
+                    novas_publicacoes.append(pub)
+            agora = self._relogio()
+            agora = agora.replace(microsecond=agora.microsecond // 1000 * 1000)
+            try:
+                salvo = self._produtos.salvar(vendedor_id, replace(produto, publicacoes=novas_publicacoes), agora)
+            except AnuncioDesatualizado:
+                continue
+            return {"produto_id": salvo.id, "item_id": item_id, "status": "nao_publicado"}
+        return None
+
+    def _sincronizar_item_do_vendedor(
+        self,
+        vendedor_id: int,
+        item_id: str,
+        dados_item: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        titulo = str(dados_item.get("title") or dados_item.get("family_name") or "").strip()[:300]
+        status_canal = _status_do_item_no_canal(str(dados_item.get("status") or ""))
+        if str(dados_item.get("status") or "").strip().lower() in ("closed", "inactive"):
+            return self._colocar_item_em_standby_no_vendedor(vendedor_id, item_id)
+
+        try:
+            preco_centavos = max(0, round(float(dados_item.get("price") or 0) * 100))
+        except (TypeError, ValueError):
+            preco_centavos = 0
+        try:
+            estoque = max(0, int(dados_item.get("available_quantity") or 0))
+        except (TypeError, ValueError):
+            estoque = 0
+        try:
+            vendidos = max(0, int(dados_item.get("sold_quantity") or 0))
+        except (TypeError, ValueError):
+            vendidos = 0
+        condicao_raw = str(dados_item.get("condition") or "").strip().lower()
+        condicao = "usado" if condicao_raw in ("used", "usado", "recondicionado") else "novo"
+        descricao = str(dados_item.get("description") or "").strip()[:50_000]
+        fotos_externas = [
+            str(u).strip()
+            for u in (dados_item.get("pictures") or [])
+            if isinstance(u, str) and str(u).strip().startswith("https://")
+        ][:12]
+        atributos_externos = [
+            {
+                "id": str(a.get("id") or "") or None,
+                "nome": str(a.get("name") or a.get("id") or "").strip()[:200],
+                "valor": str(a.get("value") if a.get("value") is not None else (a.get("value_name") or "")).strip()[:1000],
+            }
+            for a in (dados_item.get("attributes") or [])
+            if isinstance(a, dict) and (a.get("name") or a.get("id"))
+        ]
+        permalink_raw = str(dados_item.get("permalink") or "").strip()
+        permalink = permalink_raw if permalink_raw.startswith("https://") else None
+        categoria_id = str(dados_item.get("category_id") or "").strip() or None
+        saude_raw = dados_item.get("health")
+        try:
+            saude_num = float(saude_raw) if saude_raw is not None else None
+            saude = round(saude_num * 100) if saude_num is not None and saude_num <= 1 else (round(saude_num) if saude_num is not None else None)
+        except (TypeError, ValueError):
+            saude = None
+
+        for _ in range(3):
+            lista = self._produtos.listar(vendedor_id)
+            produto = self._encontrar_produto(lista, item_id, titulo)
+            agora = self._relogio()
+            agora = agora.replace(microsecond=agora.microsecond // 1000 * 1000)
+
+            pub_qs = Publicacao(
+                canal=QUICKSTORE,
+                status=status_canal,
+                id_externo=item_id,
+                permalink=permalink,
+                categoria_id=categoria_id,
+                saude=saude,
+                vendidos=vendidos,
+            )
+
+            if produto is None:
+                novo_id = f"qs_{item_id.lower()[:32]}"
+                novo_produto = Produto(
+                    id=novo_id,
+                    titulo=titulo or f"Anúncio {item_id}",
+                    descricao=descricao,
+                    categoria="outros",
+                    condicao=condicao,
+                    preco_centavos=preco_centavos,
+                    preco_sugerido_centavos=None,
+                    estoque=estoque,
+                    fotos=fotos_externas,
+                    capa=0,
+                    atributos=atributos_externos,
+                    analise_id=None,
+                    criado_em=agora,
+                    atualizado_em=agora,
+                    publicacoes=[pub_qs],
+                )
+                try:
+                    salvo = self._produtos.salvar(vendedor_id, novo_produto, agora)
+                except AnuncioDesatualizado:
+                    continue
+                return {
+                    "produto_id": salvo.id,
+                    "item_id": item_id,
+                    "status": status_canal,
+                    "novo_estoque": salvo.estoque,
+                    "canais_sincronizados": [],
+                }
+
+            novas_publicacoes: list[Publicacao] = []
+            achou_qs = False
+            for pub in produto.publicacoes:
+                if pub.canal == QUICKSTORE:
+                    achou_qs = True
+                    novas_publicacoes.append(
+                        replace(
+                            pub_qs,
+                            permalink=permalink or pub.permalink,
+                            categoria_id=categoria_id or pub.categoria_id,
+                            saude=saude if saude is not None else pub.saude,
+                        )
+                    )
+                else:
+                    novo_status_outro = "pausado" if (estoque == 0 and pub.status == "publicado") else pub.status
+                    novas_publicacoes.append(replace(pub, status=novo_status_outro))
+            if not achou_qs:
+                novas_publicacoes.append(pub_qs)
+
+            atualizado = replace(
+                produto,
+                titulo=titulo or produto.titulo,
+                descricao=descricao or produto.descricao,
+                condicao=condicao,
+                preco_centavos=preco_centavos if preco_centavos > 0 else produto.preco_centavos,
+                estoque=estoque,
+                fotos=fotos_externas if fotos_externas else produto.fotos,
+                atributos=atributos_externos if atributos_externos else produto.atributos,
+                publicacoes=novas_publicacoes,
+            )
+            try:
+                salvo = self._produtos.salvar(vendedor_id, atualizado, agora)
+            except AnuncioDesatualizado:
+                continue
+
+            canais_propagados = self._propagar_dados_nos_canais(vendedor_id, salvo)
+            return {
+                "produto_id": salvo.id,
+                "item_id": item_id,
+                "status": status_canal,
+                "novo_estoque": salvo.estoque,
+                "canais_sincronizados": canais_propagados,
+            }
+        return None
+
+    def _executar_webhook_item(self, recurso: str, user_id: str, vinculos: list[Any]) -> dict[str, Any]:
+        try:
+            item_id = _extrair_item_id(recurso)
+        except ValueError:
+            return {"status": "ignorado", "motivo": "notificacao_incompleta"}
+
+        itens_atualizados: list[dict[str, Any]] = []
+        for conta in vinculos:
+            vendedor_id = conta.vendedor_id
+            token = self._conectar.token_ativo(vendedor_id, QUICKSTORE)
+            if not token:
+                continue
+            try:
+                dados_item = self._gateway.obter_anuncio(token, item_id)
+            except FalhaNoMarketplace as erro:
+                if erro.status == 404:
+                    standby = self._colocar_item_em_standby_no_vendedor(vendedor_id, item_id)
+                    if standby is not None:
+                        itens_atualizados.append(standby)
+                else:
+                    log.warning("Falha ao buscar item %s na QuickStore para vendedor %s: %s", item_id, vendedor_id, erro)
+                continue
+
+            dono_item = str(dados_item.get("seller_id") or "").strip()
+            if dono_item and dono_item != user_id:
+                log.warning(
+                    "Tentativa de spoofing bloqueada no webhook de item QuickStore: item %s pertence a %s, não a %s.",
+                    item_id,
+                    dono_item,
+                    user_id,
+                )
+                continue
+
+            resultado = self._sincronizar_item_do_vendedor(vendedor_id, item_id, dados_item)
+            if resultado is not None:
+                itens_atualizados.append(resultado)
+
+        return {
+            "status": "ok",
+            "topico": TOPICO_ITENS,
+            "recurso": recurso,
+            "itens_atualizados": itens_atualizados,
+        }
+
     def executar(
         self,
         notificacao: dict[str, Any],
@@ -210,7 +480,10 @@ class ProcessarWebhookQuickStore:
         recurso = str(notificacao.get("resource") or "").strip()
         user_id = str(notificacao.get("user_id") if notificacao.get("user_id") is not None else "").strip()
 
-        if topico and topico != TOPICO_PEDIDOS:
+        if not topico:
+            topico = TOPICO_ITENS if recurso.startswith(("/items/", "items/")) else TOPICO_PEDIDOS
+
+        if topico not in TOPICOS_SUPORTADOS:
             return {"status": "ignorado", "motivo": "topico_nao_suportado", "topico": topico}
 
         if not recurso or not user_id:
@@ -220,6 +493,9 @@ class ProcessarWebhookQuickStore:
         if not vinculos:
             log.info("Webhook QuickStore recebido para user_id=%s sem conta vinculada.", user_id)
             return {"status": "ignorado", "motivo": "conta_nao_vinculada"}
+
+        if topico == TOPICO_ITENS or recurso.startswith(("/items/", "items/")):
+            return self._executar_webhook_item(recurso, user_id, vinculos)
 
         itens_atualizados: list[dict[str, Any]] = []
         for conta in vinculos:

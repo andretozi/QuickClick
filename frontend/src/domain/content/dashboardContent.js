@@ -79,13 +79,15 @@ export const LISTINGS_PANEL = {
   actions: {
     view: 'Ver detalhes',
     edit: 'Editar anúncio',
-    sync: 'Sincronizar com o Mercado Livre',
+    sync: 'Sincronizar canais',
     syncing: 'Sincronizando…',
     pause: 'Pausar',
     resume: 'Reativar',
     publish: 'Publicar no Mercado Livre',
-    publishBlocked: 'Conecte o Mercado Livre para publicar',
-    resumeBlocked: 'Conecte o Mercado Livre para reativar',
+    publishQs: 'Adicionar na QuickStore',
+    addToChannel: (name) => `Adicionar em ${name}`,
+    publishBlocked: 'Conecte o Mercado Livre ou a QuickStore para publicar',
+    resumeBlocked: 'Conecte o canal para reativar',
     duplicate: 'Duplicar',
     remove: 'Excluir'
   },
@@ -93,7 +95,7 @@ export const LISTINGS_PANEL = {
   copySuffix: '(cópia)',
   empty: {
     title: 'Nenhum anúncio por aqui ainda.',
-    text: 'Tire uma foto, deixe a IA escrever o anúncio e publique no Mercado Livre em poucos minutos.',
+    text: 'Tire uma foto, deixe a IA escrever o anúncio e publique no Mercado Livre e na QuickStore em poucos minutos.',
     cta: { label: 'Criar meu primeiro anúncio', href: '#/anuncios/novo' }
   },
   noResults: {
@@ -108,19 +110,22 @@ export const LISTINGS_PANEL = {
   },
   confirmDelete: {
     title: 'Excluir este anúncio?',
-    text: (title) => `"${title}" sai do painel e é encerrado e excluído no Mercado Livre. Não dá pra desfazer.`,
+    text: (title) => `"${title}" sai do painel e é encerrado e excluído nos canais conectados. Não dá pra desfazer.`,
     confirm: 'Excluir anúncio',
     deleting: 'Excluindo…',
     cancel: 'Cancelar'
   },
   toasts: {
-    paused: { title: 'Anúncio pausado.', text: 'Ele saiu do ar no Mercado Livre até você reativar.' },
-    resumed: { title: 'Anúncio reativado.', text: 'Ele voltou a aparecer no Mercado Livre.' },
-    published: { title: 'Anúncio publicado.', text: 'Ele já aparece no Mercado Livre.' },
+    paused: { title: 'Anúncio pausado.', text: 'Ele saiu do ar até você reativar.' },
+    resumed: { title: 'Anúncio reativado.', text: 'Ele voltou a aparecer para os compradores.' },
+    published: { title: 'Anúncio publicado.', text: 'Ele já aparece no canal escolhido.' },
+    publishedMl: { title: 'Publicado no Mercado Livre.', text: 'O produto voltou a ficar ativo no Mercado Livre.' },
+    publishedQs: { title: 'Adicionado na QuickStore.', text: 'O produto já está à venda na QuickStore.' },
+    publishedBoth: { title: 'Publicado nos dois canais.', text: 'O produto já está no Mercado Livre e na QuickStore.' },
     duplicated: { title: 'Anúncio duplicado.', text: 'A cópia ficou fora do ar, pronta pra você ajustar.' },
-    removed: { title: 'Anúncio excluído.', text: 'Ele saiu do painel e foi removido do Mercado Livre.' },
-    synced: { title: 'Painel sincronizado.', text: 'Os dados vieram direto do Mercado Livre.' },
-    error: { title: 'Não deu pra concluir agora.', text: 'Confira a conexão com o Mercado Livre e tente de novo.' }
+    removed: { title: 'Anúncio excluído.', text: 'Ele saiu do painel e foi removido dos canais conectados.' },
+    synced: { title: 'Painel sincronizado.', text: 'Os dados vieram direto dos canais conectados.' },
+    error: { title: 'Não deu pra concluir agora.', text: 'Confira a conexão com os canais e tente de novo.' }
   }
 };
 

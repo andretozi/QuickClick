@@ -119,6 +119,7 @@ export default function ListingEditorPage({ params }) {
         <PublishSuccess
           published={result.published}
           permalink={result.permalink}
+          qsPermalink={result.qsPermalink}
           photo={coverPhoto(editor.draft)}
           onAnother={editor.restart}
         />

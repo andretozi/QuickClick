@@ -4,11 +4,19 @@ import './PublishStep.css';
 
 /** Passo 5: o resumo, com atalho para alterar cada parte. O botão de publicar fica no rodapé. */
 export default function PublishStep({ editor }) {
-  const { draft, priceCents, willPublish, goTo, steps } = editor;
-  const { title, lead, summary, channelsNone, channelsMl } = LISTING_WIZARD.publish;
+  const { draft, priceCents, willPublishMl, willPublishQs, goTo, steps } = editor;
+  const { title, lead, summary, channelsNone, channelsMl, channelsQs, channelsBoth } = LISTING_WIZARD.publish;
   const stepOf = (name) => steps.indexOf(name);
   // a capa vem primeiro (e ocupa o dobro)
   const photos = [draft.photos[draft.coverIndex], ...draft.photos.filter((_, i) => i !== draft.coverIndex)].filter(Boolean);
+  let channelsValue = channelsNone;
+  if (willPublishMl && willPublishQs) {
+    channelsValue = channelsBoth;
+  } else if (willPublishMl) {
+    channelsValue = channelsMl;
+  } else if (willPublishQs) {
+    channelsValue = channelsQs;
+  }
 
   const rows = [
     { id: 'title', label: summary.title, value: draft.title, step: 'details' },
@@ -16,7 +24,7 @@ export default function PublishStep({ editor }) {
     { id: 'condition', label: summary.condition, value: conditionLabel(draft.condition), step: 'details' },
     { id: 'stock', label: summary.stock, value: draft.stock, step: 'details' },
     { id: 'price', label: summary.price, value: priceCents !== null ? formatMoney(priceCents) : '', step: 'price' },
-    { id: 'channels', label: summary.channels, value: willPublish ? channelsMl : channelsNone, step: 'channels' }
+    { id: 'channels', label: summary.channels, value: channelsValue, step: 'channels' }
   ];
 
   return (

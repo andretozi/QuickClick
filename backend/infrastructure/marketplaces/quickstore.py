@@ -6,6 +6,7 @@ A QuickStore implementa o mesmo contrato de rotas e payloads da API do Mercado L
 vendas (tópico orders_v2) assinadas com HMAC-SHA256 usando QUICKSTORE_CLIENT_SECRET.
 """
 
+import base64
 import hashlib
 import hmac
 from collections.abc import Callable
@@ -30,19 +31,38 @@ def _agora_utc() -> datetime:
     return datetime.now(UTC)
 
 
+def _extrair_descricao(valor: Any) -> str:
+    if isinstance(valor, dict):
+        return str(valor.get("plain_text") or valor.get("text") or "").strip()
+    if valor is None:
+        return ""
+    return str(valor).strip()
+
+
 def _resumo_do_item(body: dict[str, Any], descricao: str = "") -> dict[str, Any]:
-    fotos = [
-        str(p.get("secure_url") or p.get("url") or p.get("source"))
-        for p in (body.get("pictures") or [])
-        if isinstance(p, dict) and (p.get("secure_url") or p.get("url") or p.get("source"))
-    ]
-    atributos = [
-        {"id": str(a.get("id") or ""), "name": str(a.get("name") or ""), "value": str(a.get("value_name") or "")}
-        for a in (body.get("attributes") or [])
-        if isinstance(a, dict) and a.get("name") and a.get("value_name") and not (a.get("tags") or {}).get("hidden")
-    ]
+    fotos: list[str] = []
+    for p in body.get("pictures") or []:
+        if isinstance(p, dict):
+            url_foto = p.get("secure_url") or p.get("url") or p.get("source")
+            if url_foto:
+                fotos.append(str(url_foto))
+        elif isinstance(p, str) and p.strip():
+            fotos.append(p.strip())
+    atributos: list[dict[str, str]] = []
+    for a in body.get("attributes") or []:
+        if not isinstance(a, dict) or (a.get("tags") or {}).get("hidden"):
+            continue
+        nome = str(a.get("name") or a.get("id") or "").strip()
+        valor_bruto = a.get("value_name") if a.get("value_name") is not None else a.get("value")
+        valor = str(valor_bruto if valor_bruto is not None else "").strip()
+        if nome and valor:
+            atributos.append({"id": str(a.get("id") or ""), "name": nome, "value": valor})
     thumbnail = str(body.get("secure_thumbnail") or body.get("thumbnail") or (fotos[0] if fotos else ""))
-    descricao_final = descricao or str(body.get("description") or body.get("plain_text") or "").strip()
+    descricao_final = (
+        _extrair_descricao(descricao)
+        or _extrair_descricao(body.get("description"))
+        or _extrair_descricao(body.get("plain_text"))
+    )
     return {
         "id": body.get("id"),
         "title": body.get("title") or body.get("family_name") or "",
@@ -299,11 +319,9 @@ class GatewayQuickStore:
                 sub_status = item.get("sub_status") or []
                 if isinstance(sub_status, list) and "deleted" in sub_status:
                     continue
-                if item.get("status") == "closed":
-                    continue
                 item_id = str(item.get("id") or "")
-                descricao = str(item.get("description") or item.get("plain_text") or "").strip()
-                if not descricao and item_id:
+                descricao = _extrair_descricao(item.get("description")) or _extrair_descricao(item.get("plain_text"))
+                if not descricao and item_id and item.get("status") != "closed":
                     descricao = self._ler_descricao(access_token, item_id)
                 produtos.append(_resumo_do_item(item, descricao))
             return produtos
@@ -332,7 +350,9 @@ class GatewayQuickStore:
                 sub_status = body.get("sub_status") or []
                 if isinstance(sub_status, list) and "deleted" in sub_status:
                     continue
-                descricao = self._ler_descricao(access_token, str(body.get("id") or ""))
+                descricao = _extrair_descricao(body.get("description")) or _extrair_descricao(body.get("plain_text"))
+                if not descricao:
+                    descricao = self._ler_descricao(access_token, str(body.get("id") or ""))
                 produtos.append(_resumo_do_item(body, descricao))
             return produtos
 
@@ -351,8 +371,11 @@ class GatewayQuickStore:
             access_token=access_token,
             mensagem_erro="Falha ao buscar anúncio na QuickStore",
         )
-        descricao = self._ler_descricao(access_token, item_id)
-        return _resumo_do_item(body if isinstance(body, dict) else {}, descricao)
+        corpo = body if isinstance(body, dict) else {}
+        descricao = _extrair_descricao(corpo.get("description")) or _extrair_descricao(corpo.get("plain_text"))
+        if not descricao:
+            descricao = self._ler_descricao(access_token, item_id)
+        return _resumo_do_item(corpo, descricao)
 
     def publicar_anuncio(self, access_token: str, dados_produto: dict[str, Any]) -> dict[str, Any]:
         """POST /items para publicar um novo anúncio na QuickStore."""
@@ -447,15 +470,26 @@ class GatewayQuickStore:
         ) or []
 
     def subir_imagem(self, access_token: str, jpeg: bytes, nome: str = "foto.jpg") -> str:
-        """POST /pictures/items/upload (multipart, campo file). Devolve o id ou URL da imagem."""
-        dados = self._executar_requisicao(
-            "POST",
-            f"{self._base_url}/pictures/items/upload",
-            access_token=access_token,
-            files={"file": (nome, jpeg, "image/jpeg")},
-            mensagem_erro="Falha ao subir a foto para a QuickStore",
+        """POST /pictures/items/upload (multipart, campo file) ou fallback data:image/jpeg;base64 quando não suportado."""
+        try:
+            dados = self._executar_requisicao(
+                "POST",
+                f"{self._base_url}/pictures/items/upload",
+                access_token=access_token,
+                files={"file": (nome, jpeg, "image/jpeg")},
+                mensagem_erro="Falha ao subir a foto para a QuickStore",
+            )
+        except ErroDaQuickStore as erro:
+            if erro.status in (404, 405, 501):
+                codificado = base64.b64encode(jpeg).decode("ascii")
+                return f"data:image/jpeg;base64,{codificado}"
+            raise
+        imagem_id = (
+            (dados or {}).get("id")
+            or (dados or {}).get("secure_url")
+            or (dados or {}).get("url")
+            or (dados or {}).get("source")
         )
-        imagem_id = (dados or {}).get("id") or (dados or {}).get("secure_url") or (dados or {}).get("url")
         if not imagem_id:
             raise ErroDaQuickStore("A QuickStore não devolveu o id da foto.")
         return str(imagem_id)

@@ -726,6 +726,258 @@ class TestWebhookQuickStoreEIntegracaoHTTP(unittest.TestCase):
         self.assertEqual(res_spoof["itens_atualizados"], [])
         self.assertEqual(self.produtos.obter(1, "prod_protegido").estoque, 10)
 
+    def test_upload_imagem_fallback_data_url_e_atualizacao_completa_na_quickstore(self):
+        def handler_404_upload(request: httpx.Request) -> httpx.Response:
+            if request.url.path == "/pictures/items/upload":
+                return httpx.Response(404)
+            return httpx.Response(200, json={})
+
+        gateway = GatewayQuickStore(
+            base_url="https://quickstore.azurewebsites.net",
+            client_id="QuickClickApp",
+            client_secret=SEGREDO_QUICKSTORE,
+            client=httpx.Client(transport=httpx.MockTransport(handler_404_upload)),
+        )
+        data_url = gateway.subir_imagem("token_qs", b"\xff\xd8\xff\xe0", "image/jpeg")
+        self.assertTrue(data_url.startswith("data:image/jpeg;base64,"))
+
+        # Verifica que PublicarNoMercadoLivre(canal='quickstore') aceita data_url como source e atualiza todos os campos
+        contas = RepositorioContasEmMemoria()
+        contas.salvar(
+            ContaVinculada(
+                1,
+                "quickstore",
+                AGORA,
+                CredenciaisOAuth("token_qs", "refresh_qs", AGORA + timedelta(hours=6), "1", "LOJA_QS"),
+            )
+        )
+        vendedores = RepositorioVendedoresEmMemoria(Vendedor(1, "Ana", PRO))
+        conectar = ConectarMarketplace(vendedores, contas, {"quickstore": GatewayFalso()}, agora=lambda: AGORA)
+        publicador = PublicadorFalso(seller_id="1")
+        publicador.subir_imagem = lambda token, conteudo, tipo: "data:image/jpeg;base64,ABCD"
+        caso = PublicarNoMercadoLivre(
+            conectar,
+            publicador,
+            FonteSemCategoriaFalsa(),
+            AnalisesFalsas({}),
+            PillowPreparador(),
+            canal="quickstore",
+        )
+        criado = caso.executar(1, {**ANUNCIO, "analise_id": None}, fotos(1))
+        self.assertEqual(publicador.itens[0]["pictures"], [{"source": "data:image/jpeg;base64,ABCD"}])
+
+        # Ao atualizar um item já existente na QuickStore (mesmo com vendidos > 0), título, condição e fotos são atualizados
+        publicador._armazenados[criado["id"]]["sold_quantity"] = 3
+        atualizado = caso.atualizar(
+            1,
+            criado["id"],
+            {
+                **ANUNCIO,
+                "titulo": "Título Alterado na QuickClick",
+                "preco_centavos": 25990,
+                "estoque": 7,
+                "descricao": "Nova descrição sincronizada.",
+            },
+            fotos(1),
+        )
+        self.assertEqual(atualizado["status"], "active")
+        ultimo_id, ultimo_corpo = publicador.atualizacoes[-1]
+        self.assertEqual(ultimo_id, criado["id"])
+        self.assertEqual(ultimo_corpo["title"], "Título Alterado na QuickClick")
+        self.assertEqual(ultimo_corpo["price"], 259.9)
+        self.assertEqual(ultimo_corpo["available_quantity"], 7)
+
+    def test_webhook_items_sincroniza_alteracoes_da_quickstore_e_coloca_em_standby_quando_fechado(self):
+        self.contas.salvar(
+            ContaVinculada(
+                vendedor_id=1,
+                marketplace="quickstore",
+                conectada_em=AGORA,
+                credenciais=CredenciaisOAuth(
+                    access_token="token_qs_ativo",
+                    refresh_token="refresh_qs",
+                    expira_em=datetime.now(UTC) + timedelta(hours=5),
+                    conta_externa_id="1",
+                    apelido="LOJA_QS",
+                ),
+            )
+        )
+        produto_inicial = Produto(
+            id="prod_sync_qs",
+            titulo="Fone Bluetooth Original",
+            descricao="Descrição antiga",
+            categoria="eletronicos",
+            condicao="novo",
+            preco_centavos=15000,
+            preco_sugerido_centavos=15000,
+            estoque=10,
+            fotos=["https://http2.mlstatic.com/D_1.jpg"],
+            capa=0,
+            atributos=[{"id": "BRAND", "nome": "Marca", "valor": "Quick"}],
+            analise_id=None,
+            criado_em=AGORA,
+            atualizado_em=AGORA,
+            publicacoes=[
+                Publicacao(
+                    canal="quickstore",
+                    status="publicado",
+                    id_externo="MLB555666",
+                    permalink="https://quickstore.azurewebsites.net/produto.html?id=MLB555666",
+                    categoria_id="MLB23332",
+                    vendidos=1,
+                )
+            ],
+        )
+        self.produtos.salvar(1, produto_inicial, AGORA)
+
+        estado_remoto = {
+            "id": "MLB555666",
+            "title": "Fone Bluetooth Alterado na QuickStore",
+            "price": 179.90,
+            "available_quantity": 4,
+            "sold_quantity": 3,
+            "condition": "used",
+            "status": "active",
+            "category_id": "MLB23332",
+            "permalink": "https://quickstore.azurewebsites.net/produto.html?id=MLB555666",
+            "pictures": [{"url": "https://quickstore.azurewebsites.net/img/fone-novo.jpg"}],
+            "attributes": [{"id": "BRAND", "value_name": "QuickAudio"}],
+            "seller_id": 1,
+        }
+
+        def handler_qs(request: httpx.Request) -> httpx.Response:
+            if request.url.path == "/items/MLB555666":
+                return httpx.Response(200, json=estado_remoto)
+            if request.url.path == "/items/MLB555666/description":
+                return httpx.Response(200, json={"plain_text": "Descrição alterada lá na QuickStore"})
+            return httpx.Response(404)
+
+        gateway_qs = GatewayQuickStore(
+            base_url="https://quickstore.azurewebsites.net",
+            client_id="QuickClickApp",
+            client_secret=SEGREDO_QUICKSTORE,
+            client=httpx.Client(transport=httpx.MockTransport(handler_qs)),
+        )
+        conectar = ConectarMarketplace(self.vendedores, self.contas, {"quickstore": gateway_qs})
+        caso_webhook = ProcessarWebhookQuickStore(
+            gateway_quickstore=gateway_qs,
+            contas=self.contas,
+            conectar=conectar,
+            produtos=self.produtos,
+            publicadores={"quickstore": gateway_qs},
+            relogio=lambda: AGORA + timedelta(minutes=15),
+        )
+
+        # 1. Alteração na QuickStore reflete na QuickClick
+        res_edicao = caso_webhook.executar(
+            {"resource": "/items/MLB555666", "user_id": 1, "topic": "items"},
+            topico_header="items",
+        )
+        self.assertEqual(res_edicao["status"], "ok")
+        self.assertEqual(len(res_edicao["itens_atualizados"]), 1)
+
+        atualizado = self.produtos.obter(1, "prod_sync_qs")
+        self.assertEqual(atualizado.titulo, "Fone Bluetooth Alterado na QuickStore")
+        self.assertEqual(atualizado.descricao, "Descrição alterada lá na QuickStore")
+        self.assertEqual(atualizado.preco_centavos, 17990)
+        self.assertEqual(atualizado.estoque, 4)
+        self.assertEqual(atualizado.condicao, "usado")
+        self.assertEqual(atualizado.fotos, ["https://quickstore.azurewebsites.net/img/fone-novo.jpg"])
+        pub_qs = next(p for p in atualizado.publicacoes if p.canal == "quickstore")
+        self.assertEqual(pub_qs.status, "publicado")
+        self.assertEqual(pub_qs.vendidos, 3)
+
+        # 2. Quando o item é fechado/excluído na QuickStore, o produto na QuickClick vai para standby (nao_publicado)
+        estado_remoto["status"] = "closed"
+        caso_webhook.executar(
+            {"resource": "/items/MLB555666", "user_id": 1, "topic": "items"},
+            topico_header="items",
+        )
+        em_standby = self.produtos.obter(1, "prod_sync_qs")
+        pub_standby = next(p for p in em_standby.publicacoes if p.canal == "quickstore")
+        self.assertEqual(pub_standby.status, "nao_publicado")
+        self.assertIsNone(pub_standby.id_externo)
+
+    def test_gerenciar_produtos_propaga_edicao_e_remocao_para_quickstore(self):
+        from backend.application.casos_de_uso.produtos import GerenciarProdutos
+
+        self.contas.salvar(
+            ContaVinculada(
+                vendedor_id=1,
+                marketplace="quickstore",
+                conectada_em=AGORA,
+                credenciais=CredenciaisOAuth(
+                    access_token="token_qs_ativo",
+                    refresh_token="refresh_qs",
+                    expira_em=datetime.now(UTC) + timedelta(hours=5),
+                    conta_externa_id="1",
+                    apelido="LOJA_QS",
+                ),
+            )
+        )
+        publicador_qs = PublicadorFalso(seller_id="1")
+        publicador_qs._armazenados["MLB999999"] = {
+            **publicador_qs._armazenados["MLB123456"],
+            "id": "MLB999999",
+            "status": "active",
+        }
+        conectar = ConectarMarketplace(self.vendedores, self.contas, {"quickstore": GatewayFalso()}, agora=lambda: AGORA)
+        publicar_qs = PublicarNoMercadoLivre(
+            conectar,
+            publicador_qs,
+            FonteSemCategoriaFalsa(),
+            AnalisesFalsas({}),
+            PillowPreparador(),
+            canal="quickstore",
+        )
+        gerenciar = GerenciarProdutos(
+            self.produtos,
+            relogio=lambda: AGORA,
+            publicar_na_quickstore=publicar_qs,
+        )
+
+        produto = Produto(
+            id="prod_local_1",
+            titulo="Cadeira Gamer Quick",
+            descricao="Cadeira ergonômica",
+            categoria="casa",
+            condicao="novo",
+            preco_centavos=89900,
+            preco_sugerido_centavos=89900,
+            estoque=5,
+            fotos=["https://http2.mlstatic.com/D_1.jpg"],
+            capa=0,
+            atributos=[{"id": "BRAND", "nome": "Marca", "valor": "Quick"}],
+            analise_id=None,
+            criado_em=AGORA,
+            atualizado_em=AGORA,
+            publicacoes=[
+                Publicacao(
+                    canal="quickstore",
+                    status="publicado",
+                    id_externo="MLB999999",
+                    permalink="https://quickstore.azurewebsites.net/produto.html?id=MLB999999",
+                    categoria_id="MLB23332",
+                    vendidos=0,
+                )
+            ],
+        )
+        salvo_inicial = gerenciar.salvar(1, produto)
+        from dataclasses import replace
+
+        editado = replace(salvo_inicial, titulo="Cadeira Gamer Quick Pro", preco_centavos=99900, estoque=3)
+        gerenciar.salvar(1, editado)
+        self.assertTrue(
+            any(
+                item_id == "MLB999999" and corpo.get("title") == "Cadeira Gamer Quick Pro" and corpo.get("price") == 999.0
+                for item_id, corpo in publicador_qs.atualizacoes
+            )
+        )
+
+        gerenciar.remover(1, "prod_local_1")
+        self.assertIn("MLB999999", publicador_qs.excluidos)
+
 
 if __name__ == "__main__":
     unittest.main()
+

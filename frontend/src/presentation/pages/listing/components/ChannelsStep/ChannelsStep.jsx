@@ -6,7 +6,7 @@ import StatusPill from '@/presentation/components/StatusPill/StatusPill.jsx';
 import Toggle from '@/presentation/components/Toggle/Toggle.jsx';
 import UpgradeInvite from '@/presentation/components/UpgradeInvite/UpgradeInvite.jsx';
 import { formatMoney } from '@/domain/format/format.js';
-import { PRIMARY_CHANNEL, coverPhoto } from '@/domain/listings/listingRules.js';
+import { PRIMARY_CHANNEL, QUICKSTORE_CHANNEL, coverPhoto } from '@/domain/listings/listingRules.js';
 import { MARKETPLACE_CATALOG, getMarketplaceInfo } from '@/domain/content/marketplacesContent.js';
 import { CHANNEL_REASONS, CHANNEL_SIGNUP, LISTING_WIZARD } from '@/domain/content/listingContent.js';
 import './ChannelsStep.css';
@@ -14,19 +14,19 @@ import './ChannelsStep.css';
 /**
  * Passo 6: "Suas contas" (as conectadas, na ordem em que o vendedor conectou) e "Vale abrir conta"
  * (os marketplaces que combinam com o produto, com o motivo e o link de cadastro).
- * Só o Mercado Livre publica por enquanto. A análise de mercado (Pro e Business) reaproveita os anúncios parecidos
- * do preço, só do Mercado Livre; nos outros planos, o convite para trocar de plano.
+ * Mercado Livre e QuickStore publicam direto pela Quick Click.
  */
 export default function ChannelsStep({ editor }) {
-  const { draft, update, connection, canPublishMl, priceCents, ai, quota, editing } = editor;
+  const { draft, update, connection, qsConnection, canPublishMl, canPublishQs, priceCents, ai } = editor;
   const texts = LISTING_WIZARD.channels;
   const market = ai.analysis?.price?.market;
   const stock = Number(draft.stock) || 0;
   const fromAnalysis = ai.analysis?.channels;
   const others = (fromAnalysis ?? MARKETPLACE_CATALOG.map((m) => ({ slug: m.slug, connected: false, reason: null })))
-    .filter((channel) => channel.slug !== PRIMARY_CHANNEL);
+    .filter((channel) => channel.slug !== PRIMARY_CHANNEL && channel.slug !== QUICKSTORE_CHANNEL);
   const yours = others.filter((channel) => channel.connected);
   const worth = others.filter((channel) => !channel.connected);
+  const noneSelected = (!canPublishMl || !draft.publishMl) && (!canPublishQs || !draft.publishQs);
 
   return (
     <div className="channels-step">
@@ -52,8 +52,8 @@ export default function ChannelsStep({ editor }) {
 
       <div className="channels-step__layout">
         <div className="channels-step__list">
-          {/* Sem nenhuma conta conectada, o Mercado Livre aparece como onde publicar (e não como conta sua) */}
-          <h3 className="channels-step__group">{canPublishMl || yours.length ? texts.yours : texts.publishHere}</h3>
+          {/* Sem nenhuma conta conectada, o Mercado Livre e a QuickStore aparecem como onde publicar */}
+          <h3 className="channels-step__group">{canPublishMl || canPublishQs || yours.length ? texts.yours : texts.publishHere}</h3>
           <section className="channels-step__main" aria-labelledby="canal-ml">
             <div className="channels-step__main-head">
               <span className="channels-step__logo">
@@ -71,13 +71,42 @@ export default function ChannelsStep({ editor }) {
                 checked={draft.publishMl}
                 onChange={(checked) => update({ publishMl: checked })}
                 label={texts.toggleLabel}
-                description={draft.publishMl ? null : texts.noneSelected}
+                description={noneSelected ? texts.noneSelected : null}
               />
             ) : (
               <div className="channels-step__connect">
                 <p className="channels-step__connect-text">{texts.notConnected}</p>
                 <Button href={texts.connect.href} size="sm" icon="link" iconPosition="start" iconSize={16}>
                   {texts.connect.label}
+                </Button>
+              </div>
+            )}
+          </section>
+
+          <section className="channels-step__main" aria-labelledby="canal-qs">
+            <div className="channels-step__main-head">
+              <span className="channels-step__logo">
+                <MarketplaceLogo slug={QUICKSTORE_CHANNEL} size="lg" />
+              </span>
+              <StatusPill tone={canPublishQs ? 'green' : 'honey'} size="sm">
+                {canPublishQs ? texts.connected(qsConnection?.nickname) : texts.available}
+              </StatusPill>
+            </div>
+            <h4 id="canal-qs" className="visually-hidden">
+              {texts.toggleLabelQs}
+            </h4>
+            {canPublishQs ? (
+              <Toggle
+                checked={draft.publishQs}
+                onChange={(checked) => update({ publishQs: checked })}
+                label={texts.toggleLabelQs}
+                description={noneSelected ? texts.noneSelected : null}
+              />
+            ) : (
+              <div className="channels-step__connect">
+                <p className="channels-step__connect-text">{texts.notConnectedQs}</p>
+                <Button href={texts.connectQs.href} size="sm" icon="link" iconPosition="start" iconSize={16}>
+                  {texts.connectQs.label}
                 </Button>
               </div>
             )}

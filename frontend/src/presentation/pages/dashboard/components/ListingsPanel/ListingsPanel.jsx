@@ -24,8 +24,10 @@ export default function ListingsPanel({ dashboard }) {
     busyId,
     syncing,
     syncNow,
-    mercadoLivreConnected
+    mercadoLivreConnected,
+    quickStoreConnected
   } = dashboard;
+  const anyConnected = mercadoLivreConnected || quickStoreConnected;
   const { title, count, search, filter, sort, listLabel, actions, empty, noResults, loading, loadError } = LISTINGS_PANEL;
 
   if (status === 'loading') return <StatusPanel text={loading} size="sm" />;
@@ -42,7 +44,7 @@ export default function ListingsPanel({ dashboard }) {
             <Button href={empty.cta.href} icon="plus" iconPosition="start" iconSize={18}>
               {empty.cta.label}
             </Button>
-            {mercadoLivreConnected && (
+            {anyConnected && (
               <Button
                 variant="outline"
                 icon="sync"
@@ -73,7 +75,7 @@ export default function ListingsPanel({ dashboard }) {
             {count(visibleListings.length, listings.length)}
           </p>
         </div>
-        {mercadoLivreConnected && (
+        {anyConnected && (
           <Button
             variant="outline"
             size="sm"
@@ -133,8 +135,13 @@ export default function ListingsPanel({ dashboard }) {
               key={listing.id}
               listing={listing}
               busy={busyId === listing.id}
-              canPublish={mercadoLivreConnected}
+              canPublish={anyConnected}
+              connectedByChannel={{
+                'mercado-livre': mercadoLivreConnected,
+                quickstore: quickStoreConnected
+              }}
               onToggle={dashboard.toggleStatus}
+              onToggleChannel={dashboard.toggleChannelStatus}
               onDuplicate={dashboard.duplicate}
               onRemove={dashboard.requestRemoval}
             />

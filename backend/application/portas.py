@@ -221,7 +221,7 @@ class PublicadorMercadoLivre(Protocol):
 
 
 class GatewayWebhookQuickStore(Protocol):
-    """Operações de webhook e consulta de pedidos da QuickStore."""
+    """Operações de webhook e consulta de pedidos e anúncios da QuickStore."""
 
     @property
     def tem_segredo_configurado(self) -> bool: ...
@@ -229,4 +229,6 @@ class GatewayWebhookQuickStore(Protocol):
     def validar_assinatura_webhook(self, corpo_bruto: bytes, assinatura_header: str | None) -> bool: ...
 
     def obter_pedido(self, access_token: str, resource_ou_order_id: str) -> dict[str, Any]: ...
+
+    def obter_anuncio(self, access_token: str, item_id: str) -> dict[str, Any]: ...
 

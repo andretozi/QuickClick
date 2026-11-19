@@ -16,19 +16,30 @@ export const LISTING_LIMITS = {
   PRICE_MAX_CENTS: 10000000
 };
 
-/** Situação do anúncio no Mercado Livre (o único canal disponível por enquanto). */
+/** Situação do anúncio nos canais de venda. */
 export const LISTING_STATUS = {
   PUBLISHED: 'published',
   PAUSED: 'paused',
   UNPUBLISHED: 'unpublished'
 };
 
-/** Canal principal do produto hoje. */
+/** Canais de venda integrados à Quick Click. */
 export const PRIMARY_CHANNEL = 'mercado-livre';
+export const QUICKSTORE_CHANNEL = 'quickstore';
+export const INTEGRATED_CHANNELS = [PRIMARY_CHANNEL, QUICKSTORE_CHANNEL];
 
-/** Situação do anúncio, lida do canal principal. */
+/** Situação do anúncio em um canal específico. */
+export function channelStatus(listing, channel = PRIMARY_CHANNEL) {
+  return listing?.channels?.[channel] ?? LISTING_STATUS.UNPUBLISHED;
+}
+
+/** Situação geral do anúncio: publicado se ativo em algum canal, pausado se pausado em algum canal, senão em standby. */
 export function listingStatus(listing) {
-  return listing?.channels?.[PRIMARY_CHANNEL] ?? LISTING_STATUS.UNPUBLISHED;
+  const ml = channelStatus(listing, PRIMARY_CHANNEL);
+  const qs = channelStatus(listing, QUICKSTORE_CHANNEL);
+  if (ml === LISTING_STATUS.PUBLISHED || qs === LISTING_STATUS.PUBLISHED) return LISTING_STATUS.PUBLISHED;
+  if (ml === LISTING_STATUS.PAUSED || qs === LISTING_STATUS.PAUSED) return LISTING_STATUS.PAUSED;
+  return LISTING_STATUS.UNPUBLISHED;
 }
 
 function isActive(listing) {

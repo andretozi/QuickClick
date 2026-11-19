@@ -156,6 +156,15 @@ def criar_app(
 
     emails_admin = extrair_emails_admin(leitor.texto("ADMIN_EMAILS"))
 
+    publicar_na_quickstore = PublicarNoMercadoLivre(
+        conectar,
+        gateways["quickstore"],
+        fonte_quickstore,
+        analises,
+        preparador,
+        canal="quickstore",
+    )
+
     casos = CasosDeUso(
         listar_planos=ListarPlanos(),
         obter_vendedor_atual=ObterVendedorAtual(vendedores, contas),
@@ -171,14 +180,7 @@ def criar_app(
         analises_ia=analises_ia,
         publicar_no_mercado_livre=PublicarNoMercadoLivre(conectar, gateways["mercado-livre"], fonte_ml, analises,
                                                          preparador),
-        publicar_na_quickstore=PublicarNoMercadoLivre(
-            conectar,
-            gateways["quickstore"],
-            fonte_quickstore,
-            analises,
-            preparador,
-            canal="quickstore",
-        ),
+        publicar_na_quickstore=publicar_na_quickstore,
         webhook_quickstore=ProcessarWebhookQuickStore(
             gateway_quickstore=gateways["quickstore"],
             contas=contas,
@@ -187,7 +189,7 @@ def criar_app(
             publicadores={"mercado-livre": gateways["mercado-livre"], "quickstore": gateways["quickstore"]},
             relogio=relogio,
         ),
-        produtos=GerenciarProdutos(repositorio_produtos, relogio),
+        produtos=GerenciarProdutos(repositorio_produtos, relogio, publicar_na_quickstore=publicar_na_quickstore),
     )
 
     documentacao_ativa = leitor.booleano("DOCUMENTACAO_API_ATIVA", False)

@@ -187,7 +187,7 @@ class PublicarNoMercadoLivre:
 
     @property
     def _exigir_mlstatic(self) -> bool:
-        return self._canal == MERCADO_LIVRE
+        return False
 
     def _erro_desconectado(self) -> Exception:
         if self._canal == QUICKSTORE:
@@ -207,7 +207,7 @@ class PublicarNoMercadoLivre:
                 log.info("Marketplace recusou %s por bordas brancas/tamanho; reenviando versão ampliada.", nome)
                 ampliada = ampliar(foto.leitura_jpeg)
                 pic_id = self._publicador.subir_imagem(token, ampliada, nome)
-            if str(pic_id).startswith(("https://", "http://")):
+            if str(pic_id).startswith(("https://", "http://", "data:image/")):
                 enviadas.append({"source": str(pic_id)})
             else:
                 enviadas.append({"id": str(pic_id)})
@@ -347,13 +347,20 @@ class PublicarNoMercadoLivre:
 
         mudancas: dict[str, Any] = {
             "price": dados.preco_centavos / 100,
-            "available_quantity": max(1, dados.estoque) if atual.get("status") == "active" else dados.estoque,
+            "available_quantity": (
+                dados.estoque
+                if self._canal == QUICKSTORE
+                else (max(1, dados.estoque) if atual.get("status") == "active" else dados.estoque)
+            ),
         }
         if imagens:
             mudancas["pictures"] = imagens
         if ligados:
             mudancas["attributes"] = [ligado.para_api() for ligado in ligados]
-        if int(atual.get("sold_quantity") or 0) == 0:
+        if self._canal == QUICKSTORE:
+            mudancas["title"] = dados.titulo
+            mudancas["condition"] = dados.condicao
+        elif int(atual.get("sold_quantity") or 0) == 0:
             tags = [str(t) for t in (atual.get("tags") or [])]
             if "user_product_listing" in tags or atual.get("family_name"):
                 mudancas["family_name"] = dados.titulo
@@ -371,12 +378,14 @@ class PublicarNoMercadoLivre:
                     essencial = {"price": mudancas["price"], "available_quantity": mudancas["available_quantity"]}
                     if imagens:
                         essencial["pictures"] = imagens
+                    if self._canal == QUICKSTORE:
+                        essencial["title"] = dados.titulo
                     self._publicador.atualizar_anuncio(token, codigo, essencial)
         except FalhaNoMarketplace as erro:
             raise PublicacaoRecusada(_causas(erro.corpo)) from erro
 
         avisos = []
-        if dados.descricao:
+        if dados.descricao or self._canal == QUICKSTORE:
             try:
                 self._publicador.atualizar_descricao(token, codigo, dados.descricao)
             except FalhaNoMarketplace as erro:

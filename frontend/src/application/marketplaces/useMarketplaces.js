@@ -5,8 +5,14 @@ import { showToast, TOAST_TONES } from '@/application/feedback/toastStore.js';
 import {
   disconnectMarketplace,
   fetchAuthorizeUrl,
-  fetchConnectedMarketplaces
+  fetchConnectedMarketplaces,
+  fetchMarketplaceProducts
 } from '@/infrastructure/marketplaces/marketplacesService.js';
+import {
+  syncListingsWithMercadoLivre,
+  syncListingsWithQuickStore
+} from '@/infrastructure/storage/listingsRepository.js';
+import { PRIMARY_CHANNEL, QUICKSTORE_CHANNEL } from '@/domain/listings/listingRules.js';
 import { canConnectMore } from '@/domain/plans/planRules.js';
 import { DISCONNECT_DIALOG, MARKETPLACE_CARD, MARKETPLACE_CATALOG } from '@/domain/content/marketplacesContent.js';
 
@@ -132,7 +138,7 @@ export default function useMarketplaces() {
   // ---------- Sincronizar ----------
   const syncNow = useCallback(
     async (slug) => {
-      if (sync) return;
+      if (sync || !accountId) return;
       setSync({ slug, progress: 0 });
       const started = Date.now();
       const ticker = window.setInterval(() => {
@@ -140,14 +146,21 @@ export default function useMarketplaces() {
         setSync((current) => (current ? { ...current, progress } : current));
       }, SYNC_TICK_MS);
       try {
-        await wait(SYNC_DURATION_MS);
+        const products = await fetchMarketplaceProducts(slug);
+        if (slug === PRIMARY_CHANNEL) {
+          await syncListingsWithMercadoLivre(accountId, products);
+        } else if (slug === QUICKSTORE_CHANNEL) {
+          await syncListingsWithQuickStore(accountId, products);
+        }
+        const elapsed = Date.now() - started;
+        if (elapsed < 600) await wait(600 - elapsed);
         if (!mounted.current) return;
         setSync({ slug, progress: 100 });
         setConnections((current) =>
           current.map((item) => (item.slug === slug ? { ...item, syncedAt: new Date().toISOString() } : item))
         );
         showToast({ tone: TOAST_TONES.SUCCESS, ...MARKETPLACE_CARD.syncedToast });
-        await wait(500);
+        await wait(300);
       } catch {
         if (mounted.current) showToast({ tone: TOAST_TONES.ERROR, ...MARKETPLACE_CARD.syncError });
       } finally {
@@ -155,7 +168,7 @@ export default function useMarketplaces() {
         if (mounted.current) setSync(null);
       }
     },
-    [sync, mounted]
+    [accountId, sync, mounted]
   );
 
   // ---------- Desconectar via Backend Real ----------

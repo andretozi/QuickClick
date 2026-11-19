@@ -6,7 +6,7 @@ import { LISTING_WIZARD } from '@/domain/content/listingContent.js';
 import './PublishSuccess.css';
 
 /** Tela de sucesso depois de publicar (ou salvar fora do ar). */
-export default function PublishSuccess({ published, permalink, photo, onAnother }) {
+export default function PublishSuccess({ published, permalink, qsPermalink, photo, onAnother }) {
   const texts = LISTING_WIZARD.success;
 
   return (
@@ -30,6 +30,11 @@ export default function PublishSuccess({ published, permalink, photo, onAnother 
         {permalink && (
           <Button href={permalink} target="_blank" rel="noopener noreferrer" variant="light" icon="external" iconPosition="start" iconSize={17}>
             {texts.viewOnMl}
+          </Button>
+        )}
+        {qsPermalink && (
+          <Button href={qsPermalink} target="_blank" rel="noopener noreferrer" variant="light" icon="external" iconPosition="start" iconSize={17}>
+            {texts.viewOnQs}
           </Button>
         )}
         <Button variant="light" icon="plus" iconPosition="start" iconSize={17} onClick={onAnother}>
