@@ -37,7 +37,7 @@ ITENS: tuple[ItemDeConfiguracao, ...] = (
     ItemDeConfiguracao("MERCADO_LIVRE_CLIENT_SECRET", True, "conexão com o Mercado Livre",
                        "Mercado Livre Developers, Minhas aplicações (Secret Key)"),
     ItemDeConfiguracao("QUICKSTORE_CLIENT_SECRET", True, "conexão OAuth e assinatura de webhooks da QuickStore",
-                       "App Service da QuickStore na Azure (Client Secret)"),
+                       "App Service da QuickStore na Azure (Client Secret)", padrao="QS_QUICKCLICK_OFFICIAL_2026"),
     # Shopee: opcionais até existir conta na Shopee Open Platform (nada usa ainda)
     ItemDeConfiguracao("SHOPEE_PARTNER_ID", True, "integração com a Shopee (ainda não ligada)",
                        "Shopee Open Platform, App List (Partner ID)", usada_no_mvp=False),
@@ -59,7 +59,8 @@ ITENS: tuple[ItemDeConfiguracao, ...] = (
     ItemDeConfiguracao("MERCADO_LIVRE_REDIRECT_URI", False, "retorno do login do Mercado Livre",
                        "padrão do código", padrao="https://quickclick.azurewebsites.net/api/marketplaces/mercado-livre/callback"),
     ItemDeConfiguracao("QUICKSTORE_BASE_URL", False, "endereço base da QuickStore na Azure",
-                       "App Service da QuickStore na Azure", padrao="https://quickstore.azurewebsites.net"),
+                       "App Service da QuickStore na Azure",
+                       padrao="https://quickstore-fwdyccgqfudmd0b9.chilecentral-01.azurewebsites.net"),
     ItemDeConfiguracao("QUICKSTORE_CLIENT_ID", False, "identificador do app na QuickStore",
                        "padrão do código", padrao="QuickClickApp"),
     ItemDeConfiguracao("QUICKSTORE_REDIRECT_URI", False, "retorno do login OAuth da QuickStore",
