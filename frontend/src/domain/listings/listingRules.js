@@ -42,6 +42,41 @@ export function listingStatus(listing) {
   return LISTING_STATUS.UNPUBLISHED;
 }
 
+/** Canais integrados em que o anúncio tem publicação ativa ou pausada (ou código externo), mas a conta está desconectada. */
+export function disconnectedChannelsWithListing(listing, connectedByChannel = {}) {
+  if (!listing) return [];
+  return INTEGRATED_CHANNELS.filter((slug) => {
+    const status = channelStatus(listing, slug);
+    const hasItem = slug === QUICKSTORE_CHANNEL ? Boolean(listing.qsItemId) : Boolean(listing.mlItemId);
+    const hasListing = status !== LISTING_STATUS.UNPUBLISHED || hasItem;
+    return hasListing && !connectedByChannel[slug];
+  });
+}
+
+/**
+ * Calcula os canais alvo de uma ação geral (pausar todos os publicados, reativar todos os pausados
+ * ou publicar nos conectados quando em standby), separando conectados e desconectados.
+ */
+export function channelActionTargets(listing, connectedByChannel = {}) {
+  const overall = listingStatus(listing);
+  let targetChannels;
+  let nextStatus;
+  if (overall === LISTING_STATUS.PUBLISHED) {
+    targetChannels = INTEGRATED_CHANNELS.filter((slug) => channelStatus(listing, slug) === LISTING_STATUS.PUBLISHED);
+    nextStatus = LISTING_STATUS.PAUSED;
+  } else if (overall === LISTING_STATUS.PAUSED) {
+    targetChannels = INTEGRATED_CHANNELS.filter((slug) => channelStatus(listing, slug) === LISTING_STATUS.PAUSED);
+    nextStatus = LISTING_STATUS.PUBLISHED;
+  } else {
+    const connectedOnes = INTEGRATED_CHANNELS.filter((slug) => Boolean(connectedByChannel[slug]));
+    targetChannels = connectedOnes.length ? connectedOnes : [...INTEGRATED_CHANNELS];
+    nextStatus = LISTING_STATUS.PUBLISHED;
+  }
+  const connectedTargets = targetChannels.filter((slug) => Boolean(connectedByChannel[slug]));
+  const disconnectedTargets = targetChannels.filter((slug) => !connectedByChannel[slug]);
+  return { overall, nextStatus, targetChannels, connectedTargets, disconnectedTargets };
+}
+
 function isActive(listing) {
   return listingStatus(listing) === LISTING_STATUS.PUBLISHED;
 }

@@ -31,7 +31,6 @@ export default function ListingRow({
       : status === LISTING_STATUS.PAUSED
         ? { icon: 'play', label: canPublish ? actions.resume : actions.resumeBlocked }
         : { icon: 'upload', label: canPublish ? actions.publish : actions.publishBlocked };
-  const blocked = !canPublish;
 
   return (
     <li data-enter="3" className={cx('listing-row', busy && 'listing-row--busy')}>
@@ -74,7 +73,7 @@ export default function ListingRow({
           icon={toggle.icon}
           size="sm"
           label={actionLabel(toggle.label, listing.title)}
-          disabled={busy || blocked}
+          disabled={busy}
           onClick={() => onToggle(listing)}
         />
         <IconButton

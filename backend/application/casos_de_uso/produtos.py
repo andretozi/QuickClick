@@ -119,14 +119,15 @@ class GerenciarProdutos:
         except Exception as erro:
             log.debug("Não deu para sincronizar item %s na QuickStore ao salvar produto: %s", id_novo, erro)
 
-    def salvar(self, vendedor_id: int, produto: Produto) -> Produto:
+    def salvar(self, vendedor_id: int, produto: Produto, *, sincronizar_quickstore: bool = True) -> Produto:
         """Cria ou substitui. `produto.atualizado_em` é a versão que o navegador leu (409 se ficou velha)."""
         anterior = self._produtos.obter(vendedor_id, produto.id)
         agora = self._relogio()
         # A versão vai em milissegundos: o Date do navegador não guarda microssegundos e daria 409 à toa
         agora = agora.replace(microsecond=agora.microsecond // 1000 * 1000)
         salvo = self._produtos.salvar(vendedor_id, produto, agora)
-        self._sincronizar_com_quickstore(vendedor_id, anterior, salvo)
+        if sincronizar_quickstore:
+            self._sincronizar_com_quickstore(vendedor_id, anterior, salvo)
         return salvo
 
     def importar(self, vendedor_id: int, produto: Produto) -> bool:

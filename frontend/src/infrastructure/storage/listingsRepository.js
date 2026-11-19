@@ -129,7 +129,7 @@ async function fetchRecord(accountId, id) {
  * produto antes do PUT (pode lançar StorageFullError, como antes); se o PUT falhar, a chave volta
  * ao que era. `shownPhotos` são as fotos que o registro já tinha: iguais, a chave não é regravada.
  */
-async function saveRecord(accountId, record, version, shownPhotos = []) {
+async function saveRecord(accountId, record, version, shownPhotos = [], { syncQuickStore = true } = {}) {
   assertSessionAccount(accountId);
   const key = photosKey(accountId, record.id);
   const fotos = record.fotos ?? [];
@@ -137,10 +137,11 @@ async function saveRecord(accountId, record, version, shownPhotos = []) {
   const writeLocal = local && !samePhotos(fotos, shownPhotos);
   const before = writeLocal ? readJson(key, null) : null;
   if (writeLocal) writeJson(key, fotos);
+  const path = syncQuickStore === false ? `${productPath(record.id)}?sincronizar_quickstore=false` : productPath(record.id);
   let produto;
   try {
     // Conta conferida só antes (início da função): depois da resposta, o servidor já gravou e as fotos locais não podem voltar
-    produto = await requestJson(productPath(record.id), { method: 'PUT', body: toApi({ ...record, atualizado_em: version }) });
+    produto = await requestJson(path, { method: 'PUT', body: toApi({ ...record, atualizado_em: version }) });
   } catch (error) {
     if (writeLocal) {
       try {
@@ -263,10 +264,10 @@ export async function createListing(accountId, data) {
   return toListing(await saveRecord(accountId, anuncio, now));
 }
 
-export async function updateListing(accountId, id, patch) {
+export async function updateListing(accountId, id, patch, options = {}) {
   const current = await fetchRecord(accountId, id);
   const updated = { ...current, ...toStoreFields(patch) };
-  return toListing(await saveRecord(accountId, updated, current.atualizado_em, current.fotos));
+  return toListing(await saveRecord(accountId, updated, current.atualizado_em, current.fotos, options));
 }
 
 /** Copia um anúncio. A cópia nasce fora do ar (não publicada), sem vínculo com o item original do ML ou da QuickStore. */

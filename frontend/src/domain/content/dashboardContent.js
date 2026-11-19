@@ -76,6 +76,10 @@ export const LISTINGS_PANEL = {
     more: (count) => `+${count}`,
     label: (names) => `${names} chegam em breve`
   },
+  channels: {
+    disconnectedBadge: 'Desconectado',
+    disconnectedHint: (name) => `Sua conta de ${name} não está conectada. Reconecte em Marketplaces para atualizar ou retomar.`
+  },
   actions: {
     view: 'Ver detalhes',
     edit: 'Editar anúncio',
@@ -83,7 +87,7 @@ export const LISTINGS_PANEL = {
     syncing: 'Sincronizando…',
     pause: 'Pausar',
     resume: 'Reativar',
-    publish: 'Publicar no Mercado Livre',
+    publish: 'Publicar',
     publishQs: 'Adicionar na QuickStore',
     addToChannel: (name) => `Adicionar em ${name}`,
     publishBlocked: 'Conecte o Mercado Livre ou a QuickStore para publicar',
@@ -122,6 +126,18 @@ export const LISTINGS_PANEL = {
     publishedMl: { title: 'Publicado no Mercado Livre.', text: 'O produto voltou a ficar ativo no Mercado Livre.' },
     publishedQs: { title: 'Adicionado na QuickStore.', text: 'O produto já está à venda na QuickStore.' },
     publishedBoth: { title: 'Publicado nos dois canais.', text: 'O produto já está no Mercado Livre e na QuickStore.' },
+    disconnectedChannel: (name) => ({
+      title: `Você não está logado ou conectado em ${name}.`,
+      text: `Conecte sua conta de ${name} em Marketplaces para publicar, retomar ou alterar o status deste anúncio.`
+    }),
+    disconnectedMultiple: (names) => ({
+      title: `Você não está logado ou conectado em ${names}.`,
+      text: 'Conecte suas contas em Marketplaces para publicar, retomar ou alterar o status deste anúncio.'
+    }),
+    partialSuccess: (connectedNames, disconnectedNames) => ({
+      title: `Atualizado em ${connectedNames}.`,
+      text: `Não foi possível atualizar em ${disconnectedNames} porque você não está conectado nessa plataforma. Reconecte em Marketplaces.`
+    }),
     duplicated: { title: 'Anúncio duplicado.', text: 'A cópia ficou fora do ar, pronta pra você ajustar.' },
     removed: { title: 'Anúncio excluído.', text: 'Ele saiu do painel e foi removido dos canais conectados.' },
     synced: { title: 'Painel sincronizado.', text: 'Os dados vieram direto dos canais conectados.' },

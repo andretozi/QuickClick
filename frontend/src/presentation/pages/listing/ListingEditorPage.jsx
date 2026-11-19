@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import Button from '@/presentation/components/Button/Button.jsx';
 import EmptyState from '@/presentation/components/EmptyState/EmptyState.jsx';
+import FormAlert from '@/presentation/components/FormAlert/FormAlert.jsx';
 import Icon from '@/presentation/components/Icon/Icon.jsx';
 import PageHeader from '@/presentation/components/PageHeader/PageHeader.jsx';
 import Panel from '@/presentation/components/Panel/Panel.jsx';
@@ -21,6 +22,7 @@ import useCelebration from '@/application/animation/useCelebration.js';
 import { hrefForListing } from '@/application/navigation/routes.js';
 import { cx } from '@/presentation/utils/cx.js';
 import { LISTING_EDITOR, LISTING_WIZARD } from '@/domain/content/listingContent.js';
+import { getMarketplaceInfo } from '@/domain/content/marketplacesContent.js';
 import { STORAGE_ERRORS } from '@/domain/content/commonContent.js';
 import { coverPhoto } from '@/domain/listings/listingRules.js';
 import './ListingEditorPage.css';
@@ -40,11 +42,12 @@ const STEP_VIEWS = {
  * animado (fotos, análise da IA, confirmar, detalhes, preço, canais e publicar), o rascunho
  * salvo sozinho, o selo do plano com as análises restantes e a comemoração ao publicar.
  */
-export default function ListingEditorPage({ params }) {
+export default function ListingEditorPage({ params, query }) {
   const rootRef = useRef(null);
   const celebrate = useCelebration(rootRef);
-  const editor = useListingEditor({ listingId: params?.id, celebrate });
-  const { editing, status, step, stepIndex, steps, result, publishing } = editor;
+  const editor = useListingEditor({ listingId: params?.id, channelScope: query?.canal ?? null, celebrate });
+  const { editing, channelScope, channelDisconnected, status, step, stepIndex, steps, result, publishing } = editor;
+  const scopedChannelName = channelScope ? getMarketplaceInfo(channelScope).name : null;
   const header = editing ? LISTING_EDITOR : LISTING_WIZARD;
   const { nav } = LISTING_WIZARD;
   const StepView = STEP_VIEWS[step];
@@ -70,7 +73,7 @@ export default function ListingEditorPage({ params }) {
       <PageHeader
         eyebrow={header.eyebrow}
         title={header.title}
-        lead={header.lead}
+        lead={scopedChannelName ? LISTING_EDITOR.channelScopeBanner(scopedChannelName) : header.lead}
         actions={
           editing ? (
             <Button
@@ -136,6 +139,21 @@ export default function ListingEditorPage({ params }) {
             onSelect={editor.goTo}
             className="listing-editor__stepper"
           />
+
+          {scopedChannelName && (
+            <FormAlert tone="info">
+              {LISTING_EDITOR.channelScopeBanner(scopedChannelName)}
+            </FormAlert>
+          )}
+
+          {scopedChannelName && channelDisconnected && (
+            <FormAlert title={LISTING_EDITOR.channelDisconnectedTitle(scopedChannelName)}>
+              <span>{LISTING_EDITOR.channelDisconnectedText(scopedChannelName)} </span>
+              <Button href={LISTING_EDITOR.connectAction.href} size="sm" icon="link" iconPosition="start" iconSize={15}>
+                {LISTING_EDITOR.connectAction.label}
+              </Button>
+            </FormAlert>
+          )}
 
           {editor.storageFull && (
             <p className="listing-editor__warning" role="alert">

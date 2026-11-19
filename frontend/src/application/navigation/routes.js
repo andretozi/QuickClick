@@ -150,7 +150,8 @@ export function hrefForListing(id) {
   return hrefFor(ROUTES.LISTING, { id });
 }
 
-/** Endereço da edição de um anúncio: "#/anuncios/a_k3f9/editar". */
-export function hrefForListingEdit(id) {
-  return hrefFor(ROUTES.EDIT_LISTING, { id });
+/** Endereço da edição de um anúncio: "#/anuncios/a_k3f9/editar" (ou com "?canal=..." para um e-commerce específico). */
+export function hrefForListingEdit(id, channel = null) {
+  const base = hrefFor(ROUTES.EDIT_LISTING, { id });
+  return channel ? `${base}?canal=${encodeURIComponent(channel)}` : base;
 }

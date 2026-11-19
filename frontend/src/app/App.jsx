@@ -54,17 +54,17 @@ export default function App() {
 
   if (access === ACCESS.ALLOWED && isAdminRoute && !isAuthorizedAdmin) {
     // Camuflagem total: não-administradores recebem a página 404 pura, sem pistas de existência
-    content = <NotFoundPage key={location.path} params={location.params} />;
+    content = <NotFoundPage key={location.path} params={location.params} query={location.query} />;
   } else if (access === ACCESS.ALLOWED && isPrivateRoute(location.route)) {
     const Page = APP_PAGES[location.route];
     content = (
       <AppShell current={location.route}>
-        <Page key={location.path} params={location.params} />
+        <Page key={location.path} params={location.params} query={location.query} />
       </AppShell>
     );
   } else if (access === ACCESS.ALLOWED) {
     const Page = PAGES[location.route] ?? NotFoundPage;
-    content = <Page key={location.path} params={location.params} />;
+    content = <Page key={location.path} params={location.params} query={location.query} />;
   }
 
   const tree = (

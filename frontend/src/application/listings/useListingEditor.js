@@ -64,6 +64,10 @@ import { LISTING_EDITOR, LISTING_WIZARD, aiErrorText } from '@/domain/content/li
 
 const EDIT_STEPS = WIZARD_STEPS.filter((name) => !AI_STEPS.includes(name));
 const USER_FIELDS = ['title', 'description', 'category'];
+const CHANNEL_NAMES = {
+  [PRIMARY_CHANNEL]: 'Mercado Livre',
+  [QUICKSTORE_CHANNEL]: 'QuickStore'
+};
 
 /** Uma marca das fotos que foram para a análise (fotos novas pedem análise nova). */
 const photosKey = (photos) => photos.map((photo) => photo.slice(-24)).join('|');
@@ -77,12 +81,17 @@ const photosKey = (photos) => photos.map((photo) => photo.slice(-24)).join('|');
  * sincronizando com o Mercado Livre e a QuickStore quando o anúncio já está publicado.
  *
  * - listingId: com id, abre o anúncio para editar; sem id, é um anúncio novo
+ * - channelScope: opcional ('mercado-livre' | 'quickstore' | null), restringe a edição a um canal
  * - celebrate(word): animação de publicar (cursor, clique e partículas); devolve uma Promise
  */
-export default function useListingEditor({ listingId, celebrate }) {
+export default function useListingEditor({ listingId, channelScope: rawChannelScope = null, celebrate }) {
   const { account } = useSession();
   const accountId = account?.id;
   const editing = Boolean(listingId);
+  const channelScope =
+    editing && (rawChannelScope === PRIMARY_CHANNEL || rawChannelScope === QUICKSTORE_CHANNEL)
+      ? rawChannelScope
+      : null;
   const steps = editing ? EDIT_STEPS : WIZARD_STEPS;
 
   const [status, setStatus] = useState('loading');
@@ -111,33 +120,37 @@ export default function useListingEditor({ listingId, celebrate }) {
       try {
         const connections = await fetchConnectedMarketplaces().catch(() => []);
         if (!mounted.current) return;
-        const mlConn = connections.find((item) => item.slug === PRIMARY_CHANNEL) ?? null;
-        const qsConn = connections.find((item) => item.slug === QUICKSTORE_CHANNEL) ?? null;
-        setConnection(mlConn);
-        setQsConnection(qsConn);
+        let mlConn = connections.find((item) => item.slug === PRIMARY_CHANNEL) ?? null;
+        let qsConn = connections.find((item) => item.slug === QUICKSTORE_CHANNEL) ?? null;
         if (editing) {
           let listing = await getListing(accountId, listingId);
-          if (mlConn && listing.mlItemId) {
+          const syncMl = !channelScope || channelScope === PRIMARY_CHANNEL;
+          const syncQs = !channelScope || channelScope === QUICKSTORE_CHANNEL;
+          if (syncMl && mlConn && listing.mlItemId) {
             try {
               const mlFresh = await fetchMercadoLivreItem(listing.mlItemId);
               listing = await mergeMercadoLivreItem(accountId, listingId, mlFresh);
-            } catch {
-              // Mantém os dados locais se a sincronização falhar
+            } catch (error) {
+              if (error?.code === 'mercado_livre_desconectado') mlConn = null;
             }
           }
-          if (qsConn && listing.qsItemId) {
+          if (syncQs && qsConn && listing.qsItemId) {
             try {
               const qsFresh = await fetchQuickStoreItem(listing.qsItemId);
               listing = await mergeQuickStoreItem(accountId, listingId, qsFresh);
-            } catch {
-              // Mantém os dados locais se a sincronização falhar
+            } catch (error) {
+              if (error?.code === 'quickstore_desconectada') qsConn = null;
             }
           }
           if (!mounted.current) return;
+          setConnection(mlConn);
+          setQsConnection(qsConn);
           setOriginal(listing);
           setDraft({ ...EMPTY_DRAFT, ...toDraft(listing) });
           setVisited(EDIT_STEPS.length - 1);
         } else {
+          setConnection(mlConn);
+          setQsConnection(qsConn);
           const saved = await getDraft(accountId);
           if (!mounted.current) return;
           if (saved?.data && !isBlankDraft({ ...EMPTY_DRAFT, ...saved.data })) {
@@ -158,7 +171,7 @@ export default function useListingEditor({ listingId, celebrate }) {
         loaded.current = true;
       }
     })();
-  }, [accountId, editing, listingId, mounted]);
+  }, [accountId, channelScope, editing, listingId, mounted]);
 
   // ---------- Rascunho salvo sozinho (só no criar) ----------
   const autosave = useDraftAutosave({
@@ -357,8 +370,15 @@ export default function useListingEditor({ listingId, celebrate }) {
   // ---------- Publicar ou salvar ----------
   const canPublishMl = Boolean(connection);
   const canPublishQs = Boolean(qsConnection);
-  const willPublishMl = Boolean(draft.publishMl && canPublishMl);
-  const willPublishQs = Boolean(draft.publishQs && canPublishQs);
+  const channelDisconnected =
+    Boolean(editing && channelScope) &&
+    (channelScope === QUICKSTORE_CHANNEL ? !canPublishQs : !canPublishMl);
+  const willPublishMl = Boolean(
+    (!channelScope || channelScope === PRIMARY_CHANNEL) && draft.publishMl && canPublishMl
+  );
+  const willPublishQs = Boolean(
+    (!channelScope || channelScope === QUICKSTORE_CHANNEL) && draft.publishQs && canPublishQs
+  );
   const willPublish = willPublishMl || willPublishQs;
 
   const prepareChannelPayload = useCallback(
@@ -426,20 +446,37 @@ export default function useListingEditor({ listingId, celebrate }) {
         return;
       }
     }
+    if (editing && channelScope && channelDisconnected) {
+      const hasRemoteItem = channelScope === QUICKSTORE_CHANNEL ? Boolean(original?.qsItemId) : Boolean(original?.mlItemId);
+      const wantsPublish = channelScope === QUICKSTORE_CHANNEL ? draft.publishQs : draft.publishMl;
+      if (hasRemoteItem || wantsPublish) {
+        showToast({
+          tone: TOAST_TONES.ERROR,
+          ...aiErrorText(channelScope === QUICKSTORE_CHANNEL ? 'quickstore_desconectada' : 'mercado_livre_desconectado')
+        });
+        return;
+      }
+    }
+
     setPublishing(true);
     finishing.current = true;
     const data = toListingData(draft, range.status === 'ready' ? range : null);
     try {
       if (editing) {
+        const shouldRunMl = !channelScope || channelScope === PRIMARY_CHANNEL;
+        const shouldRunQs = !channelScope || channelScope === QUICKSTORE_CHANNEL;
+
         const previousMlStatus = channelStatus(original, PRIMARY_CHANNEL);
-        const nextMlStatus = statusAfterSave({
-          previous: previousMlStatus,
-          publish: draft.publishMl,
-          canPublish: canPublishMl
-        });
+        const nextMlStatus = shouldRunMl
+          ? statusAfterSave({
+              previous: previousMlStatus,
+              publish: draft.publishMl,
+              canPublish: canPublishMl
+            })
+          : previousMlStatus;
         let mlPatch = {};
         let finalMlStatus = nextMlStatus;
-        if (canPublishMl) {
+        if (shouldRunMl && canPublishMl) {
           if (original.mlItemId && previousMlStatus !== LISTING_STATUS.UNPUBLISHED) {
             try {
               const mlUpdated = await updateOnMl(original.mlItemId, data);
@@ -486,14 +523,16 @@ export default function useListingEditor({ listingId, celebrate }) {
         }
 
         const previousQsStatus = channelStatus(original, QUICKSTORE_CHANNEL);
-        const nextQsStatus = statusAfterSave({
-          previous: previousQsStatus,
-          publish: draft.publishQs,
-          canPublish: canPublishQs
-        });
+        const nextQsStatus = shouldRunQs
+          ? statusAfterSave({
+              previous: previousQsStatus,
+              publish: draft.publishQs,
+              canPublish: canPublishQs
+            })
+          : previousQsStatus;
         let qsPatch = {};
         let finalQsStatus = nextQsStatus;
-        if (canPublishQs) {
+        if (shouldRunQs && canPublishQs) {
           if (original.qsItemId && previousQsStatus !== LISTING_STATUS.UNPUBLISHED) {
             try {
               const qsUpdated = await updateOnQs(original.qsItemId, data);
@@ -518,7 +557,11 @@ export default function useListingEditor({ listingId, celebrate }) {
                 ...(qsHttpsPhotos.length && !mlPatch.photos ? { photos: qsHttpsPhotos, coverIndex: 0 } : {})
               };
             } catch (error) {
-              if (draft.publishQs && (error?.code === 'anuncio_nao_encontrado' || error?.code === 'publicacao_recusada')) {
+              if (
+                draft.publishQs &&
+                previousQsStatus === LISTING_STATUS.PUBLISHED &&
+                (error?.code === 'anuncio_nao_encontrado' || error?.code === 'publicacao_recusada')
+              ) {
                 const publishedQs = await publishOnQs(data);
                 finalQsStatus = LISTING_STATUS.PUBLISHED;
                 qsPatch = {
@@ -544,23 +587,31 @@ export default function useListingEditor({ listingId, celebrate }) {
         const updatedChannels = {
           ...original.channels,
           [PRIMARY_CHANNEL]: finalMlStatus,
-          ...(canPublishQs || original.channels?.[QUICKSTORE_CHANNEL] !== undefined
+          ...(original.channels?.[QUICKSTORE_CHANNEL] !== undefined || qsPatch.qsItemId || (shouldRunQs && draft.publishQs)
             ? { [QUICKSTORE_CHANNEL]: finalQsStatus }
             : {})
         };
-        const updated = await updateListing(accountId, listingId, {
-          ...data,
-          ...mlPatch,
-          ...qsPatch,
-          suggestedPriceCents: data.suggestedPriceCents ?? original.suggestedPriceCents,
-          channels: updatedChannels
-        });
+        const updated = await updateListing(
+          accountId,
+          listingId,
+          {
+            ...data,
+            ...mlPatch,
+            ...qsPatch,
+            suggestedPriceCents: data.suggestedPriceCents ?? original.suggestedPriceCents,
+            channels: updatedChannels
+          },
+          { syncQuickStore: channelScope !== PRIMARY_CHANNEL }
+        );
         photos.release();
         finishing.current = false;
         if (!mounted.current) return;
         setOriginal(updated);
         setPublishing(false);
-        showToast({ tone: TOAST_TONES.SUCCESS, ...LISTING_EDITOR.saved });
+        const savedToast = channelScope
+          ? LISTING_EDITOR.savedChannel(CHANNEL_NAMES[channelScope] ?? channelScope)
+          : LISTING_EDITOR.saved;
+        showToast({ tone: TOAST_TONES.SUCCESS, ...savedToast });
         return;
       }
 
@@ -584,9 +635,7 @@ export default function useListingEditor({ listingId, celebrate }) {
           qsCategoryId: publishedQs?.categoryId ?? data.qsCategoryId ?? data.mlCategoryId ?? null,
           channels: {
             [PRIMARY_CHANNEL]: publishedMl ? LISTING_STATUS.PUBLISHED : LISTING_STATUS.UNPUBLISHED,
-            ...(canPublishQs || publishedQs
-              ? { [QUICKSTORE_CHANNEL]: publishedQs ? LISTING_STATUS.PUBLISHED : LISTING_STATUS.UNPUBLISHED }
-              : {})
+            ...(publishedQs ? { [QUICKSTORE_CHANNEL]: LISTING_STATUS.PUBLISHED } : {})
           }
         });
       } catch (error) {
@@ -616,6 +665,8 @@ export default function useListingEditor({ listingId, celebrate }) {
       finishing.current = false;
       if (!mounted.current) return;
       setPublishing(false);
+      if (error?.code === 'mercado_livre_desconectado') setConnection(null);
+      if (error?.code === 'quickstore_desconectada') setQsConnection(null);
       let message = LISTING_WIZARD.errors.generic;
       if (error instanceof StorageFullError) message = LISTING_WIZARD.errors.storage;
       else if (error?.code) message = aiErrorText(error.code, error.userMessage);
@@ -626,6 +677,8 @@ export default function useListingEditor({ listingId, celebrate }) {
     canPublishMl,
     canPublishQs,
     celebrate,
+    channelDisconnected,
+    channelScope,
     draft,
     editing,
     listingId,
@@ -666,6 +719,8 @@ export default function useListingEditor({ listingId, celebrate }) {
 
   return {
     editing,
+    channelScope,
+    channelDisconnected,
     status,
     steps,
     step,
