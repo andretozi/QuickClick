@@ -295,6 +295,9 @@ class RequisicaoConfirmacaoIA(BaseModel):
     campos_proprios: list[CampoProprioEntrada] = Field(default_factory=list, max_length=60)
 
 
+PADRAO_ID_PRODUTO = r"^[A-Za-z0-9_-]{1,40}$"
+
+
 class RequisicaoPublicarAnuncio(BaseModel):
     titulo: str = Field(default="", max_length=200)
     descricao: str = Field(default="", max_length=60_000)
@@ -305,13 +308,13 @@ class RequisicaoPublicarAnuncio(BaseModel):
     analise_id: str | None = Field(default=None, max_length=80)
     ml_categoria_id: str | None = Field(default=None, max_length=40)
     fotos_mantidas: list[str] = Field(default_factory=list, max_length=6)
+    produto_id: str | None = Field(default=None, max_length=40, pattern=PADRAO_ID_PRODUTO)
 
 
 class RequisicaoStatusAnuncio(BaseModel):
     status: str = Field(max_length=20, examples=["pausado", "publicado"])
 
 
-PADRAO_ID_PRODUTO = r"^[A-Za-z0-9_-]{1,40}$"
 MAX_CENTAVOS = 1_000_000_000
 UrlDaFoto = Annotated[str, Field(max_length=1000, pattern=r"^https://")]  # data: e http: são recusados
 Permalink = Annotated[str, Field(max_length=500, pattern=r"^https://")]

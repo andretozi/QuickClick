@@ -7,7 +7,7 @@
   gap: clamp(20px, 3vw, 30px);
 }
 
-/* ---------- Topo cinematográfico no amarelo do Mercado Livre ---------- */
+/* ---------- Topo neutro da Quick Click ---------- */
 .marketplaces-page__hero {
   position: relative;
   isolation: isolate;
@@ -15,17 +15,15 @@
   grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
   align-items: center;
   gap: 24px;
-  min-height: 260px;
-  padding: clamp(28px, 4vw, 48px);
+  min-height: 220px;
+  padding: clamp(28px, 4vw, 44px);
   overflow: hidden;
   border-radius: var(--radius-2xl);
+  background: var(--color-paper);
+  border: 1px solid rgb(var(--rgb-ink) / 0.12);
   box-shadow:
-    0 0 0 1px rgb(var(--rgb-mercado-livre) / 0.4),
-    0 50px 90px -50px rgb(var(--rgb-mercado-livre) / 0.6);
-}
-
-.marketplaces-page__backdrop {
-  z-index: -1;
+    inset 0 1px 0 rgb(var(--rgb-white) / 0.8),
+    0 24px 60px -36px rgb(var(--rgb-black) / 0.45);
 }
 
 .marketplaces-page__hero-text {
@@ -33,7 +31,7 @@
 }
 
 .marketplaces-page__eyebrow {
-  color: var(--color-mercado-livre-ink);
+  color: var(--color-coral);
 }
 
 .marketplaces-page__title {
@@ -48,28 +46,55 @@
 }
 
 .marketplaces-page__lead {
-  max-width: 460px;
+  max-width: 480px;
   margin: 14px 0 0;
-  color: rgb(var(--rgb-ink) / 0.8);
+  color: rgb(var(--rgb-ink) / 0.78);
   font-size: clamp(15px, 1.5vw, 18px);
   font-weight: 700;
 }
 
-/* O logo grande, numa pastilha de vidro claro */
-.marketplaces-page__hero-logo {
+/* Slot lateral com os chips das lojas conectadas */
+.marketplaces-page__hero-connected {
   display: flex;
-  justify-self: end;
-  width: min(100%, 340px);
-  height: 150px;
-  padding: 22px 28px;
-  border-radius: var(--radius-xl);
-  background: rgb(var(--rgb-white) / 0.55);
-  box-shadow:
-    inset 0 1px 0 rgb(var(--rgb-white) / 0.9),
-    0 30px 50px -30px rgb(var(--rgb-black) / 0.5);
-  transform: rotate(2deg);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+}
+
+.marketplaces-page__hero-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: var(--radius-lg);
+  background: var(--color-white);
+  border: 1px solid rgb(var(--rgb-ink) / 0.1);
+  box-shadow: 0 12px 28px -18px rgb(var(--rgb-black) / 0.35);
+}
+
+.marketplaces-page__hero-chip-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.marketplaces-page__hero-chip-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.marketplaces-page__hero-chip-name {
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.marketplaces-page__hero-chip-account {
+  color: rgb(var(--rgb-ink) / 0.62);
+  font-size: 12.5px;
+  font-weight: 700;
 }
 
 @media (max-width: 720px) {
@@ -77,9 +102,7 @@
     grid-template-columns: 1fr;
   }
 
-  .marketplaces-page__hero-logo {
-    justify-self: start;
-    height: 110px;
-    transform: none;
+  .marketplaces-page__hero-connected {
+    justify-content: flex-start;
   }
 }

@@ -20,6 +20,7 @@ const SOON_SHOWN = 3;
 export default function ListingChannels({
   status,
   channels,
+  itemIds = {},
   connectedByChannel = {},
   onPublishChannel,
   disabled = false,
@@ -31,13 +32,15 @@ export default function ListingChannels({
     <div className={cx('listing-channels', className)}>
       {AVAILABLE.map((marketplace) => {
         const chStatus = channels?.[marketplace.slug] ?? LISTING_STATUS.UNPUBLISHED;
+        const hasItemId = Boolean(itemIds?.[marketplace.slug]);
         const statusInfo = LISTING_STATUS_LABELS[chStatus] ?? LISTING_STATUS_LABELS.unpublished;
         const isConnected = Boolean(connectedByChannel[marketplace.slug]);
         const isDisconnectedWithListing = chStatus !== LISTING_STATUS.UNPUBLISHED && !isConnected;
         const canQuickAdd =
           Boolean(onPublishChannel) &&
           isConnected &&
-          chStatus === LISTING_STATUS.UNPUBLISHED;
+          chStatus === LISTING_STATUS.UNPUBLISHED &&
+          !hasItemId;
 
         return (
           <span key={marketplace.slug} className="listing-channels__main">

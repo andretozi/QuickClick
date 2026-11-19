@@ -254,8 +254,16 @@
   gap: 10px;
 }
 
-.listing-detail__delete-btn {
+.listing-detail__delete-btn,
+.listing-detail__channel-delete-btn {
   color: var(--color-coral);
+  border-color: rgb(var(--rgb-coral) / 0.35);
+}
+
+.listing-detail__delete-btn:hover,
+.listing-detail__channel-delete-btn:hover {
+  background: rgb(var(--rgb-coral) / 0.08);
+  border-color: var(--color-coral);
 }
 
 .listing-detail__specs-list {

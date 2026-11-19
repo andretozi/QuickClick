@@ -115,6 +115,9 @@ export const LISTINGS_PANEL = {
   confirmDelete: {
     title: 'Excluir este anúncio?',
     text: (title) => `"${title}" sai do painel e é encerrado e excluído nos canais conectados. Não dá pra desfazer.`,
+    textWithChannels: (title) =>
+      `Escolha se deseja excluir "${title}" apenas de uma plataforma ou apagar o produto por completo do painel e de todos os canais.`,
+    deleteOnlyChannel: (name) => `Excluir só em ${name}`,
     confirm: 'Excluir anúncio',
     deleting: 'Excluindo…',
     cancel: 'Cancelar'
@@ -140,6 +143,10 @@ export const LISTINGS_PANEL = {
     }),
     duplicated: { title: 'Anúncio duplicado.', text: 'A cópia ficou fora do ar, pronta pra você ajustar.' },
     removed: { title: 'Anúncio excluído.', text: 'Ele saiu do painel e foi removido dos canais conectados.' },
+    removedChannel: (name) => ({
+      title: `Anúncio excluído de ${name}.`,
+      text: 'Ele foi removido dessa plataforma, mas o produto continua salvo no painel.'
+    }),
     synced: { title: 'Painel sincronizado.', text: 'Os dados vieram direto dos canais conectados.' },
     error: { title: 'Não deu pra concluir agora.', text: 'Confira a conexão com os canais e tente de novo.' }
   }

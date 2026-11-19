@@ -163,6 +163,7 @@ def criar_app(
         analises,
         preparador,
         canal="quickstore",
+        produtos=repositorio_produtos,
     )
 
     casos = CasosDeUso(
@@ -179,7 +180,7 @@ def criar_app(
         trocar_plano=TrocarPlano(vendedores, usuarios, livre=leitor.booleano("TROCA_DE_PLANO_LIVRE", False)),
         analises_ia=analises_ia,
         publicar_no_mercado_livre=PublicarNoMercadoLivre(conectar, gateways["mercado-livre"], fonte_ml, analises,
-                                                         preparador),
+                                                         preparador, produtos=repositorio_produtos),
         publicar_na_quickstore=publicar_na_quickstore,
         webhook_quickstore=ProcessarWebhookQuickStore(
             gateway_quickstore=gateways["quickstore"],

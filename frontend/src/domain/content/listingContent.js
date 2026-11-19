@@ -262,6 +262,7 @@ export const LISTING_WIZARD = {
     available: 'Disponível',
     soon: 'Em breve',
     connected: (nickname) => `Conectado como ${nickname}`,
+    linkedCode: (code) => `ID vinculado: ${code}`,
     notConnected: 'Conecte sua conta do Mercado Livre para publicar.',
     notConnectedQs: 'Conecte sua conta da QuickStore para publicar.',
     connect: { label: 'Conectar o Mercado Livre', href: '#/marketplaces' },
@@ -386,6 +387,15 @@ export const LISTING_DETAIL = {
     itemCode: (code) => `Código: ${code}`,
     editChannel: (name) => `Editar em ${name}`,
     standbyChannel: 'Tirar de venda (Standby)',
+    deleteChannel: (name) => `Excluir em ${name}`,
+    confirmDeleteChannel: {
+      title: (name) => `Excluir anúncio em ${name}?`,
+      text: (title, name) =>
+        `"${title}" será encerrado e excluído apenas em ${name}. O produto continua salvo na Quick Click e nos outros canais.`,
+      confirm: (name) => `Excluir em ${name}`,
+      deleting: 'Excluindo…',
+      cancel: 'Cancelar'
+    },
     publishChannel: (name) => `Publicar em ${name}`,
     pauseChannel: (name) => `Pausar em ${name}`,
     resumeChannel: (name) => `Reativar em ${name}`,
@@ -435,6 +445,14 @@ export const LISTING_DETAIL = {
     standbyDisconnected: (name) => ({
       title: `Você não está conectado em ${name}.`,
       text: `Conecte sua conta de ${name} em Marketplaces para retirar o anúncio ativo dessa plataforma.`
+    }),
+    deletedChannel: (name) => ({
+      title: `Anúncio excluído de ${name}.`,
+      text: 'Ele foi removido dessa plataforma, mas o produto continua salvo na Quick Click.'
+    }),
+    deleteChannelDisconnected: (name) => ({
+      title: `Você não está conectado em ${name}.`,
+      text: `Conecte sua conta de ${name} em Marketplaces para excluir o anúncio ativo dessa plataforma.`
     }),
     syncError: { title: 'Não deu pra sincronizar agora.', text: 'Mostrando os últimos dados salvos no painel.' }
   }
