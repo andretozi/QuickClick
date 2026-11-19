@@ -99,8 +99,7 @@ export const LISTING_WIZARD = {
     plans: { gratis: 'Grátis', essencial: 'Essencial', pro: 'Pro', business: 'Business' },
     badge: (plan) => `Plano ${plan}`,
     remaining: (left, total) => `${left} de ${total} ${plural(total, 'análise', 'análises')} da IA neste mês`,
-    none: 'As análises da IA deste mês acabaram.',
-    budget: 'Hoje a IA completa chegou no limite do dia: a análise usa a versão básica.'
+    none: 'As análises da IA deste mês acabaram.'
   },
   analysis: {
     title: 'A IA está olhando as fotos',
@@ -127,7 +126,8 @@ export const LISTING_WIZARD = {
     unavailable: {
       ia_desligada: { title: 'A IA está desligada agora.', text: 'Preencha o anúncio à mão. Fica pronto do mesmo jeito.' },
       provedor_indisponivel: { title: 'A IA está fora do ar agora.', text: 'Preencha à mão ou tente de novo daqui a pouco.' },
-      cota_esgotada: { title: 'As análises da IA deste mês acabaram.', text: 'Dá pra terminar o anúncio à mão, ou mudar de plano para ter mais.' }
+      cota_esgotada: { title: 'As análises da IA deste mês acabaram.', text: 'Dá pra terminar o anúncio à mão, ou mudar de plano para ter mais.' },
+      orcamento_do_dia: { title: 'IA indisponível hoje.', text: 'Preencha o anúncio à mão ou tente de novo amanhã.' }
     }
   },
   confirm: {
@@ -458,6 +458,7 @@ export const AI_ERRORS = {
   limite_por_hora: { title: 'Muitas análises na última hora.', text: 'Espera um pouco e tenta de novo, ou preencha à mão.' },
   analise_em_andamento: { title: 'Já tem uma análise rodando.', text: 'Espera ela terminar para começar outra.' },
   ia_indisponivel: { title: 'A IA está fora do ar agora.', text: 'Você pode preencher o anúncio à mão.' },
+  ia_indisponivel_hoje: { title: 'IA indisponível hoje.', text: 'Preencha o anúncio à mão ou tente de novo amanhã.' },
   foto_invalida: { title: 'Não deu pra abrir uma das fotos.', text: 'Use JPG, PNG ou WEBP de até 10 MB.' },
   fotos_necessarias: { title: 'Precisamos das fotos de novo.', text: 'Elas saíram da memória. Mande de novo para continuar.' },
   interrompida: { title: 'A análise parou no meio.', text: 'O servidor reiniciou. Toque em tentar de novo.' },

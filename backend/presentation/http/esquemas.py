@@ -34,7 +34,7 @@ class PlanoSaida(BaseModel):
 
 class ListaDePlanos(BaseModel):
     planos: list[PlanoSaida]
-    troca_de_plano_livre: bool = Field(default=True, description="false: a troca de plano espera o pagamento "
+    troca_de_plano_livre: bool = Field(default=False, description="false: a troca de plano espera o pagamento "
                                        "(PUT /api/me/plano responde 402)")
 
 

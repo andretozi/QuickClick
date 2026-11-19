@@ -9,11 +9,11 @@ import { PLAN_SECTION } from '@/domain/content/settingsContent.js';
  * Aplicação · O vendedor troca o próprio plano na tela de Configurações (MVP: na hora e sem
  * pagamento). Confirmando no modal, o back troca o plano e devolve a conta: a sessão é
  * atualizada e tudo o que lê o plano dela (selo do menu, limite de marketplaces) muda junto; a
- * cota da IA é relida quando o assistente abre. Com a troca livre desligada (versão final), os
- * botões viram "Em breve".
+ * cota da IA é relida quando o assistente abre. A troca livre vem desligada do back (só liga no
+ * desenvolvimento): enquanto ele não disser que está livre, os botões ficam em "Em breve".
  */
 export default function usePlanChange({ mounted }) {
-  const [free, setFree] = useState(true);
+  const [free, setFree] = useState(false); // fechada até o back dizer que a troca está livre
   const [target, setTarget] = useState(null); // fica depois de fechar, para o modal sair com o texto certo
   const [confirming, setConfirming] = useState(false);
   const [changing, setChanging] = useState(false);
@@ -23,7 +23,7 @@ export default function usePlanChange({ mounted }) {
       .then((switching) => {
         if (mounted.current) setFree(switching.free);
       })
-      .catch(() => {}); // sem resposta: os botões ficam, e a própria troca diz se não der
+      .catch(() => {}); // sem resposta: a troca continua fechada, com o aviso "Em breve"
   }, [mounted]);
 
   const open = useCallback((planId) => {

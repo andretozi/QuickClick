@@ -4,7 +4,7 @@ Infraestrutura · IA · Monta os provedores a partir da configuração
 Interruptores (variáveis de ambiente; o App Service reinicia a aplicação quando elas mudam):
     IA_ATIVA (true)            false: nenhum provedor, todos os campos manuais abertos
     PESQUISA_WEB_ATIVA (true)  false: pesquisa e preço sem busca na web
-    ADVISOR_ATIVO (false)      true: orientador (Opus) na pesquisa de mercado
+    ADVISOR_ATIVO (false)      true: orientador (Opus) na pesquisa de mercado, só no Pro e no Business
     IA_CACHE_TTL (5m)          5m ou 1h
 Modelos: MODELO_VISAO, MODELO_TEXTO, MODELO_RAPIDO, MODELO_GEMINI_TEXTO (padrões no catálogo).
 Sem a chave, o provedor não nasce e o log diz qual variável falta.
@@ -58,13 +58,17 @@ def criar_provedores(leitor: LeitorDeConfiguracao, registro: RegistroDeUso) -> P
 
     return ProvedoresDeIA(
         leitor_visao_pago=AnthropicLeitor(pago, visao, effort_leitura="high", effort_releitura="medium"),
+        leitor_texto_pago=AnthropicLeitor(pago, texto, effort_leitura="high", effort_releitura="medium"),
         leitor_rapido_pago=AnthropicLeitor(pago, rapido, effort_leitura="low", effort_releitura="low"),
         leitor_gemini_gratis=GeminiLeitor(gemini_gratis, gemini),
         leitor_rapido_gratis=AnthropicLeitor(gratis, rapido, effort_leitura="low", effort_releitura="low"),
-        pesquisador_pago=AnthropicPesquisador(pago, texto, com_web=com_web, orientador=orientador, effort="medium"),
+        pesquisador_pago=AnthropicPesquisador(pago, texto, com_web=com_web, effort="medium"),
+        pesquisador_orientado_pago=(AnthropicPesquisador(pago, texto, com_web=com_web, orientador=orientador,
+                                                         effort="medium") if orientador else None),
         pesquisador_rapido_pago=AnthropicPesquisador(pago, rapido, com_web=False, effort="low"),
         pesquisador_gratis=AnthropicPesquisador(gratis, rapido, com_web=False, effort="low"),
         precificador_pago=AnthropicPrecificador(pago, visao, effort="medium"),
+        precificador_texto_pago=AnthropicPrecificador(pago, texto, effort="medium"),
         precos_na_web_pago=AnthropicPrecosNaWeb(pago, texto) if com_web else None,
         redator_pago=AnthropicRedator(pago, texto, effort="medium"),
         redator_rapido_pago=AnthropicRedator(pago, rapido, effort="low"),

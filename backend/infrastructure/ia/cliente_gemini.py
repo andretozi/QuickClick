@@ -42,6 +42,7 @@ class ClienteGemini:
                  relogio: Callable[[], datetime] = agora_utc, dormir: Callable[[float], None] = time.sleep,
                  cliente: Any = None):
         self.nome_variavel = nome_variavel
+        self.tipo_de_chave = "paga" if nome_variavel.endswith("_PAGO") else "gratis"
         self._chave = chave
         self._registro = registro
         self._relogio = relogio
@@ -122,7 +123,7 @@ class ClienteGemini:
             vendedor_id=contexto.vendedor_id, analise_id=contexto.analise_id, etapa=contexto.etapa,
             provedor="gemini", modelo=modelo, versao_prompt=versao_prompt, tokens_entrada=entrada,
             tokens_saida=saida, cache_lido=lido, cache_gravado=0, buscas_web=0, custo_estimado_usd=Decimal("0"),
-            duracao_ms=duracao_ms, criado_em=self._relogio(),
+            duracao_ms=duracao_ms, criado_em=self._relogio(), chave=self.tipo_de_chave,
         )
         log.info("IA uso: etapa=%s modelo=%s entrada=%d saida=%d cache_lido=%d custo_usd=0 tempo_ms=%d",
                  registro.etapa, modelo, entrada, saida, lido, duracao_ms)

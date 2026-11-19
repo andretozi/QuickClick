@@ -91,6 +91,13 @@
   font-weight: 700;
 }
 
+.plan-card__billing {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
 /* ---------- Recursos ---------- */
 .plan-card__features {
   display: flex;

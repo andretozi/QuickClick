@@ -160,6 +160,7 @@ class UsoIAModel(Base):
     custo_estimado_usd = Column(Numeric(12, 6), nullable=False, default=0)
     duracao_ms = Column(Integer, nullable=False, default=0)
     criado_em = Column(DateTime(timezone=True), nullable=False)
+    chave = Column(String(10), nullable=True)  # "paga" ou "gratis"; nulo nas linhas anteriores à 0006
 
     __table_args__ = (
         Index("ix_ia_uso_criado", "criado_em"),

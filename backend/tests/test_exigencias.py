@@ -244,11 +244,23 @@ class OrcamentoFalso:
         return self.gasto
 
 
+class TestNivelDaAnalise(unittest.TestCase):
+    def test_o_nivel_vem_do_plano_gravado_e_plano_pago_nunca_roda_no_gratis(self):
+        from backend.domain.ia.analise import Nivel
+
+        casos = (("gratis", "pro", Nivel.PAGO),  # análise antiga, gravada como grátis quando o orçamento estourava
+                 ("pago", "essencial", Nivel.PAGO), ("gratis", "gratis", Nivel.GRATIS), ("pago", None, Nivel.PAGO))
+        for gravado, plano, esperado in casos:
+            with self.subTest(gravado=gravado, plano=plano):
+                self.assertIs(ProcessoDaAnalise._nivel({"nivel": gravado, "plano_no_momento": plano}), esperado)
+
+
 class TestProcessoComExigencias(unittest.TestCase):
     def processar(self, conectados=(ML, SHOPEE), fonte_ml=None, shopee=None, nivel="gratis", orcamento=None,
                   falha_na_releitura=False):
         self.leitor = LeitorFalso(falha_na_releitura)
         self.repo = RepositorioDeAnalisesEmMemoria({"id": "a1", "vendedor_id": 1, "nivel": nivel, "avisos": [],
+                                                    "plano_no_momento": "pro" if nivel == "pago" else "gratis",
                                                     "fotos_meta": [{"indice": 0}, {"indice": 1}]})
         self.fotos = tuple(FotoPreparada(i, b"foto%d" % i, b"detalhe") for i in range(2))
         fonte_ml = fonte_ml or FonteMLFalsa()

@@ -15,6 +15,7 @@ from backend.application.ia import escolha
 from backend.application.ia.modelos import (
     ArquivoDeFoto,
     ContextoDaChamada,
+    EntradaDaPesquisa,
     EntradaDaReleitura,
     FalhaDoProvedor,
     FotoPreparada,
@@ -23,9 +24,15 @@ from backend.application.ia.modelos import (
 from backend.domain.canais.esquema import TipoDeCampo
 from backend.domain.erros import FotoInvalida
 from backend.domain.ia.analise import Nivel
+from backend.domain.ia.capacidade import capacidade_do_plano
 from backend.domain.ia.fotos import QualidadeFoto
 from backend.infrastructure.ia import esquemas
-from backend.infrastructure.ia.anthropic_ia import AnthropicLeitor
+from backend.infrastructure.ia.anthropic_ia import (
+    DOMINIOS_DE_MARKETPLACES,
+    AnthropicLeitor,
+    AnthropicPesquisador,
+    AnthropicPrecosNaWeb,
+)
 from backend.infrastructure.ia.carregador_de_prompts import PASTA_DE_PROMPTS, carregar_prompts
 from backend.infrastructure.ia.cliente_anthropic import ClienteAnthropic, json_da_resposta
 from backend.infrastructure.ia.cliente_gemini import ClienteGemini, esquema_para_gemini
@@ -92,6 +99,16 @@ def chamar(cliente):
 
 
 class TestClienteAnthropic(unittest.TestCase):
+    def test_uso_da_chave_paga_sai_como_paga_e_o_da_gratis_como_gratis(self):
+        """O orçamento do dia soma só a chave paga: se o tipo sair errado, o teto nunca dispara."""
+        for variavel, esperado in (("ANTHROPIC_API_KEY_PAGO", "paga"), ("ANTHROPIC_API_KEY_GRATIS", "gratis")):
+            with self.subTest(variavel=variavel):
+                registro = RegistroEmMemoria()
+                cliente = ClienteAnthropic(variavel, CHAVE_FALSA, registro, "5m", relogio=lambda: AGORA,
+                                           dormir=lambda s: None, cliente=SDKFalso(resposta_anthropic()))
+                chamar(cliente)
+                self.assertEqual(registro.usos[0].chave, esperado)
+
     def test_sucesso_registra_uso_com_custo(self):
         cliente, _, registro, _ = cliente_anthropic(resposta_anthropic())
         chamar(cliente)
@@ -189,7 +206,8 @@ class GeminiFalso:
 
 class TestClienteGemini(unittest.TestCase):
     def _cliente(self, *respostas):
-        return ClienteGemini("GEMINI_API_KEY_GRATIS", CHAVE_FALSA, RegistroEmMemoria(), relogio=lambda: AGORA,
+        self.registro = RegistroEmMemoria()
+        return ClienteGemini("GEMINI_API_KEY_GRATIS", CHAVE_FALSA, self.registro, relogio=lambda: AGORA,
                              dormir=lambda s: None, cliente=GeminiFalso(*respostas))
 
     def _gerar(self, cliente):
@@ -201,6 +219,7 @@ class TestClienteGemini(unittest.TestCase):
                                cached_content_token_count=0)
         cliente = self._cliente(SimpleNamespace(text='{"titulo": "x"}', usage_metadata=meta))
         self.assertEqual(self._gerar(cliente), {"titulo": "x"})
+        self.assertEqual(self.registro.usos[0].chave, "gratis")
 
     def test_429_vira_falha_e_a_reserva_assume(self):
         from google.genai import errors
@@ -339,9 +358,10 @@ class TestEscolha(unittest.TestCase):
             leitor_visao_pago=ProvedorFalso("opus"), leitor_rapido_pago=ProvedorFalso("haiku pago"),
             leitor_gemini_gratis=ProvedorFalso("gemini", disponivel=False), leitor_rapido_gratis=ProvedorFalso("haiku"),
         )
-        self.assertEqual([x.nome for x in escolha.leitores(p, Nivel.PAGO)], ["opus", "haiku pago"])
-        self.assertEqual([x.nome for x in escolha.leitores(p, Nivel.GRATIS)], ["haiku"])
-        self.assertEqual(escolha.precificadores(p, Nivel.GRATIS), [])
+        self.assertEqual([x.nome for x in escolha.leitores(p, Nivel.PAGO, ponta=True)], ["opus", "haiku pago"])
+        self.assertEqual([x.nome for x in escolha.leitores(p, Nivel.PAGO, ponta=False)], ["haiku pago"])
+        self.assertEqual([x.nome for x in escolha.leitores(p, Nivel.GRATIS, ponta=False)], ["haiku"])
+        self.assertEqual(escolha.precificadores(p, Nivel.GRATIS, ponta=True), [])
 
     def test_tentar_em_ordem_usa_a_reserva(self):
         primeiro, segundo = ProvedorFalso("a", falha=True), ProvedorFalso("b")
@@ -354,27 +374,105 @@ class TestEscolha(unittest.TestCase):
             self.assertIsNone(escolha.tentar_em_ordem([ProvedorFalso("a", falha=True)], lambda p: p.chamar()))
 
 
+class TestBuscaNaWeb(unittest.TestCase):
+    """Só o Mercado Livre está integrado: nenhuma busca na web (perfil do comprador ou preço) sai dele."""
+
+    def _busca_enviada(self, chamar):
+        sdk = SDKFalso(resposta_anthropic())
+        cliente = ClienteAnthropic("ANTHROPIC_API_KEY_PAGO", CHAVE_FALSA, RegistroEmMemoria(), "5m",
+                                   relogio=lambda: AGORA, dormir=lambda s: None, cliente=sdk)
+        try:
+            chamar(cliente)
+        except FalhaDoProvedor:
+            pass  # a resposta falsa não traz o resultado da ferramenta; só interessa o pedido enviado
+        buscas = [f for f in sdk.pedidos[0]["tools"] if f["name"] == "web_search"]
+        self.assertEqual(len(buscas), 1)
+        return buscas[0]
+
+    def test_dominios_permitidos_sao_so_o_mercado_livre(self):
+        self.assertEqual(DOMINIOS_DE_MARKETPLACES, ["mercadolivre.com.br"])
+
+    def test_pesquisa_do_comprador_busca_so_no_mercado_livre(self):
+        entrada = EntradaDaPesquisa("Tênis de corrida", "calcados", "novo", (), com_web=True)
+        busca = self._busca_enviada(lambda c: AnthropicPesquisador(c, "claude-sonnet-5-5", com_web=True)
+                                    .pesquisar(entrada, CONTEXTO))
+        self.assertEqual(busca["allowed_domains"], ["mercadolivre.com.br"])
+
+    def test_preco_na_web_busca_so_no_mercado_livre(self):
+        busca = self._busca_enviada(lambda c: AnthropicPrecosNaWeb(c, "claude-sonnet-5-5")
+                                    .buscar_precos("Tênis de corrida", "novo", (), CONTEXTO))
+        self.assertEqual(busca["allowed_domains"], ["mercadolivre.com.br"])
+
+
 class TestFabrica(unittest.TestCase):
     def test_ia_desligada_nao_monta_nada(self):
         with self.assertLogs("quickclick.ia", "WARNING"):
             provedores = criar_provedores(leitor_de_teste(IA_ATIVA="false"), RegistroEmMemoria())
-        self.assertEqual(escolha.leitores(provedores, Nivel.PAGO), [])
+        self.assertEqual(escolha.leitores(provedores, Nivel.PAGO, ponta=True), [])
 
     def test_sem_chaves_nenhum_provedor_disponivel_e_o_log_diz_o_que_falta(self):
         with self.assertLogs("quickclick.ia", "WARNING") as logs:
             provedores = criar_provedores(leitor_de_teste(), RegistroEmMemoria())
-        self.assertEqual(escolha.leitores(provedores, Nivel.GRATIS), [])
+        self.assertEqual(escolha.leitores(provedores, Nivel.GRATIS, ponta=False), [])
         self.assertTrue(any("ANTHROPIC_API_KEY_PAGO" in linha for linha in logs.output))
 
     def test_com_chaves_monta_na_ordem(self):
         leitor = leitor_de_teste(ANTHROPIC_API_KEY_PAGO="x", ANTHROPIC_API_KEY_GRATIS="y", GEMINI_API_KEY_GRATIS="z",
                                  PESQUISA_WEB_ATIVA="false")
         provedores = criar_provedores(leitor, RegistroEmMemoria())
-        self.assertEqual([x.nome for x in escolha.leitores(provedores, Nivel.GRATIS)],
+        self.assertEqual([x.nome for x in escolha.leitores(provedores, Nivel.GRATIS, ponta=False)],
                          ["leitura gemini-3.8-flash", "leitura claude-haiku-5-5"])
         self.assertEqual([x.nome for x in escolha.redatores(provedores, Nivel.PAGO)],
                          ["texto claude-sonnet-5-5", "texto claude-haiku-5-5"])
         self.assertEqual(escolha.precos_na_web(provedores, Nivel.PAGO), [])  # busca na web desligada
+
+    def test_modelo_de_cada_etapa_por_plano(self):
+        """Sem rede: as chaves são falsas e nada é chamado, só a escolha dos provedores."""
+        leitor = leitor_de_teste(ANTHROPIC_API_KEY_PAGO="x", ANTHROPIC_API_KEY_GRATIS="y", GEMINI_API_KEY_GRATIS="z")
+        provedores = criar_provedores(leitor, RegistroEmMemoria())
+
+        def modelos(lista):
+            return [x.nome.split()[-1] for x in lista]
+
+        esperado = {
+            "gratis": (["gemini-3.8-flash", "claude-haiku-5-5"], [], ["gemini-3.8-flash", "claude-haiku-5-5"], []),
+            "essencial": (["claude-sonnet-5-5", "claude-haiku-5-5"], ["claude-sonnet-5-5"],
+                          ["claude-sonnet-5-5", "claude-haiku-5-5"], ["claude-sonnet-5-5"]),
+            "pro": (["claude-opus-5-5", "claude-haiku-5-5"], ["claude-opus-5-5"],
+                    ["claude-sonnet-5-5", "claude-haiku-5-5"], ["claude-sonnet-5-5"]),
+            "business": (["claude-opus-5-5", "claude-haiku-5-5"], ["claude-opus-5-5"],
+                         ["claude-sonnet-5-5", "claude-haiku-5-5"], ["claude-sonnet-5-5"]),
+        }
+        for plano, (leitura, preco, texto, web) in esperado.items():
+            with self.subTest(plano=plano):
+                cap = capacidade_do_plano(plano)
+                self.assertEqual(modelos(escolha.leitores(provedores, cap.nivel, ponta=cap.modelo_de_ponta)), leitura)
+                self.assertEqual(modelos(escolha.precificadores(provedores, cap.nivel, ponta=cap.modelo_de_ponta)), preco)
+                self.assertEqual(modelos(escolha.redatores(provedores, cap.nivel)), texto)
+                self.assertEqual(modelos(escolha.precos_na_web(provedores, cap.nivel)), web)
+
+    def test_orientador_so_no_pro_e_no_business(self):
+        chaves = dict(ANTHROPIC_API_KEY_PAGO="x", ANTHROPIC_API_KEY_GRATIS="y", GEMINI_API_KEY_GRATIS="z")
+        com = criar_provedores(leitor_de_teste(ADVISOR_ATIVO="true", **chaves), RegistroEmMemoria())
+        sem = criar_provedores(leitor_de_teste(**chaves), RegistroEmMemoria())
+
+        def primeiro(provedores, plano):
+            cap = capacidade_do_plano(plano)
+            return escolha.pesquisadores(provedores, cap.nivel, ponta=cap.modelo_de_ponta)[0].nome
+
+        for plano, orientado in (("gratis", False), ("essencial", False), ("pro", True), ("business", True)):
+            with self.subTest(plano=plano):
+                self.assertEqual("com orientador" in primeiro(com, plano), orientado)
+                self.assertNotIn("com orientador", primeiro(sem, plano))  # ADVISOR_ATIVO desligado: ninguém
+
+    def test_plano_pago_sem_chave_paga_nao_cai_no_gemini(self):
+        with self.assertLogs("quickclick.ia", "WARNING"):
+            provedores = criar_provedores(leitor_de_teste(ANTHROPIC_API_KEY_GRATIS="y", GEMINI_API_KEY_GRATIS="z"),
+                                          RegistroEmMemoria())
+        for plano in ("essencial", "pro", "business"):
+            cap = capacidade_do_plano(plano)
+            self.assertEqual(escolha.leitores(provedores, cap.nivel, ponta=cap.modelo_de_ponta), [], plano)
+            self.assertEqual(escolha.redatores(provedores, cap.nivel), [], plano)
 
 
 class TestEsquemas(unittest.TestCase):

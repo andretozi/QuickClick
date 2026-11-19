@@ -189,6 +189,7 @@ class TestPlanoGratis(BaseIA):
         cota = self.cliente.get("/api/ia/cota").json()
         self.assertEqual((cota["plano"], cota["nivel"], cota["restantes"], cota["disponivel"]), ("gratis", "gratis", 5, True))
         self.assertFalse(cota["tem"]["pesquisa_de_mercado"])
+        self.assertFalse(cota["tem"]["analise_de_mercado"])
         self.assertTrue(cota["aviso_de_dados_no_gratis"])
 
     def test_fluxo_completo_no_gratis_usa_gemini_e_preco_so_por_regra(self):
@@ -332,10 +333,14 @@ class TestPlanoPago(BaseIA):
                                                                    for p in (14000, 15000, 16000, 17000, 15500)]}})
         self.fonte = FonteMLFalsa()
         self.gemini = Falso("gemini", leitores())
+        self.orientado = Falso("orientado", {"pesquisar": self.sonnet.respostas["pesquisar"]})
         self.montar(ProvedoresDeIA(leitor_visao_pago=self.opus, pesquisador_pago=self.sonnet,
-                                   precificador_pago=self.opus, precos_na_web_pago=self.sonnet, redator_pago=self.sonnet,
+                                   pesquisador_orientado_pago=self.orientado, precificador_pago=self.opus, precos_na_web_pago=self.sonnet, redator_pago=self.sonnet,
                                    leitor_gemini_gratis=self.gemini),
                     fonte_ml=self.fonte)
+
+    def test_pro_tem_a_analise_de_mercado(self):
+        self.assertTrue(self.cliente.get("/api/ia/cota").json()["tem"]["analise_de_mercado"])
 
     def test_fluxo_pago_com_releitura_da_etiqueta_pesquisa_preco_pela_web_e_canais(self):
         analise_id = self.criar().json()["id"]
@@ -356,7 +361,8 @@ class TestPlanoPago(BaseIA):
         for _ in range(2):
             analise_id = self.criar().json()["id"]
             self.confirmar(analise_id)
-        self.assertEqual(self.sonnet.chamadas.count("pesquisar"), 1)
+        self.assertEqual(self.orientado.chamadas.count("pesquisar"), 1)  # o Pro usa o orientador
+        self.assertNotIn("pesquisar", self.sonnet.chamadas)
 
     def test_preco_da_ia_fora_dos_dados_reais_fica_o_da_regra(self):
         self.opus.respostas["precificar"]["preco_sugerido_centavos"] = 99_000_00
@@ -365,18 +371,46 @@ class TestPlanoPago(BaseIA):
         self.assertFalse(preco["por_ia"])
         self.assertLess(preco["sugerido_centavos"], 20000)
 
-    def test_orcamento_do_dia_estourado_cai_no_gratis_com_aviso(self):
+    def gastar(self, custo, chave):
         with self.Session() as sessao:
             sessao.add(models.UsoIAModel(etapa="leitura", provedor="anthropic", modelo="claude-opus-5-5",
                                          tokens_entrada=0, tokens_saida=0, cache_lido=0, cache_gravado=0, buscas_web=0,
-                                         custo_estimado_usd=Decimal("0.50"), duracao_ms=1, criado_em=self.agora))
+                                         custo_estimado_usd=Decimal(custo), duracao_ms=1, criado_em=self.agora,
+                                         chave=chave))
             sessao.commit()
+
+    def test_orcamento_da_chave_paga_esgotado_deixa_a_ia_indisponivel_hoje_sem_cair_no_gemini(self):
+        self.gastar("0.50", "paga")
         cota = self.cliente.get("/api/ia/cota").json()
-        self.assertEqual((cota["orcamento_do_dia_estourado"], cota["nivel"], cota["nivel_agora"]), (True, "pago", "gratis"))
-        analise = self.analise(self.criar().json()["id"])
-        self.assertEqual(analise["nivel"], "gratis")
-        self.assertIn("orcamento_do_dia", [a["codigo"] for a in analise["avisos"]])
-        self.assertEqual((self.gemini.chamadas, self.opus.chamadas), (["ler"], []))
+        self.assertEqual((cota["orcamento_do_dia_estourado"], cota["disponivel"], cota["motivo_indisponivel"]),
+                         (True, False, "orcamento_do_dia"))
+        resposta = self.criar()
+        self.assertEqual((resposta.status_code, resposta.json()["erro"]["codigo"], resposta.json()["erro"]["mensagem"]),
+                         (503, "ia_indisponivel_hoje", "IA indisponível hoje."))
+        self.assertEqual((self.gemini.chamadas, self.opus.chamadas), ([], []))
+
+    def test_foto_extra_e_retomada_tambem_respeitam_o_orcamento_da_chave_paga(self):
+        analise_id = self.criar().json()["id"]
+        self.gastar("0.50", "paga")
+        self.gemini.chamadas.clear()
+        extra = self.cliente.post(f"/api/ia/analises/{analise_id}/fotos", data={"tipo": "etiqueta"},
+                                  files=self.fotos(1, campo="foto"))
+        self.assertEqual((extra.status_code, extra.json()["erro"]["codigo"]), (503, "ia_indisponivel_hoje"))
+        with self.Session() as sessao:
+            sessao.query(models.AnaliseIAModel).filter_by(id=analise_id).update({"status": "interrompida"})
+            sessao.commit()
+        retomada = self.cliente.post(f"/api/ia/analises/{analise_id}/retomar", files=self.fotos(2))
+        self.assertEqual((retomada.status_code, retomada.json()["erro"]["codigo"]), (503, "ia_indisponivel_hoje"))
+        self.assertEqual((self.gemini.chamadas, self.opus.chamadas[2:]), ([], []))
+
+    def test_uso_da_chave_gratis_nao_entra_no_orcamento_da_paga(self):
+        self.gastar("0.50", "gratis")
+        self.assertFalse(self.cliente.get("/api/ia/cota").json()["orcamento_do_dia_estourado"])
+        self.assertEqual(self.criar().status_code, 202)
+
+    def test_linha_de_uso_sem_chave_conta_como_paga(self):
+        self.gastar("0.50", None)  # anterior à migração 0006
+        self.assertTrue(self.cliente.get("/api/ia/cota").json()["orcamento_do_dia_estourado"])
 
     def test_interrompida_na_partida_e_retomada_sem_fotos_depois_da_leitura(self):
         analise_id = self.criar().json()["id"]
@@ -393,6 +427,59 @@ class TestPlanoPago(BaseIA):
         self.assertFalse(interrompida["precisa_fotos_para_retomar"])
         retomada = self.cliente.post(f"/api/ia/analises/{analise_id}/retomar")
         self.assertEqual(retomada.json()["status"], "pronta")
+
+
+class TestPlanoEssencial(BaseIA):
+    plano = "essencial"
+
+    def setUp(self):
+        precificar = {"preco_sugerido_centavos": 15990, "faixa": {"min": 14000, "max": 17000},
+                      "estrategia": "equilibrado", "justificativa": "Perto da mediana.", "alertas": [], "canais": []}
+        self.opus = Falso("opus", {**leitores(), "precificar": precificar})
+        self.sonnet = Falso("sonnet", {**leitores({**LEITURA, "etiqueta_ilegivel": [{"foto": 0, "caixa": [100, 100, 400, 300]}]}),
+                                       "precificar": precificar, "escrever": TEXTO,
+                                       "pesquisar": {"perfil_comprador": "Corredor amador.", "o_que_valoriza": [],
+                                                     "objecoes": [], "termos_que_usam": [], "fontes": []},
+                                       "buscar_precos": {"itens": [{"preco_centavos": p, "frete_gratis": True, "url": "x"}
+                                                                   for p in (14000, 15000, 16000, 17000, 15500)]}})
+        self.gemini = Falso("gemini", leitores())
+        self.orientado = Falso("orientado", {"pesquisar": self.sonnet.respostas["pesquisar"]})
+        self.montar(ProvedoresDeIA(leitor_visao_pago=self.opus, leitor_texto_pago=self.sonnet,
+                                   pesquisador_pago=self.sonnet, pesquisador_orientado_pago=self.orientado,
+                                   precificador_pago=self.opus,
+                                   precificador_texto_pago=self.sonnet, precos_na_web_pago=self.sonnet,
+                                   redator_pago=self.sonnet, leitor_gemini_gratis=self.gemini),
+                    fonte_ml=FonteMLFalsa())
+
+    def test_essencial_nao_tem_a_analise_de_mercado(self):
+        cota = self.cliente.get("/api/ia/cota").json()
+        self.assertEqual((cota["tem"]["analise_de_mercado"], cota["tem"]["pesquisa_de_mercado"]), (False, True))
+
+    def test_essencial_usa_o_sonnet_na_foto_no_preco_e_no_texto(self):
+        pronta = self.confirmar(self.criar().json()["id"]).json()
+        self.assertEqual(pronta["status"], "pronta")
+        self.assertTrue(pronta["preco"]["por_ia"])
+        self.assertEqual(self.sonnet.chamadas[:2], ["ler", "reler"])  # a etiqueta é relida pelo mesmo Sonnet
+        self.assertIn("precificar", self.sonnet.chamadas)
+        self.assertIn("escrever", self.sonnet.chamadas)
+        self.assertEqual((self.opus.chamadas, self.gemini.chamadas), ([], []))
+        self.assertIn("pesquisar", self.sonnet.chamadas)
+        self.assertEqual(self.orientado.chamadas, [])  # o orientador é só do Pro e do Business
+
+
+class TestPagoSemChavePaga(BaseIA):
+    plano = "pro"
+
+    def setUp(self):
+        self.gemini = Falso("gemini", leitores())
+        self.montar(ProvedoresDeIA(leitor_gemini_gratis=self.gemini, leitor_rapido_gratis=Falso("haiku", leitores())))
+
+    def test_ia_indisponivel_sem_cair_no_gemini(self):
+        cota = self.cliente.get("/api/ia/cota").json()
+        self.assertEqual((cota["disponivel"], cota["motivo_indisponivel"]), (False, "provedor_indisponivel"))
+        resposta = self.criar()
+        self.assertEqual((resposta.status_code, resposta.json()["erro"]["codigo"]), (503, "ia_indisponivel"))
+        self.assertEqual(self.gemini.chamadas, [])
 
 
 class TestSemIA(BaseIA):

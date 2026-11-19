@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import Button from '@/presentation/components/Button/Button.jsx';
 import Icon from '@/presentation/components/Icon/Icon.jsx';
 import Modal from '@/presentation/components/Modal/Modal.jsx';
@@ -16,6 +17,10 @@ import './PlanSection.css';
 export default function PlanSection({ planId, plan }) {
   const { modal } = PLAN_SECTION;
   const target = PLANS.items.find((item) => item.id === plan.target);
+  const [selectedId, setSelectedId] = useState(planId);
+  const selected = PLANS.items.find((item) => item.id === selectedId) ?? PLANS.items[0];
+
+  useEffect(() => setSelectedId(planId), [planId]); // trocou de plano: volta a selecionar o atual
 
   return (
     <SettingsSection id="plano" title={PLAN_SECTION.title} lead={PLAN_SECTION.lead}>
@@ -28,31 +33,30 @@ export default function PlanSection({ planId, plan }) {
               className={cx('plan-section__card', current && 'plan-section__card--current', item.featured && 'plan-section__card--featured')}
               aria-current={current ? 'true' : undefined}
             >
-              <div className="plan-section__top">
-                <h3 className="plan-section__name">{item.name}</h3>
-                {current && (
-                  <StatusPill tone="coral" size="sm">
-                    {PLAN_SECTION.current}
-                  </StatusPill>
-                )}
-                {!current && item.featured && (
-                  <StatusPill tone="honey" size="sm">
-                    {PLAN_SECTION.recommended}
-                  </StatusPill>
-                )}
-              </div>
-              <p className="plan-section__price">
-                {item.price} <span className="plan-section__period">{item.period}</span>
-              </p>
-              <p className="plan-section__tagline">{item.tagline}</p>
-              <ul className="plan-section__features">
-                {item.features.map((feature) => (
-                  <li key={feature} className="plan-section__feature">
-                    <Icon name="check" size={15} className="plan-section__check" />
-                    {feature}
-                  </li>
-                ))}
-              </ul>
+              <button
+                type="button"
+                className="plan-section__select"
+                aria-pressed={item.id === selected.id}
+                onClick={() => setSelectedId(item.id)}
+              >
+                <span className="plan-section__top">
+                  <span className="plan-section__name">{item.name}</span>
+                  {current && (
+                    <StatusPill tone="coral" size="sm">
+                      {PLAN_SECTION.current}
+                    </StatusPill>
+                  )}
+                  {!current && item.featured && (
+                    <StatusPill tone="honey" size="sm">
+                      {PLAN_SECTION.recommended}
+                    </StatusPill>
+                  )}
+                </span>
+                <span className="plan-section__price">
+                  {item.price} <span className="plan-section__period">{item.period}</span>
+                </span>
+                <span className="plan-section__tagline">{item.tagline}</span>
+              </button>
               {!current && (
                 <Button
                   variant={item.featured ? 'primary' : 'outline'}
@@ -71,6 +75,22 @@ export default function PlanSection({ planId, plan }) {
           );
         })}
       </ul>
+      <div className="plan-section__detail" aria-live="polite" aria-atomic="true">
+        <h3 className="plan-section__detail-name">{selected.name}</h3>
+        <p className="plan-section__price">
+          {selected.price} <span className="plan-section__period">{selected.period}</span>
+        </p>
+        <p className="plan-section__tagline">{selected.tagline}</p>
+        <ul className="plan-section__features">
+          {selected.features.map((feature) => (
+            <li key={feature} className="plan-section__feature">
+              <Icon name="check" size={15} className="plan-section__check" />
+              {feature}
+            </li>
+          ))}
+        </ul>
+        {selected.billingNote && <p className="plan-section__billing">{selected.billingNote}</p>}
+      </div>
       {!plan.free && (
         <p className="plan-section__soon">
           <Icon name="clock" size={16} />

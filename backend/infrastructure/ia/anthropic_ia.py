@@ -39,10 +39,8 @@ TIPO_ORIENTADOR = "advisor_20260301"
 MAX_BUSCAS = 4
 MAX_CONTINUACOES = 3  # pause_turn da busca na web
 LOCAL_DO_COMPRADOR = {"type": "approximate", "country": "BR", "timezone": "America/Sao_Paulo"}
-DOMINIOS_DE_MARKETPLACES = [
-    "mercadolivre.com.br", "shopee.com.br", "amazon.com.br", "magazineluiza.com.br",
-    "americanas.com.br", "casasbahia.com.br",
-]
+# Só o Mercado Livre está integrado: shortcut: um domínio por marketplace integrado, acrescente aqui ao integrar
+DOMINIOS_DE_MARKETPLACES = ["mercadolivre.com.br"]
 
 
 def em_json(dados: Any) -> str:
@@ -144,7 +142,7 @@ class AnthropicLeitor(_BaseAnthropic):
 class AnthropicPesquisador(_BaseAnthropic):
     def __init__(self, cliente: ClienteAnthropic, modelo: str, com_web: bool, orientador: str | None = None,
                  effort: str = "medium"):
-        super().__init__(cliente, modelo, f"pesquisa {modelo}")
+        super().__init__(cliente, modelo, f"pesquisa {modelo}" + (" com orientador" if orientador else ""))
         self._com_web = com_web
         self._orientador = orientador  # modelo do orientador (ADVISOR_ATIVO), ou None
         self._effort = effort
@@ -157,7 +155,8 @@ class AnthropicPesquisador(_BaseAnthropic):
                               conteudo=[{"type": "text", "text": f"Produto: {produto}"}],
                               esquema=esquemas.PESQUISA_SEM_WEB, effort=self._effort, max_tokens=3000, timeout_s=90)
         ferramentas = [{"type": TIPO_BUSCA_WEB, "name": "web_search", "max_uses": MAX_BUSCAS,
-                        "user_location": LOCAL_DO_COMPRADOR, "response_inclusion": "excluded"}]
+                        "user_location": LOCAL_DO_COMPRADOR, "allowed_domains": DOMINIOS_DE_MARKETPLACES,
+                        "response_inclusion": "excluded"}]
         betas = None
         if self._orientador:
             ferramentas.append({"type": TIPO_ORIENTADOR, "name": "advisor", "model": self._orientador,

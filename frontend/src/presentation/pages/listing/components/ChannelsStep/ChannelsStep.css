@@ -168,3 +168,27 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Análise de mercado (Pro e Business): só o que o Mercado Livre mostrou */
+.channels-step__market {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid rgb(var(--rgb-ink) / 0.14);
+  border-radius: var(--radius-lg);
+  background: rgb(var(--rgb-ink) / 0.03);
+}
+
+.channels-step__market-text {
+  margin: 0;
+  color: var(--color-ink);
+  font-weight: 700;
+}
+
+.channels-step__market-note {
+  margin: 0;
+  color: rgb(var(--rgb-ink) / 0.62);
+  font-size: 14px;
+  font-weight: 600;
+}

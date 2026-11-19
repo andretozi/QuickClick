@@ -56,6 +56,7 @@ from backend.domain.ia.atributos_ml import (
     perguntas_dos_obrigatorios,
 )
 from backend.domain.ia.canais import aplicar_motivos, canais_candidatos
+from backend.domain.ia.capacidade import capacidade_do_plano
 from backend.domain.ia.escrita import (
     DESCRICAO_MAX,
     ESPECIFICACOES_MAX,
@@ -125,6 +126,19 @@ class ProcessoDaAnalise:
         campos["atualizado_em"] = self.d.relogio()
         self.d.analises.atualizar(analise_id, campos)
 
+    @staticmethod
+    def _nivel(analise: dict[str, Any]) -> Nivel:
+        """O nível vem do plano gravado: análise de plano pago, mesmo antiga (gravada como grátis quando o
+        orçamento estourava), nunca roda no Gemini. Sem plano gravado, vale o nível gravado."""
+        if analise.get("plano_no_momento"):
+            return capacidade_do_plano(analise["plano_no_momento"]).nivel
+        return Nivel(analise["nivel"])
+
+    @staticmethod
+    def _ponta(analise: dict[str, Any]) -> bool:
+        """Opus ou Sonnet na leitura e no preço, pelo plano gravado quando a análise começou."""
+        return capacidade_do_plano(analise.get("plano_no_momento") or "").modelo_de_ponta
+
     def _contexto(self, analise: dict[str, Any], etapa: str) -> ContextoDaChamada:
         return ContextoDaChamada(vendedor_id=analise["vendedor_id"], analise_id=analise["id"], etapa=etapa)
 
@@ -156,9 +170,9 @@ class ProcessoDaAnalise:
         fotos, avisos = self._tratar_e_verificar(analise, fotos)
         self._salvar(analise_id, status=StatusAnalise.LENDO_PRODUTO.value, etapa_atual=StatusAnalise.LENDO_PRODUTO.value)
 
-        nivel = Nivel(analise["nivel"])
+        nivel = self._nivel(analise)
         entrada = EntradaDaLeitura(tuple(fotos[:MAX_FOTOS_NA_LEITURA]), CATEGORIAS)
-        resultado = escolha.tentar_em_ordem(escolha.leitores(self.d.provedores, nivel),
+        resultado = escolha.tentar_em_ordem(escolha.leitores(self.d.provedores, nivel, ponta=self._ponta(analise)),
                                             lambda p: p.ler(entrada, self._contexto(analise, "leitura")))
         if resultado is None:
             self._falhar(analise_id, StatusAnalise.LENDO_PRODUTO, IAIndisponivel())
@@ -237,7 +251,7 @@ class ProcessoDaAnalise:
         ligados, sobras = ligar_por_regra(com_valor, da_categoria)
         if sobras and da_categoria:
             resultado = escolha.tentar_em_ordem(
-                escolha.ligadores(self.d.provedores, Nivel(analise["nivel"])),
+                escolha.ligadores(self.d.provedores, self._nivel(analise)),
                 lambda p: p.ligar(sobras, da_categoria, self._contexto(analise, "atributos_ml")))
             if resultado is not None:
                 ligados += ligar_sugestoes_da_ia(resultado[0].dados.get("ligacoes"), sobras, da_categoria, ligados)
@@ -301,7 +315,7 @@ class ProcessoDaAnalise:
         """Releitura dirigida (uma por análise): o mesmo leitor procura só essas chaves nas fotos da leitura.
         Devolve uma cópia da leitura com o que achou (só para as sugestões); None se não rodou."""
         orcamento = self.d.orcamento
-        if Nivel(analise["nivel"]) is Nivel.PAGO and orcamento is not None \
+        if self._nivel(analise) is Nivel.PAGO and orcamento is not None \
                 and orcamento.gasto_de_hoje_usd(self.d.relogio()) >= self.d.config.orcamento_diario_usd:
             log.info("Releitura dirigida pulada: o orçamento do dia acabou.")
             return None
@@ -321,7 +335,7 @@ class ProcessoDaAnalise:
             leitura = normalizar_leitura(atual, len(analise.get("fotos_meta") or []))
             contexto_sem_ml = {k: v for k, v in atual.items() if k not in ("ml", "exigencias")}
             resultado = escolha.tentar_em_ordem(
-                escolha.leitores(self.d.provedores, Nivel(analise["nivel"])),
+                escolha.leitores(self.d.provedores, self._nivel(analise), ponta=self._ponta(analise)),
                 lambda p: p.reler(EntradaDaReleitura((), contexto_sem_ml, foto.leitura_jpeg, tipo),
                                   self._contexto(analise, "foto_extra")))
             avisos = analise.get("avisos") or []
@@ -360,7 +374,7 @@ class ProcessoDaAnalise:
             analise = self.d.analises.obter(analise_id)
             leitura = normalizar_leitura(analise.get("leitura") or {}, len(analise.get("fotos_meta") or []))
             confirmacao = normalizar_confirmacao(analise.get("atributos_confirmados") or {}, leitura)
-            nivel = Nivel(analise["nivel"])
+            nivel = self._nivel(analise)
             perfil = None
 
             if posicao(desde) <= posicao(StatusAnalise.PESQUISANDO_MERCADO):
@@ -406,8 +420,9 @@ class ProcessoDaAnalise:
     def _pesquisar(self, analise: dict[str, Any], confirmacao: Confirmacao, nivel: Nivel
                    ) -> tuple[str | None, dict[str, Any] | None]:
         agora = self.d.relogio()
-        chave = chave_da_pesquisa(nivel.value, analise.get("ml_categoria_id"), confirmacao.produto,
-                                  confirmacao.condicao.value)
+        ponta = self._ponta(analise)
+        chave = chave_da_pesquisa(nivel.value + ("-ponta" if ponta else ""), analise.get("ml_categoria_id"),
+                                  confirmacao.produto, confirmacao.condicao.value)
         guardada = self.d.pesquisas.obter(chave, agora)
         if guardada is not None:
             return chave, guardada
@@ -416,7 +431,7 @@ class ProcessoDaAnalise:
             atributos=_fatos(confirmacao),
             com_web=nivel is Nivel.PAGO and self.d.config.pesquisa_web_ativa,
         )
-        resultado = escolha.tentar_em_ordem(escolha.pesquisadores(self.d.provedores, nivel),
+        resultado = escolha.tentar_em_ordem(escolha.pesquisadores(self.d.provedores, nivel, ponta=ponta),
                                             lambda p: p.pesquisar(entrada, self._contexto(analise, "pesquisa")))
         if resultado is None:
             return None, None
@@ -488,7 +503,8 @@ class ProcessoDaAnalise:
                 atributos=_fatos(confirmacao), condicao=condicao,
                 defeitos=confirmacao.defeitos, canais_candidatos=tuple(c.para_dict() for c in candidatos),
             )
-            resultado = escolha.tentar_em_ordem(escolha.precificadores(self.d.provedores, nivel),
+            resultado = escolha.tentar_em_ordem(escolha.precificadores(self.d.provedores, nivel,
+                                                                       ponta=self._ponta(analise)),
                                                 lambda p: p.precificar(entrada, self._contexto(analise, "preco")))
             if resultado is not None:
                 preco, candidatos = _aplicar_preco_da_ia(preco, resultado[0].dados, est, candidatos)

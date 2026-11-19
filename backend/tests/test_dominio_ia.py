@@ -14,7 +14,12 @@ from backend.domain.ia.atributos_ml import (
     obrigatorios_faltando,
 )
 from backend.domain.ia.canais import aplicar_motivos, canais_candidatos
-from backend.domain.ia.capacidade import capacidade_do_plano, garantir_pode_comecar, nivel_efetivo, restantes
+from backend.domain.ia.capacidade import (
+    capacidade_do_plano,
+    garantir_pode_comecar,
+    orcamento_esgotado,
+    restantes,
+)
 from backend.domain.ia.escrita import cortar_titulo, limpar_escrita, problemas_de_escrita, titulo_valido
 from backend.domain.ia.fotos import QualidadeFoto, caixa_em_pixels, classificar_qualidade, tamanho_para_lado_maior
 from backend.domain.ia.leitura import (
@@ -89,10 +94,20 @@ class TestCapacidade(unittest.TestCase):
         with self.assertRaises(LimitePorHora):
             garantir_pode_comecar(capacidade_do_plano("pro"), usadas_no_mes=0, em_andamento=0, na_ultima_hora=10)
 
-    def test_orcamento_do_dia_estourado_cai_no_gratis(self):
-        self.assertEqual(nivel_efetivo(Nivel.PAGO, Decimal("0.31"), Decimal("0.30")), (Nivel.GRATIS, True))
-        self.assertEqual(nivel_efetivo(Nivel.PAGO, Decimal("0.10"), Decimal("0.30")), (Nivel.PAGO, False))
-        self.assertEqual(nivel_efetivo(Nivel.GRATIS, Decimal("9"), Decimal("0.30")), (Nivel.GRATIS, False))
+    def test_orcamento_do_dia_esgotado_so_vale_para_o_plano_pago(self):
+        teto = Decimal("0.30")
+        for plano in ("essencial", "pro", "business"):
+            cap = capacidade_do_plano(plano)
+            self.assertTrue(orcamento_esgotado(cap, Decimal("0.30"), teto), plano)
+            self.assertFalse(orcamento_esgotado(cap, Decimal("0.10"), teto), plano)
+        self.assertFalse(orcamento_esgotado(capacidade_do_plano("gratis"), Decimal("9"), teto))
+
+    def test_orientador_e_analise_de_mercado_so_no_pro_e_no_business(self):
+        quem = {p: (capacidade_do_plano(p).modelo_de_ponta, capacidade_do_plano(p).analise_de_mercado)
+                for p in ("gratis", "essencial", "pro", "business")}
+        self.assertEqual(quem, {"gratis": (False, False), "essencial": (False, False),
+                                "pro": (True, True), "business": (True, True)})
+        self.assertEqual(capacidade_do_plano("vip").modelo_de_ponta, False)  # desconhecido vale como Grátis
 
 
 class TestFotos(unittest.TestCase):

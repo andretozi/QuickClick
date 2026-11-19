@@ -14,7 +14,7 @@ from typing import Any
 
 from backend.application.casos_de_uso.comum import obter_vendedor
 from backend.application.ia import escolha
-from backend.application.ia.etapas import DependenciasDaAnalise, ProcessoDaAnalise, com_aviso
+from backend.application.ia.etapas import DependenciasDaAnalise, ProcessoDaAnalise
 from backend.application.ia.modelos import ArquivoDeFoto
 from backend.application.ia.portas import Executor, OrcamentoDeIA
 from backend.application.portas import RepositorioVendedores
@@ -24,6 +24,7 @@ from backend.domain.erros import (
     EstadoDaAnaliseInvalido,
     FotosNecessarias,
     IAIndisponivel,
+    OrcamentoDaIAEsgotado,
 )
 from backend.domain.ia.analise import (
     StatusAnalise,
@@ -39,7 +40,7 @@ from backend.domain.ia.capacidade import (
     CapacidadeIA,
     capacidade_do_plano,
     garantir_pode_comecar,
-    nivel_efetivo,
+    orcamento_esgotado,
     restantes,
 )
 from backend.domain.ia.leitura import normalizar_confirmacao, normalizar_leitura
@@ -48,8 +49,6 @@ log = logging.getLogger("quickclick.ia")
 
 TIPOS_DE_FOTO_EXTRA = ("etiqueta", "verso", "detalhe")
 MENSAGEM_INTERROMPIDA = "A análise parou no meio porque o servidor reiniciou. Toque em retomar."
-AVISO_ORCAMENTO = ("orcamento_do_dia", "Hoje a IA completa já chegou no limite do dia, então usei a versão básica, "
-                                      "a mesma do plano Grátis.")
 
 
 class ServicoDeAnalises:
@@ -74,9 +73,19 @@ class ServicoDeAnalises:
     def _capacidade(self, vendedor_id: int) -> CapacidadeIA:
         return capacidade_do_plano(obter_vendedor(self._vendedores, vendedor_id).plano.slug)
 
-    def _nivel_agora(self, capacidade: CapacidadeIA):
+    def _garantir_orcamento(self, vendedor_id: int) -> None:
+        """Foto extra e retomada também gastam a chave paga: o teto do dia vale para elas."""
+        if self._orcamento_esgotado(self._capacidade(vendedor_id)):
+            raise OrcamentoDaIAEsgotado()
+
+    def _orcamento_esgotado(self, capacidade: CapacidadeIA) -> bool:
+        # shortcut: conferido ao começar, ao pedir foto extra e ao retomar; análises já em andamento terminam e
+        # várias começando juntas passam juntas pelo teto. Preciso só com trava no registro do gasto.
         gasto = self._orcamento.gasto_de_hoje_usd(self.d.relogio())
-        return nivel_efetivo(capacidade.nivel, gasto, self.d.config.orcamento_diario_usd)
+        return orcamento_esgotado(capacidade, gasto, self.d.config.orcamento_diario_usd)
+
+    def _sem_leitor(self, capacidade: CapacidadeIA) -> bool:
+        return not escolha.leitores(self.d.provedores, capacidade.nivel, ponta=capacidade.modelo_de_ponta)
 
     def _da_conta(self, vendedor_id: int, analise_id: str) -> dict[str, Any]:
         analise = self.d.analises.obter(analise_id)
@@ -88,23 +97,24 @@ class ServicoDeAnalises:
         capacidade = self._capacidade(vendedor_id)
         agora = self.d.relogio()
         usadas = self.d.analises.prontas_no_mes(vendedor_id, agora)
-        nivel, estourou = self._nivel_agora(capacidade)
+        esgotado = self._orcamento_esgotado(capacidade)
         sobram = restantes(capacidade, usadas)
         motivo = None
         if not self.d.config.ia_ativa:
             motivo = "ia_desligada"
-        elif not escolha.leitores(self.d.provedores, nivel):
+        elif self._sem_leitor(capacidade):
             motivo = "provedor_indisponivel"
+        elif esgotado:
+            motivo = "orcamento_do_dia"
         elif sobram <= 0:
             motivo = "cota_esgotada"
         return {
             "plano": capacidade.plano,
             "nivel": capacidade.nivel.value,
-            "nivel_agora": nivel.value,
             "analises_por_mes": capacidade.analises_por_mes,
             "usadas_no_mes": usadas,
             "restantes": sobram,
-            "orcamento_do_dia_estourado": estourou,
+            "orcamento_do_dia_estourado": esgotado,
             "disponivel": motivo is None,
             "motivo_indisponivel": motivo,
             "tem": {
@@ -112,6 +122,7 @@ class ServicoDeAnalises:
                 "pesquisa_de_mercado": capacidade.pesquisa_de_mercado,
                 "preco_com_analise": capacidade.preco_com_analise,
                 "busca_na_web": capacidade.pesquisa_de_mercado and self.d.config.pesquisa_web_ativa,
+                "analise_de_mercado": capacidade.analise_de_mercado,
             },
             "aviso_de_dados_no_gratis": capacidade.plano == "gratis",
         }
@@ -129,14 +140,15 @@ class ServicoDeAnalises:
                 em_andamento=self.d.analises.em_andamento(vendedor_id),
                 na_ultima_hora=self.d.analises.criadas_desde(vendedor_id, agora - timedelta(hours=1)),
             )
-            nivel, estourou = self._nivel_agora(capacidade)
-            if not escolha.leitores(self.d.provedores, nivel):
+            if self._sem_leitor(capacidade):
                 raise IAIndisponivel()
+            if self._orcamento_esgotado(capacidade):
+                raise OrcamentoDaIAEsgotado()
             analise_id = str(uuid.uuid4())
             self.d.analises.criar({
                 "id": analise_id, "vendedor_id": vendedor_id, "plano_no_momento": capacidade.plano,
-                "nivel": nivel.value, "status": StatusAnalise.RECEBIDA.value, "etapa_atual": StatusAnalise.RECEBIDA.value,
-                "fotos_meta": [f.meta() for f in fotos], "avisos": com_aviso([], *AVISO_ORCAMENTO) if estourou else [],
+                "nivel": capacidade.nivel.value, "status": StatusAnalise.RECEBIDA.value,
+                "etapa_atual": StatusAnalise.RECEBIDA.value, "fotos_meta": [f.meta() for f in fotos], "avisos": [],
                 "criado_em": agora, "atualizado_em": agora,
             })
         self._executor.submit(self.processo.ler, analise_id, fotos)
@@ -149,6 +161,7 @@ class ServicoDeAnalises:
         analise = self._da_conta(vendedor_id, analise_id)
         if not pode_receber_foto_extra(StatusAnalise(analise["status"])):
             raise EstadoDaAnaliseInvalido("Essa análise não está esperando uma foto extra agora.")
+        self._garantir_orcamento(vendedor_id)
         tipo = tipo if tipo in TIPOS_DE_FOTO_EXTRA else "detalhe"
         foto = self.d.preparador.preparar([arquivo], primeiro_indice=len(analise.get("fotos_meta") or []))[0]
         self.d.analises.atualizar(analise_id, {"status": StatusAnalise.LENDO_PRODUTO.value,
@@ -174,6 +187,7 @@ class ServicoDeAnalises:
         analise = self._da_conta(vendedor_id, analise_id)
         if not pode_retomar(StatusAnalise(analise["status"])):
             raise EstadoDaAnaliseInvalido("Essa análise não precisa ser retomada.")
+        self._garantir_orcamento(vendedor_id)
         try:
             etapa = StatusAnalise(analise.get("etapa_atual"))
         except ValueError:
