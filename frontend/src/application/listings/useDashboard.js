@@ -331,49 +331,15 @@ export default function useDashboard() {
   /** Pausar (publicado), reativar (pausado) ou publicar (standby) nos canais conectados. */
   const toggleStatus = useCallback(
     async (listing) => {
-      const overall = listingStatus(listing);
-      // Se estiver em standby e os dois canais estiverem conectados, publica nos dois!
-      if (overall === LISTING_STATUS.UNPUBLISHED && mercadoLivreConnected && quickStoreConnected) {
-        setBusyId(listing.id);
-        try {
-          const { payload, photoBlobs } = buildPublishInputs(listing);
-          const [pubMl, pubQs] = await Promise.all([
-            publishToMercadoLivre(payload, photoBlobs),
-            publishToQuickStore(payload, photoBlobs)
-          ]);
-          const updated = await updateListing(accountId, listing.id, {
-            mlItemId: pubMl.id,
-            permalink: pubMl.permalink,
-            mlCategoryId: pubMl.categoryId ?? listing.mlCategoryId,
-            qsItemId: pubQs.id,
-            qsPermalink: pubQs.permalink,
-            qsCategoryId: pubQs.categoryId ?? listing.qsCategoryId ?? listing.mlCategoryId,
-            channels: {
-              ...listing.channels,
-              [PRIMARY_CHANNEL]: LISTING_STATUS.PUBLISHED,
-              [QUICKSTORE_CHANNEL]: LISTING_STATUS.PUBLISHED
-            }
-          });
-          if (!mounted.current) return;
-          replaceListing(updated);
-          showToast({ tone: TOAST_TONES.SUCCESS, ...LISTINGS_PANEL.toasts.publishedBoth });
-          return;
-        } catch (error) {
-          if (mounted.current) failed(error);
-          return;
-        } finally {
-          if (mounted.current) setBusyId(null);
-        }
-      }
+      const mlStatus = channelStatus(listing, PRIMARY_CHANNEL);
+      const qsStatus = channelStatus(listing, QUICKSTORE_CHANNEL);
       const targetChannel =
-        mercadoLivreConnected && (channelStatus(listing, PRIMARY_CHANNEL) !== LISTING_STATUS.UNPUBLISHED || !quickStoreConnected)
-          ? PRIMARY_CHANNEL
-          : quickStoreConnected
-            ? QUICKSTORE_CHANNEL
-            : PRIMARY_CHANNEL;
+        mlStatus === LISTING_STATUS.UNPUBLISHED && qsStatus !== LISTING_STATUS.UNPUBLISHED
+          ? QUICKSTORE_CHANNEL
+          : PRIMARY_CHANNEL;
       await toggleChannelStatus(listing, targetChannel);
     },
-    [accountId, failed, mercadoLivreConnected, quickStoreConnected, replaceListing, toggleChannelStatus, mounted]
+    [toggleChannelStatus]
   );
 
   const duplicate = useCallback(

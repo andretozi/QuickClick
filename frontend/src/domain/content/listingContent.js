@@ -274,7 +274,16 @@ export const LISTING_WIZARD = {
     previewNew: 'Novo',
     previewUsed: 'Usado',
     previewBuy: 'Comprar agora',
-    noneSelected: 'Sem canal escolhido, o anúncio fica salvo no painel em standby (fora do ar).'
+    noneSelected: 'Sem canal escolhido, o anúncio fica salvo no painel em standby (fora do ar).',
+    market: {
+      title: 'Análise de mercado',
+      found: (count, min, max) =>
+        `Encontramos ${count} ${plural(count, 'anúncio parecido', 'anúncios parecidos')} entre ${min} e ${max}.`,
+      noData: 'Sem anúncios parecidos para comparar no momento.',
+      onlyMl: 'Dados pesquisados no Mercado Livre.',
+      locked: 'Nos planos pagos, a IA analisa os anúncios concorrentes antes de escolher onde publicar.',
+      upgrade: { label: 'Ver planos', href: '#/configuracoes' }
+    }
   },
   publish: {
     title: 'Tudo pronto. Bora vender?',

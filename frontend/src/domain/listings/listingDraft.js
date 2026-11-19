@@ -17,7 +17,7 @@ export const EMPTY_DRAFT = {
   stock: '1',
   priceInput: '',
   publishMl: true,
-  publishQs: true,
+  publishQs: false,
   // IA (só no criar): a análise, o que o vendedor confirmou e o que a IA preencheu
   analysisId: null,
   analysisPhotos: '', // marca das fotos que foram para a análise

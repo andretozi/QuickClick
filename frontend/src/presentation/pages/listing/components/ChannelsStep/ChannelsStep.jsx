@@ -17,7 +17,7 @@ import './ChannelsStep.css';
  * Mercado Livre e QuickStore publicam direto pela Quick Click.
  */
 export default function ChannelsStep({ editor }) {
-  const { draft, update, connection, qsConnection, canPublishMl, canPublishQs, priceCents, ai } = editor;
+  const { draft, update, connection, qsConnection, canPublishMl, canPublishQs, priceCents, ai, editing, quota } = editor;
   const texts = LISTING_WIZARD.channels;
   const market = ai.analysis?.price?.market;
   const stock = Number(draft.stock) || 0;

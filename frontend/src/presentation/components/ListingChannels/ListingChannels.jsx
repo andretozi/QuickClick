@@ -29,7 +29,7 @@ export default function ListingChannels({
   return (
     <div className={cx('listing-channels', className)}>
       {AVAILABLE.map((marketplace) => {
-        const chStatus = channels?.[marketplace.slug] ?? status ?? LISTING_STATUS.UNPUBLISHED;
+        const chStatus = channels?.[marketplace.slug] ?? LISTING_STATUS.UNPUBLISHED;
         const statusInfo = LISTING_STATUS_LABELS[chStatus] ?? LISTING_STATUS_LABELS.unpublished;
         const canQuickAdd =
           Boolean(onPublishChannel) &&

@@ -518,7 +518,11 @@ export default function useListingEditor({ listingId, celebrate }) {
                 ...(qsHttpsPhotos.length && !mlPatch.photos ? { photos: qsHttpsPhotos, coverIndex: 0 } : {})
               };
             } catch (error) {
-              if (draft.publishQs && (error?.code === 'anuncio_nao_encontrado' || error?.code === 'publicacao_recusada')) {
+              if (
+                draft.publishQs &&
+                previousQsStatus === LISTING_STATUS.PUBLISHED &&
+                (error?.code === 'anuncio_nao_encontrado' || error?.code === 'publicacao_recusada')
+              ) {
                 const publishedQs = await publishOnQs(data);
                 finalQsStatus = LISTING_STATUS.PUBLISHED;
                 qsPatch = {
@@ -544,7 +548,7 @@ export default function useListingEditor({ listingId, celebrate }) {
         const updatedChannels = {
           ...original.channels,
           [PRIMARY_CHANNEL]: finalMlStatus,
-          ...(canPublishQs || original.channels?.[QUICKSTORE_CHANNEL] !== undefined
+          ...(original.channels?.[QUICKSTORE_CHANNEL] !== undefined || qsPatch.qsItemId || draft.publishQs
             ? { [QUICKSTORE_CHANNEL]: finalQsStatus }
             : {})
         };
@@ -584,9 +588,7 @@ export default function useListingEditor({ listingId, celebrate }) {
           qsCategoryId: publishedQs?.categoryId ?? data.qsCategoryId ?? data.mlCategoryId ?? null,
           channels: {
             [PRIMARY_CHANNEL]: publishedMl ? LISTING_STATUS.PUBLISHED : LISTING_STATUS.UNPUBLISHED,
-            ...(canPublishQs || publishedQs
-              ? { [QUICKSTORE_CHANNEL]: publishedQs ? LISTING_STATUS.PUBLISHED : LISTING_STATUS.UNPUBLISHED }
-              : {})
+            ...(publishedQs ? { [QUICKSTORE_CHANNEL]: LISTING_STATUS.PUBLISHED } : {})
           }
         });
       } catch (error) {
