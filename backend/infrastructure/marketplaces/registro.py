@@ -5,6 +5,7 @@ from backend.domain.marketplace import CATALOGO
 from backend.infrastructure.configuracao import LeitorDeConfiguracao
 from backend.infrastructure.marketplaces.amazon import GatewayAmazon
 from backend.infrastructure.marketplaces.mercado_livre import GatewayMercadoLivre
+from backend.infrastructure.marketplaces.quickstore import GatewayQuickStore
 from backend.infrastructure.marketplaces.shopee import GatewayShopee
 
 
@@ -14,7 +15,16 @@ def criar_gateways(leitor: LeitorDeConfiguracao) -> dict[str, GatewayMarketplace
         client_secret=leitor.texto("MERCADO_LIVRE_CLIENT_SECRET"),
         redirect_uri=leitor.texto("MERCADO_LIVRE_REDIRECT_URI"),
     )
-    gateways = {gateway.slug: gateway for gateway in (mercado_livre, GatewayShopee(), GatewayAmazon())}
+    quickstore = GatewayQuickStore(
+        base_url=leitor.texto("QUICKSTORE_BASE_URL"),
+        client_id=leitor.texto("QUICKSTORE_CLIENT_ID"),
+        client_secret=leitor.texto("QUICKSTORE_CLIENT_SECRET"),
+        redirect_uri=leitor.texto("QUICKSTORE_REDIRECT_URI"),
+    )
+    gateways = {
+        gateway.slug: gateway
+        for gateway in (mercado_livre, quickstore, GatewayShopee(), GatewayAmazon())
+    }
     sem_gateway = [m.slug for m in CATALOGO if m.disponivel and m.slug not in gateways]
     if sem_gateway:
         raise RuntimeError(f"Marketplace disponível sem gateway: {', '.join(sem_gateway)}")

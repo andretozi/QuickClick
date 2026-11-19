@@ -92,4 +92,56 @@ def criar_rotas_anuncios(casos: CasosDeUso, VendedorAtual) -> APIRouter:  # noqa
             raise ServicoIndisponivel()
         return await run_in_threadpool(casos.publicar_no_mercado_livre.excluir, vendedor_id, item_id)
 
+    @rotas.post("/publicar/quickstore", summary="Publica o anúncio na QuickStore (montado no back)",
+                responses=ERROS_IA)
+    async def publicar_na_quickstore(request: Request, vendedor_id: VendedorAtual) -> dict[str, Any]:
+        if casos.publicar_na_quickstore is None:
+            raise ServicoIndisponivel()
+        fotos = await ler_fotos(request, "fotos", MAX_FOTOS_POR_ANALISE)
+        bruto = await campo_de_texto(request, "anuncio") or "{}"
+        anuncio = _ler_anuncio_json(bruto)
+        return await run_in_threadpool(casos.publicar_na_quickstore.executar, vendedor_id, anuncio, fotos)
+
+    @rotas.get("/quickstore/{item_id}", summary="Obtém os dados atualizados de um anúncio na QuickStore",
+               responses=ERROS_IA)
+    async def obter_anuncio_quickstore(item_id: str, vendedor_id: VendedorAtual) -> dict[str, Any]:
+        if casos.publicar_na_quickstore is None:
+            raise ServicoIndisponivel()
+        return await run_in_threadpool(casos.publicar_na_quickstore.obter, vendedor_id, item_id)
+
+    @rotas.patch("/quickstore/{item_id}/status", summary="Pausa ou reativa um anúncio na QuickStore",
+                 responses=ERROS_IA)
+    async def alterar_status_quickstore(item_id: str, corpo: RequisicaoStatusAnuncio,
+                                        vendedor_id: VendedorAtual) -> dict[str, Any]:
+        if casos.publicar_na_quickstore is None:
+            raise ServicoIndisponivel()
+        return await run_in_threadpool(
+            casos.publicar_na_quickstore.alterar_status, vendedor_id, item_id, corpo.status
+        )
+
+    @rotas.put("/quickstore/{item_id}", summary="Atualiza um anúncio existente na QuickStore",
+               responses=ERROS_IA)
+    async def atualizar_anuncio_quickstore(item_id: str, request: Request,
+                                           vendedor_id: VendedorAtual) -> dict[str, Any]:
+        if casos.publicar_na_quickstore is None:
+            raise ServicoIndisponivel()
+        tipo_conteudo = (request.headers.get("content-type") or "").lower()
+        if "multipart/form-data" in tipo_conteudo:
+            fotos = await ler_fotos(request, "fotos", MAX_FOTOS_POR_ANALISE)
+            bruto = await campo_de_texto(request, "anuncio") or "{}"
+        else:
+            fotos = []
+            bruto = (await request.body()).decode("utf-8", errors="replace") or "{}"
+        anuncio = _ler_anuncio_json(bruto)
+        return await run_in_threadpool(
+            casos.publicar_na_quickstore.atualizar, vendedor_id, item_id, anuncio, fotos
+        )
+
+    @rotas.delete("/quickstore/{item_id}", summary="Fecha e exclui um anúncio na QuickStore",
+                  responses=ERROS_IA)
+    async def excluir_anuncio_quickstore(item_id: str, vendedor_id: VendedorAtual) -> dict[str, Any]:
+        if casos.publicar_na_quickstore is None:
+            raise ServicoIndisponivel()
+        return await run_in_threadpool(casos.publicar_na_quickstore.excluir, vendedor_id, item_id)
+
     return rotas

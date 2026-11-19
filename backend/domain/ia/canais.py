@@ -26,6 +26,7 @@ class Afinidade:
 # Tabela simples de afinidade (o André ajusta)
 AFINIDADE: dict[str, Afinidade] = {
     "mercado-livre": Afinidade(None),
+    "quickstore": Afinidade(None),
     "shopee": Afinidade(frozenset({"moda", "calcados", "acessorios", "casa", "cozinha", "beleza", "brinquedos",
                                    "eletronicos", "esporte"}), preco_max_centavos=800 * REAIS),
     "amazon": Afinidade(frozenset({"eletronicos", "livros", "casa", "cozinha", "esporte", "brinquedos", "beleza"}),

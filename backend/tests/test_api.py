@@ -711,9 +711,9 @@ class TestApiConsultas(BaseApi):
 
     def test_marketplaces_lista_o_catalogo_inteiro(self):
         marketplaces = self.cliente.get("/api/marketplaces").json()["marketplaces"]
-        self.assertEqual(len(marketplaces), 9)
+        self.assertEqual(len(marketplaces), 10)
         self.assertEqual(
-            [m["nome"] for m in marketplaces if m["status"] == "disponivel"], ["Mercado Livre"]
+            [m["nome"] for m in marketplaces if m["status"] == "disponivel"], ["Mercado Livre", "QuickStore"]
         )
         self.assertEqual(sum(m["status"] == "em_breve" for m in marketplaces), 8)
         self.assertFalse(any(m["conectado"] for m in marketplaces))

@@ -8,6 +8,7 @@ imagens, cria o item e grava a descrição em texto simples. Nada é publicado s
 Também sincroniza, pausa, reativa, edita e exclui anúncios direto na conta do vendedor no Mercado Livre.
 """
 
+import ipaddress
 import logging
 import re
 from dataclasses import dataclass
@@ -23,6 +24,7 @@ from backend.domain.erros import (
     FotoInvalida,
     MercadoLivreDesconectado,
     PublicacaoRecusada,
+    QuickStoreDesconectada,
 )
 from backend.domain.ia.atributos_ml import completar_para_publicacao, ligar_confirmados
 from backend.domain.ia.escrita import cortar_titulo
@@ -31,6 +33,8 @@ from backend.domain.ia.leitura import normalizar_chave
 log = logging.getLogger("quickclick.marketplaces")
 
 MERCADO_LIVRE = "mercado-livre"
+QUICKSTORE = "quickstore"
+CATEGORIA_PADRAO_QUICKSTORE = "MLB23332"
 ANUNCIO_CLASSICO = "gold_special"
 CONDICAO_NO_ML = {"novo": "new", "new": "new", "usado": "used", "used": "used", "recondicionado": "used"}
 STATUS_PARA_ML = {
@@ -66,18 +70,42 @@ def _validar_item_id(item_id: str) -> str:
     return codigo
 
 
-def _validar_url_foto_ml(url: Any) -> str | None:
+_HOSTS_INTERNOS_BLOQUEADOS = {"localhost", "metadata.google.internal", "169.254.169.254"}
+_SUFIXOS_INTERNOS_BLOQUEADOS = (".local", ".internal", ".localhost", ".lan", ".corp", ".home")
+
+
+def _host_publico_seguro(host: str) -> bool:
+    limpo = host.strip().lower().rstrip(".")
+    if not limpo or limpo in _HOSTS_INTERNOS_BLOQUEADOS or "." not in limpo:
+        return False
+    if limpo.endswith(_SUFIXOS_INTERNOS_BLOQUEADOS):
+        return False
+    try:
+        ip = ipaddress.ip_address(limpo)
+        return ip.is_global and not (
+            ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved
+        )
+    except ValueError:
+        return True
+
+
+def _validar_url_foto_ml(url: Any, *, exigir_mlstatic: bool = True) -> str | None:
     texto = str(url or "").strip()
     if not texto or len(texto) > 500:
         return None
     partes = urlparse(texto)
     host = (partes.hostname or "").lower()
-    if partes.scheme != "https" or not (host == "mlstatic.com" or host.endswith(".mlstatic.com")):
+    if partes.scheme != "https" or not host or partes.username or partes.password:
+        return None
+    if exigir_mlstatic:
+        if not (host == "mlstatic.com" or host.endswith(".mlstatic.com")):
+            return None
+    elif not _host_publico_seguro(host):
         return None
     return texto
 
 
-def anuncio_de_dict(dados: dict[str, Any]) -> AnuncioParaPublicar:
+def anuncio_de_dict(dados: dict[str, Any], *, exigir_mlstatic: bool = True) -> AnuncioParaPublicar:
     if not isinstance(dados, dict):
         raise ValueError("Anúncio inválido.")
     titulo = cortar_titulo(str(dados.get("titulo") or ""))
@@ -99,8 +127,13 @@ def anuncio_de_dict(dados: dict[str, Any]) -> AnuncioParaPublicar:
             if chave and valor:
                 atributos.append((chave, valor))
     mantidas = tuple(
-        url for url in (_validar_url_foto_ml(u) for u in (dados.get("fotos_mantidas") or [])[:6]) if url
-    )
+        url
+        for url in (
+            _validar_url_foto_ml(u, exigir_mlstatic=exigir_mlstatic)
+            for u in (dados.get("fotos_mantidas") or [])[:24]
+        )
+        if url
+    )[:6]
     return AnuncioParaPublicar(
         titulo=titulo,
         descricao=str(dados.get("descricao") or "").strip()[:DESCRICAO_MAX_ML],
@@ -135,13 +168,31 @@ def _erro_tamanho_imagem_ml(corpo: Any) -> bool:
 
 
 class PublicarNoMercadoLivre:
-    def __init__(self, conectar: ConectarMarketplace, publicador: PublicadorMercadoLivre,
-                 fonte: FontePrecosMarketplace, analises: RepositorioDeAnalises, preparador: PreparadorDeFotos):
+    def __init__(
+        self,
+        conectar: ConectarMarketplace,
+        publicador: PublicadorMercadoLivre,
+        fonte: FontePrecosMarketplace,
+        analises: RepositorioDeAnalises,
+        preparador: PreparadorDeFotos,
+        *,
+        canal: str = MERCADO_LIVRE,
+    ):
         self._conectar = conectar
         self._publicador = publicador
         self._fonte = fonte
         self._analises = analises
         self._preparador = preparador
+        self._canal = canal
+
+    @property
+    def _exigir_mlstatic(self) -> bool:
+        return self._canal == MERCADO_LIVRE
+
+    def _erro_desconectado(self) -> Exception:
+        if self._canal == QUICKSTORE:
+            return QuickStoreDesconectada()
+        return MercadoLivreDesconectado()
 
     def _subir_imagens(self, token: str, preparadas: list[FotoPreparada]) -> list[dict[str, str]]:
         enviadas: list[dict[str, str]] = []
@@ -153,10 +204,13 @@ class PublicarNoMercadoLivre:
                 ampliar = getattr(self._preparador, "ampliar_para_publicacao", None)
                 if not callable(ampliar) or not _erro_tamanho_imagem_ml(erro.corpo):
                     raise
-                log.info("Mercado Livre recusou %s por bordas brancas/tamanho; reenviando versão ampliada.", nome)
+                log.info("Marketplace recusou %s por bordas brancas/tamanho; reenviando versão ampliada.", nome)
                 ampliada = ampliar(foto.leitura_jpeg)
                 pic_id = self._publicador.subir_imagem(token, ampliada, nome)
-            enviadas.append({"id": pic_id})
+            if str(pic_id).startswith(("https://", "http://")):
+                enviadas.append({"source": str(pic_id)})
+            else:
+                enviadas.append({"id": str(pic_id)})
         return enviadas
 
     def _ml_da_analise(self, vendedor_id: int, analise_id: str | None) -> dict[str, Any]:
@@ -169,9 +223,9 @@ class PublicarNoMercadoLivre:
 
     def _conferir_dono(self, vendedor_id: int, item_id: str) -> tuple[str, dict[str, Any]]:
         codigo = _validar_item_id(item_id)
-        credenciais = self._conectar.credenciais_ativas(vendedor_id, MERCADO_LIVRE)
+        credenciais = self._conectar.credenciais_ativas(vendedor_id, self._canal)
         if credenciais is None or not credenciais.access_token:
-            raise MercadoLivreDesconectado()
+            raise self._erro_desconectado()
         try:
             atual = self._publicador.obter_anuncio(credenciais.access_token, codigo)
         except FalhaNoMarketplace as erro:
@@ -185,14 +239,14 @@ class PublicarNoMercadoLivre:
         return credenciais.access_token, atual
 
     def executar(self, vendedor_id: int, anuncio: dict[str, Any], fotos: list[ArquivoDeFoto]) -> dict[str, Any]:
-        dados = anuncio_de_dict(anuncio)
+        dados = anuncio_de_dict(anuncio, exigir_mlstatic=self._exigir_mlstatic)
         if dados.estoque < 1:
             raise ValueError("O estoque precisa ser de pelo menos 1 unidade.")
         if not fotos and not dados.fotos_mantidas:
             raise FotoInvalida("Escolha pelo menos uma foto para o anúncio.")
-        token = self._conectar.token_ativo(vendedor_id, MERCADO_LIVRE)
+        token = self._conectar.token_ativo(vendedor_id, self._canal)
         if not token:
-            raise MercadoLivreDesconectado()
+            raise self._erro_desconectado()
         preparadas = self._preparador.preparar(fotos) if fotos else []  # confere o conteúdo e tira os metadados
 
         ml = self._ml_da_analise(vendedor_id, dados.analise_id)
@@ -200,8 +254,12 @@ class PublicarNoMercadoLivre:
         if not categoria_id:
             sugerida = self._fonte.descobrir_categoria([dados.titulo], token)
             if sugerida is None:
-                raise PublicacaoRecusada(["Não consegui descobrir a categoria do Mercado Livre para esse título."])
-            categoria_id = sugerida.categoria_id
+                if self._canal == QUICKSTORE:
+                    categoria_id = CATEGORIA_PADRAO_QUICKSTORE
+                else:
+                    raise PublicacaoRecusada(["Não consegui descobrir a categoria do Mercado Livre para esse título."])
+            else:
+                categoria_id = sugerida.categoria_id
         da_categoria = self._fonte.atributos_da_categoria(categoria_id, token)
         ligados = completar_para_publicacao(
             ligar_confirmados(list(dados.atributos), da_categoria, ml.get("mapa") or {}),
@@ -224,12 +282,12 @@ class PublicarNoMercadoLivre:
             except FalhaNoMarketplace as erro:
                 if not _pede_family_name(erro.corpo):
                     raise
-                log.info("Mercado Livre pediu family_name (User Products): publicando de novo com ele.")
+                log.info("Marketplace pediu family_name (User Products): publicando de novo com ele.")
                 sem_titulo = {k: v for k, v in item.items() if k != "title"}
                 criado = self._publicador.publicar_anuncio(token, {**sem_titulo, "family_name": dados.titulo})
         except FalhaNoMarketplace as erro:
             causas = _causas(erro.corpo)
-            log.warning("Mercado Livre recusou a publicação (%s): %s", erro.status or "sem resposta",
+            log.warning("%s recusou a publicação (%s): %s", self._canal, erro.status or "sem resposta",
                         "; ".join(causas) or "sem detalhes")
             raise PublicacaoRecusada(causas) from erro
 
@@ -239,7 +297,7 @@ class PublicarNoMercadoLivre:
             try:
                 self._publicador.gravar_descricao(token, item_id, dados.descricao)
             except FalhaNoMarketplace as erro:
-                log.warning("Descrição não gravada no Mercado Livre (%s).", erro.status or "sem resposta")
+                log.warning("Descrição não gravada em %s (%s).", self._canal, erro.status or "sem resposta")
                 avisos.append({"codigo": "descricao_nao_gravada",
                                "mensagem": "O anúncio foi criado, mas a descrição não entrou. Confira no Mercado Livre."})
         return {"id": item_id, "permalink": criado.get("permalink"), "status": criado.get("status"),
@@ -263,7 +321,7 @@ class PublicarNoMercadoLivre:
 
     def atualizar(self, vendedor_id: int, item_id: str, anuncio: dict[str, Any],
                   fotos: list[ArquivoDeFoto] | None = None) -> dict[str, Any]:
-        dados = anuncio_de_dict(anuncio)
+        dados = anuncio_de_dict(anuncio, exigir_mlstatic=self._exigir_mlstatic)
         token, atual = self._conferir_dono(vendedor_id, item_id)
         codigo = str(atual["id"])
         preparadas = self._preparador.preparar(fotos) if fotos else []
@@ -322,7 +380,7 @@ class PublicarNoMercadoLivre:
             try:
                 self._publicador.atualizar_descricao(token, codigo, dados.descricao)
             except FalhaNoMarketplace as erro:
-                log.warning("Descrição não atualizada no Mercado Livre (%s).", erro.status or "sem resposta")
+                log.warning("Descrição não atualizada em %s (%s).", self._canal, erro.status or "sem resposta")
                 avisos.append({"codigo": "descricao_nao_gravada",
                                "mensagem": "Os dados principais foram salvos, mas a descrição não pôde ser atualizada."})
 

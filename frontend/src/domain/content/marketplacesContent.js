@@ -13,6 +13,7 @@
  */
 export const MARKETPLACE_CATALOG = [
   { slug: 'mercado-livre', name: 'Mercado Livre', monogram: 'ML', article: 'no', available: true },
+  { slug: 'quickstore', name: 'QuickStore', monogram: 'QS', article: 'na', available: true },
   { slug: 'shopee', name: 'Shopee', monogram: 'S', article: 'na', available: false },
   { slug: 'amazon', name: 'Amazon', monogram: 'A', article: 'na', available: false },
   { slug: 'magalu', name: 'Magalu', monogram: 'M', article: 'na', available: false },
@@ -37,6 +38,7 @@ export const MARKETPLACE_CATALOG = [
  */
 export const MARKETPLACE_PALETTES = {
   'mercado-livre': { primary: '#ffe600', secondary: '#fff159', deep: '#9c7c00', glow: '#fffbe0', titleTone: 'coral' },
+  quickstore: { primary: '#4f46e5', secondary: '#818cf8', deep: '#1e1b4b', glow: '#eef2ff', titleTone: 'coral' },
   shopee: { primary: '#ee4d2d', secondary: '#ff9f7a', deep: '#4a1205', glow: '#fff1ec', titleTone: 'cream' },
   amazon: { primary: '#ff6201', secondary: '#171d27', deep: '#0d1118', glow: '#fff4ea', titleTone: 'cream' },
   magalu: { primary: '#0e87fe', secondary: '#097db6', deep: '#031c3a', glow: '#eaf5ff', titleTone: 'coral' },

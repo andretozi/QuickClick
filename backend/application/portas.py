@@ -38,6 +38,8 @@ class RepositorioContasVinculadas(Protocol):
 
     def remover(self, vendedor_id: int, marketplace: str) -> None: ...
 
+    def buscar_por_conta_externa(self, marketplace: str, conta_externa_id: str) -> list[ContaVinculada]: ...
+
 
 class RepositorioDeProdutos(Protocol):
     """Todo método recebe o vendedor do token e só enxerga os produtos dele."""
@@ -216,3 +218,15 @@ class PublicadorMercadoLivre(Protocol):
     def atualizar_descricao(self, access_token: str, item_id: str, texto: str) -> Any: ...
 
     def excluir_anuncio(self, access_token: str, item_id: str) -> dict[str, Any]: ...
+
+
+class GatewayWebhookQuickStore(Protocol):
+    """Operações de webhook e consulta de pedidos da QuickStore."""
+
+    @property
+    def tem_segredo_configurado(self) -> bool: ...
+
+    def validar_assinatura_webhook(self, corpo_bruto: bytes, assinatura_header: str | None) -> bool: ...
+
+    def obter_pedido(self, access_token: str, resource_ou_order_id: str) -> dict[str, Any]: ...
+
