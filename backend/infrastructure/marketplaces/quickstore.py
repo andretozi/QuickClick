@@ -18,8 +18,9 @@ import httpx
 from backend.application.portas import FalhaNoMarketplace
 from backend.domain.conta_vinculada import CredenciaisOAuth
 
-URL_BASE_QUICKSTORE_PADRAO = "https://quickstore.azurewebsites.net"
+URL_BASE_QUICKSTORE_PADRAO = "https://quickstore-fwdyccgqfudmd0b9.chilecentral-01.azurewebsites.net"
 CLIENT_ID_QUICKSTORE_PADRAO = "QuickClickApp"
+CLIENT_SECRET_QUICKSTORE_PADRAO = "QS_QUICKCLICK_OFFICIAL_2026"
 REDIRECT_URI_QUICKSTORE_PADRAO = (
     "https://quickclick-cudkaseffgceaaaq.chilecentral-01.azurewebsites.net/api/quickstore/callback"
 )
@@ -84,7 +85,8 @@ class GatewayQuickStore:
         self._agora = agora
         self._base_url = (base_url or URL_BASE_QUICKSTORE_PADRAO).strip().rstrip("/")
         self._client_id = (client_id or CLIENT_ID_QUICKSTORE_PADRAO).strip()
-        self._client_secret = (client_secret or "").strip()
+        segredo = CLIENT_SECRET_QUICKSTORE_PADRAO if client_secret is None else client_secret
+        self._client_secret = segredo.strip()
         self._redirect_uri = (redirect_uri or REDIRECT_URI_QUICKSTORE_PADRAO).strip()
         self._client = client
 
