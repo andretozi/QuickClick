@@ -338,7 +338,17 @@ export const LISTING_EDITOR = {
     text: 'Ele pode ter sido excluído. Que tal voltar ao painel?',
     action: { label: 'Voltar ao painel', href: '#/painel' }
   },
-  saved: { title: 'Alterações salvas.', text: 'O anúncio já está atualizado em todos os canais.' }
+  saved: { title: 'Alterações salvas.', text: 'O anúncio já está atualizado em todos os canais.' },
+  savedChannel: (channelName) => ({
+    title: `Alterações salvas em ${channelName}.`,
+    text: `Somente o anúncio de ${channelName} foi atualizado.`
+  }),
+  channelScopeBanner: (channelName) =>
+    `Modo individual: você está editando apenas em ${channelName}. As alterações feitas aqui não mudam os outros canais.`,
+  channelDisconnectedTitle: (channelName) => `Você não está logado ou conectado em ${channelName}.`,
+  channelDisconnectedText: (channelName) =>
+    `Conecte sua conta de ${channelName} em Marketplaces para publicar, retomar ou enviar alterações para essa plataforma.`,
+  connectAction: { label: 'Ir para Marketplaces', href: '#/marketplaces' }
 };
 
 /** Visão geral das macroinformações de um anúncio (#/anuncios/:id). */
@@ -348,7 +358,7 @@ export const LISTING_DETAIL = {
   loading: 'Carregando os dados do anúncio…',
   syncing: 'Sincronizando canais…',
   actions: {
-    edit: 'Editar anúncio',
+    edit: 'Editar em todos os canais',
     sync: 'Sincronizar agora',
     viewOnMl: 'Abrir no Mercado Livre',
     viewOnQs: 'Abrir na QuickStore',
@@ -363,6 +373,31 @@ export const LISTING_DETAIL = {
     standbyQs: 'Tirar de venda na QuickStore (Standby)',
     duplicate: 'Duplicar',
     remove: 'Excluir'
+  },
+  channels: {
+    title: 'Gerenciar por e-commerce',
+    subtitle: 'Controle cada plataforma separadamente ou edite apenas um canal por vez.',
+    connected: 'Conta conectada',
+    disconnected: 'Conta desconectada',
+    disconnectedAlertTitle: (name) => `Você não está logado ou conectado em ${name}.`,
+    disconnectedAlertText: (name) =>
+      `Conecte sua conta de ${name} em Marketplaces para publicar, retomar ou atualizar este anúncio na plataforma.`,
+    connectCta: 'Conectar em Marketplaces',
+    itemCode: (code) => `Código: ${code}`,
+    editChannel: (name) => `Editar em ${name}`,
+    standbyChannel: 'Tirar de venda (Standby)',
+    publishChannel: (name) => `Publicar em ${name}`,
+    pauseChannel: (name) => `Pausar em ${name}`,
+    resumeChannel: (name) => `Reativar em ${name}`,
+    openChannel: (name) => `Abrir em ${name}`
+  },
+  globalActions: {
+    title: 'Ações gerais do anúncio',
+    subtitle: 'Aplicam a mesma operação em todos os e-commerces conectados de uma só vez.',
+    pauseAll: 'Pausar em todos os canais',
+    resumeAll: 'Reativar em todos os canais',
+    publishAll: 'Publicar nos canais conectados',
+    editAll: 'Editar em todos os canais'
   },
   metrics: {
     price: 'Preço de venda',
@@ -397,6 +432,10 @@ export const LISTING_DETAIL = {
   toasts: {
     synced: { title: 'Anúncio sincronizado.', text: 'As informações vieram direto dos canais conectados.' },
     standby: { title: 'Produto em standby.', text: 'Ele foi retirado de venda nesse canal e pode voltar quando você quiser.' },
+    standbyDisconnected: (name) => ({
+      title: `Você não está conectado em ${name}.`,
+      text: `Conecte sua conta de ${name} em Marketplaces para retirar o anúncio ativo dessa plataforma.`
+    }),
     syncError: { title: 'Não deu pra sincronizar agora.', text: 'Mostrando os últimos dados salvos no painel.' }
   }
 };
@@ -471,8 +510,14 @@ export const AI_ERRORS = {
   foto_invalida: { title: 'Não deu pra abrir uma das fotos.', text: 'Use JPG, PNG ou WEBP de até 10 MB.' },
   fotos_necessarias: { title: 'Precisamos das fotos de novo.', text: 'Elas saíram da memória. Mande de novo para continuar.' },
   interrompida: { title: 'A análise parou no meio.', text: 'O servidor reiniciou. Toque em tentar de novo.' },
-  mercado_livre_desconectado: { title: 'O Mercado Livre não está conectado.', text: 'Conecte a sua conta para publicar.' },
-  quickstore_desconectada: { title: 'A QuickStore não está conectada.', text: 'Conecte a sua conta para publicar.' },
+  mercado_livre_desconectado: {
+    title: 'Você não está logado ou conectado no Mercado Livre.',
+    text: 'Conecte sua conta do Mercado Livre em Marketplaces para publicar, retomar ou gerenciar o anúncio.'
+  },
+  quickstore_desconectada: {
+    title: 'Você não está logado ou conectado na QuickStore.',
+    text: 'Conecte sua conta da QuickStore em Marketplaces para publicar, retomar ou gerenciar o anúncio.'
+  },
   publicacao_recusada: { title: 'O Mercado Livre recusou a operação.', text: 'Confira os dados do anúncio e tente de novo.' },
   anuncio_nao_encontrado: { title: 'Anúncio não encontrado no Mercado Livre.', text: 'Ele pode já ter sido removido por lá.' },
   descricao_nao_gravada: { title: 'O anúncio foi salvo, mas a descrição não entrou.', text: 'Confira no Mercado Livre.' },

@@ -32,10 +32,10 @@ import {
   LISTING_STATUS,
   PRIMARY_CHANNEL,
   QUICKSTORE_CHANNEL,
+  channelActionTargets,
   channelStatus,
   copyTitle,
   filterListings,
-  listingStatus,
   sortListings,
   summarizeListings
 } from '@/domain/listings/listingRules.js';
@@ -45,6 +45,13 @@ import { aiErrorText } from '@/domain/content/listingContent.js';
 export const DASHBOARD_TABS = { LISTINGS: 'listings', INSIGHTS: 'insights' };
 
 const DEFAULT_FILTERS = { query: '', status: 'all', sort: 'recent' };
+
+const CHANNEL_NAMES = {
+  [PRIMARY_CHANNEL]: 'Mercado Livre',
+  [QUICKSTORE_CHANNEL]: 'QuickStore'
+};
+
+const formatChannelNames = (slugs) => slugs.map((slug) => CHANNEL_NAMES[slug] ?? slug).join(' e ');
 
 /** Rede fora ou servidor com erro (5xx): o painel mostra a cópia salva no navegador. */
 const isConnectionError = (error) => error?.status === 0 || error?.status >= 500 || error?.code === 'sem_conexao';
@@ -90,6 +97,13 @@ export default function useDashboard() {
   const [hour] = useState(currentHour);
   const mounted = useMountedRef();
 
+  const markChannelDisconnected = useCallback((slug) => {
+    setData((current) => ({
+      ...current,
+      connections: current.connections.filter((connection) => connection.slug !== slug)
+    }));
+  }, []);
+
   const syncAllConnected = useCallback(
     async (connectionsList) => {
       if (!accountId) return null;
@@ -101,8 +115,10 @@ export default function useDashboard() {
           const mlProducts = await fetchMarketplaceProducts(PRIMARY_CHANNEL);
           if (!mounted.current) return null;
           latest = await syncListingsWithMercadoLivre(accountId, mlProducts);
-        } catch {
-          // Mantém a lista atual se o Mercado Livre não responder
+        } catch (error) {
+          if (mounted.current && error?.code === 'mercado_livre_desconectado') {
+            markChannelDisconnected(PRIMARY_CHANNEL);
+          }
         }
       }
       if (qsConnected) {
@@ -110,13 +126,15 @@ export default function useDashboard() {
           const qsProducts = await fetchMarketplaceProducts(QUICKSTORE_CHANNEL);
           if (!mounted.current) return null;
           latest = await syncListingsWithQuickStore(accountId, qsProducts);
-        } catch {
-          // Mantém a lista atual se a QuickStore não responder
+        } catch (error) {
+          if (mounted.current && error?.code === 'quickstore_desconectada') {
+            markChannelDisconnected(QUICKSTORE_CHANNEL);
+          }
         }
       }
       return latest;
     },
-    [accountId, mounted]
+    [accountId, markChannelDisconnected, mounted]
   );
 
   const load = useCallback(async () => {
@@ -201,10 +219,15 @@ export default function useDashboard() {
     }));
   }, []);
 
-  const failed = useCallback((error) => {
-    const message = error?.code ? aiErrorText(error.code, error.userMessage) : LISTINGS_PANEL.toasts.error;
-    showToast({ tone: TOAST_TONES.ERROR, ...message });
-  }, []);
+  const failed = useCallback(
+    (error) => {
+      if (error?.code === 'mercado_livre_desconectado') markChannelDisconnected(PRIMARY_CHANNEL);
+      if (error?.code === 'quickstore_desconectada') markChannelDisconnected(QUICKSTORE_CHANNEL);
+      const message = error?.code ? aiErrorText(error.code, error.userMessage) : LISTINGS_PANEL.toasts.error;
+      showToast({ tone: TOAST_TONES.ERROR, ...message });
+    },
+    [markChannelDisconnected]
+  );
 
   const syncNow = useCallback(async () => {
     if (!accountId || (!mercadoLivreConnected && !quickStoreConnected) || syncing) return;
@@ -229,15 +252,104 @@ export default function useDashboard() {
     }
   }, [accountId, failed, mercadoLivreConnected, quickStoreConnected, mounted, syncing]);
 
+  const applyChannelTransition = useCallback(
+    async (currentListing, channel, targetStatus) => {
+      const isQs = channel === QUICKSTORE_CHANNEL;
+      const currentStatus = channelStatus(currentListing, channel);
+      const itemId = isQs ? currentListing.qsItemId : currentListing.mlItemId;
+      const shouldCreateFresh = !itemId || currentStatus === LISTING_STATUS.UNPUBLISHED;
+
+      if (!shouldCreateFresh) {
+        try {
+          if (isQs) {
+            const qsItem = await updateQuickStoreStatus(itemId, targetStatus);
+            return mergeQuickStoreItem(accountId, currentListing.id, qsItem);
+          }
+          const mlItem = await updateMercadoLivreStatus(itemId, targetStatus);
+          return mergeMercadoLivreItem(accountId, currentListing.id, mlItem);
+        } catch (error) {
+          if (
+            targetStatus === LISTING_STATUS.PUBLISHED &&
+            (error?.code === 'anuncio_nao_encontrado' || error?.code === 'publicacao_recusada')
+          ) {
+            const { payload, photoBlobs } = buildPublishInputs(currentListing);
+            const published = isQs
+              ? await publishToQuickStore(payload, photoBlobs)
+              : await publishToMercadoLivre(payload, photoBlobs);
+            return updateListing(
+              accountId,
+              currentListing.id,
+              isQs
+                ? {
+                    qsItemId: published.id,
+                    qsPermalink: published.permalink,
+                    qsCategoryId: published.categoryId ?? currentListing.qsCategoryId ?? currentListing.mlCategoryId,
+                    channels: { ...currentListing.channels, [QUICKSTORE_CHANNEL]: LISTING_STATUS.PUBLISHED }
+                  }
+                : {
+                    mlItemId: published.id,
+                    permalink: published.permalink,
+                    mlCategoryId: published.categoryId ?? currentListing.mlCategoryId,
+                    channels: { ...currentListing.channels, [PRIMARY_CHANNEL]: LISTING_STATUS.PUBLISHED }
+                  },
+              { syncQuickStore: false }
+            );
+          }
+          throw error;
+        }
+      }
+
+      if (targetStatus === LISTING_STATUS.PUBLISHED) {
+        const { payload, photoBlobs } = buildPublishInputs(currentListing);
+        const published = isQs
+          ? await publishToQuickStore(payload, photoBlobs)
+          : await publishToMercadoLivre(payload, photoBlobs);
+        return updateListing(
+          accountId,
+          currentListing.id,
+          isQs
+            ? {
+                qsItemId: published.id,
+                qsPermalink: published.permalink,
+                qsCategoryId: published.categoryId ?? currentListing.qsCategoryId ?? currentListing.mlCategoryId,
+                channels: { ...currentListing.channels, [QUICKSTORE_CHANNEL]: targetStatus }
+              }
+            : {
+                mlItemId: published.id,
+                permalink: published.permalink,
+                mlCategoryId: published.categoryId ?? currentListing.mlCategoryId,
+                channels: { ...currentListing.channels, [PRIMARY_CHANNEL]: targetStatus }
+              },
+          { syncQuickStore: false }
+        );
+      }
+
+      return updateListing(
+        accountId,
+        currentListing.id,
+        {
+          channels: { ...currentListing.channels, [channel]: targetStatus }
+        },
+        { syncQuickStore: false }
+      );
+    },
+    [accountId]
+  );
+
   /** Publica, pausa ou reativa um produto em um canal específico ('mercado-livre' ou 'quickstore'). */
   const toggleChannelStatus = useCallback(
     async (listing, channel = PRIMARY_CHANNEL) => {
       const isQs = channel === QUICKSTORE_CHANNEL;
       const connected = isQs ? quickStoreConnected : mercadoLivreConnected;
-      if (!connected) return;
+      if (!connected) {
+        showToast({
+          tone: TOAST_TONES.ERROR,
+          ...aiErrorText(isQs ? 'quickstore_desconectada' : 'mercado_livre_desconectado')
+        });
+        return;
+      }
 
       const currentStatus = channelStatus(listing, channel);
-      const itemId = isQs ? listing.qsItemId : listing.mlItemId;
       const next =
         currentStatus === LISTING_STATUS.PUBLISHED
           ? { status: LISTING_STATUS.PAUSED, toast: LISTINGS_PANEL.toasts.paused }
@@ -250,72 +362,7 @@ export default function useDashboard() {
 
       setBusyId(listing.id);
       try {
-        let updated;
-        const shouldCreateFresh = !itemId || currentStatus === LISTING_STATUS.UNPUBLISHED;
-        if (!shouldCreateFresh) {
-          try {
-            if (isQs) {
-              const qsItem = await updateQuickStoreStatus(itemId, next.status);
-              updated = await mergeQuickStoreItem(accountId, listing.id, qsItem);
-            } else {
-              const mlItem = await updateMercadoLivreStatus(itemId, next.status);
-              updated = await mergeMercadoLivreItem(accountId, listing.id, mlItem);
-            }
-          } catch (error) {
-            // Se o item antigo estava fechado ou excluído no canal, publica um novo anúncio ativo
-            if (next.status === LISTING_STATUS.PUBLISHED && (error?.code === 'anuncio_nao_encontrado' || error?.code === 'publicacao_recusada')) {
-              const { payload, photoBlobs } = buildPublishInputs(listing);
-              const published = isQs
-                ? await publishToQuickStore(payload, photoBlobs)
-                : await publishToMercadoLivre(payload, photoBlobs);
-              updated = await updateListing(
-                accountId,
-                listing.id,
-                isQs
-                  ? {
-                      qsItemId: published.id,
-                      qsPermalink: published.permalink,
-                      qsCategoryId: published.categoryId ?? listing.qsCategoryId ?? listing.mlCategoryId,
-                      channels: { ...listing.channels, [QUICKSTORE_CHANNEL]: LISTING_STATUS.PUBLISHED }
-                    }
-                  : {
-                      mlItemId: published.id,
-                      permalink: published.permalink,
-                      mlCategoryId: published.categoryId ?? listing.mlCategoryId,
-                      channels: { ...listing.channels, [PRIMARY_CHANNEL]: LISTING_STATUS.PUBLISHED }
-                    }
-              );
-            } else {
-              throw error;
-            }
-          }
-        } else if (next.status === LISTING_STATUS.PUBLISHED) {
-          const { payload, photoBlobs } = buildPublishInputs(listing);
-          const published = isQs
-            ? await publishToQuickStore(payload, photoBlobs)
-            : await publishToMercadoLivre(payload, photoBlobs);
-          updated = await updateListing(
-            accountId,
-            listing.id,
-            isQs
-              ? {
-                  qsItemId: published.id,
-                  qsPermalink: published.permalink,
-                  qsCategoryId: published.categoryId ?? listing.qsCategoryId ?? listing.mlCategoryId,
-                  channels: { ...listing.channels, [QUICKSTORE_CHANNEL]: next.status }
-                }
-              : {
-                  mlItemId: published.id,
-                  permalink: published.permalink,
-                  mlCategoryId: published.categoryId ?? listing.mlCategoryId,
-                  channels: { ...listing.channels, [PRIMARY_CHANNEL]: next.status }
-                }
-          );
-        } else {
-          updated = await updateListing(accountId, listing.id, {
-            channels: { ...listing.channels, [channel]: next.status }
-          });
-        }
+        const updated = await applyChannelTransition(listing, channel, next.status);
         if (!mounted.current) return;
         replaceListing(updated);
         showToast({ tone: TOAST_TONES.SUCCESS, ...next.toast });
@@ -325,21 +372,77 @@ export default function useDashboard() {
         if (mounted.current) setBusyId(null);
       }
     },
-    [accountId, failed, mercadoLivreConnected, quickStoreConnected, replaceListing, mounted]
+    [applyChannelTransition, failed, mercadoLivreConnected, quickStoreConnected, replaceListing, mounted]
   );
 
-  /** Pausar (publicado), reativar (pausado) ou publicar (standby) nos canais conectados. */
+  /** Ação geral do painel principal: atua em todos os e-commerces relevantes e sinaliza vínculos ausentes. */
   const toggleStatus = useCallback(
     async (listing) => {
-      const mlStatus = channelStatus(listing, PRIMARY_CHANNEL);
-      const qsStatus = channelStatus(listing, QUICKSTORE_CHANNEL);
-      const targetChannel =
-        mlStatus === LISTING_STATUS.UNPUBLISHED && qsStatus !== LISTING_STATUS.UNPUBLISHED
-          ? QUICKSTORE_CHANNEL
-          : PRIMARY_CHANNEL;
-      await toggleChannelStatus(listing, targetChannel);
+      const connectedByChannel = {
+        [PRIMARY_CHANNEL]: mercadoLivreConnected,
+        [QUICKSTORE_CHANNEL]: quickStoreConnected
+      };
+      const { overall, nextStatus, connectedTargets, disconnectedTargets } = channelActionTargets(
+        listing,
+        connectedByChannel
+      );
+
+      if (connectedTargets.length === 0) {
+        if (disconnectedTargets.length === 1) {
+          const slug = disconnectedTargets[0];
+          showToast({
+            tone: TOAST_TONES.ERROR,
+            ...aiErrorText(slug === QUICKSTORE_CHANNEL ? 'quickstore_desconectada' : 'mercado_livre_desconectado')
+          });
+        } else {
+          showToast({
+            tone: TOAST_TONES.ERROR,
+            ...LISTINGS_PANEL.toasts.disconnectedMultiple(formatChannelNames(disconnectedTargets))
+          });
+        }
+        return;
+      }
+
+      setBusyId(listing.id);
+      try {
+        let current = listing;
+        for (const channel of connectedTargets) {
+          current = await applyChannelTransition(current, channel, nextStatus);
+        }
+        if (!mounted.current) return;
+        replaceListing(current);
+
+        const activeDisconnected = disconnectedTargets.filter(
+          (slug) => channelStatus(listing, slug) !== LISTING_STATUS.UNPUBLISHED
+        );
+        if (activeDisconnected.length > 0) {
+          showToast({
+            tone: TOAST_TONES.INFO,
+            ...LISTINGS_PANEL.toasts.partialSuccess(
+              formatChannelNames(connectedTargets),
+              formatChannelNames(activeDisconnected)
+            )
+          });
+        } else {
+          const toast =
+            overall === LISTING_STATUS.PUBLISHED
+              ? LISTINGS_PANEL.toasts.paused
+              : overall === LISTING_STATUS.PAUSED
+                ? LISTINGS_PANEL.toasts.resumed
+                : connectedTargets.length > 1
+                  ? LISTINGS_PANEL.toasts.publishedBoth
+                  : connectedTargets[0] === QUICKSTORE_CHANNEL
+                    ? LISTINGS_PANEL.toasts.publishedQs
+                    : LISTINGS_PANEL.toasts.publishedMl;
+          showToast({ tone: TOAST_TONES.SUCCESS, ...toast });
+        }
+      } catch (error) {
+        if (mounted.current) failed(error);
+      } finally {
+        if (mounted.current) setBusyId(null);
+      }
     },
-    [toggleChannelStatus]
+    [applyChannelTransition, failed, mercadoLivreConnected, mounted, quickStoreConnected, replaceListing]
   );
 
   const duplicate = useCallback(

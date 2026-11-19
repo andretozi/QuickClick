@@ -1,3 +1,4 @@
+import Icon from '@/presentation/components/Icon/Icon.jsx';
 import MarketplaceLogo from '@/presentation/components/MarketplaceLogo/MarketplaceLogo.jsx';
 import StatusPill from '@/presentation/components/StatusPill/StatusPill.jsx';
 import { cx } from '@/presentation/utils/cx.js';
@@ -31,9 +32,11 @@ export default function ListingChannels({
       {AVAILABLE.map((marketplace) => {
         const chStatus = channels?.[marketplace.slug] ?? LISTING_STATUS.UNPUBLISHED;
         const statusInfo = LISTING_STATUS_LABELS[chStatus] ?? LISTING_STATUS_LABELS.unpublished;
+        const isConnected = Boolean(connectedByChannel[marketplace.slug]);
+        const isDisconnectedWithListing = chStatus !== LISTING_STATUS.UNPUBLISHED && !isConnected;
         const canQuickAdd =
           Boolean(onPublishChannel) &&
-          Boolean(connectedByChannel[marketplace.slug]) &&
+          isConnected &&
           chStatus === LISTING_STATUS.UNPUBLISHED;
 
         return (
@@ -53,10 +56,22 @@ export default function ListingChannels({
                 {`+ ${marketplace.name}`}
               </button>
             ) : (
-              <StatusPill tone={statusInfo.tone} size="sm">
-                <span className="visually-hidden">{`${marketplace.name}: `}</span>
-                {statusInfo.label}
-              </StatusPill>
+              <>
+                <StatusPill tone={statusInfo.tone} size="sm">
+                  <span className="visually-hidden">{`${marketplace.name}: `}</span>
+                  {statusInfo.label}
+                </StatusPill>
+                {isDisconnectedWithListing && (
+                  <span
+                    className="listing-channels__disconnected"
+                    title={LISTINGS_PANEL.channels.disconnectedHint(marketplace.name)}
+                    aria-label={LISTINGS_PANEL.channels.disconnectedHint(marketplace.name)}
+                  >
+                    <Icon name="alert" size={12} />
+                    {LISTINGS_PANEL.channels.disconnectedBadge}
+                  </span>
+                )}
+              </>
             )}
           </span>
         );

@@ -229,6 +229,8 @@ class PublicarNoMercadoLivre:
         try:
             atual = self._publicador.obter_anuncio(credenciais.access_token, codigo)
         except FalhaNoMarketplace as erro:
+            if erro.status in (401, 403):
+                raise self._erro_desconectado() from erro
             if erro.status == 404:
                 raise AnuncioNaoEncontrado() from erro
             raise PublicacaoRecusada(_causas(erro.corpo)) from erro
@@ -280,12 +282,16 @@ class PublicarNoMercadoLivre:
             try:
                 criado = self._publicador.publicar_anuncio(token, item)
             except FalhaNoMarketplace as erro:
+                if erro.status in (401, 403):
+                    raise
                 if not _pede_family_name(erro.corpo):
                     raise
                 log.info("Marketplace pediu family_name (User Products): publicando de novo com ele.")
                 sem_titulo = {k: v for k, v in item.items() if k != "title"}
                 criado = self._publicador.publicar_anuncio(token, {**sem_titulo, "family_name": dados.titulo})
         except FalhaNoMarketplace as erro:
+            if erro.status in (401, 403):
+                raise self._erro_desconectado() from erro
             causas = _causas(erro.corpo)
             log.warning("%s recusou a publicação (%s): %s", self._canal, erro.status or "sem resposta",
                         "; ".join(causas) or "sem detalhes")
@@ -317,6 +323,8 @@ class PublicarNoMercadoLivre:
             self._publicador.atualizar_anuncio(token, codigo, {"status": destino})
             return self._publicador.obter_anuncio(token, codigo)
         except FalhaNoMarketplace as erro:
+            if erro.status in (401, 403):
+                raise self._erro_desconectado() from erro
             raise PublicacaoRecusada(_causas(erro.corpo)) from erro
 
     def atualizar(self, vendedor_id: int, item_id: str, anuncio: dict[str, Any],
@@ -329,6 +337,8 @@ class PublicarNoMercadoLivre:
         try:
             novas = self._subir_imagens(token, preparadas)
         except FalhaNoMarketplace as erro:
+            if erro.status in (401, 403):
+                raise self._erro_desconectado() from erro
             raise PublicacaoRecusada(_causas(erro.corpo)) from erro
 
         mantidas = [{"source": url} for url in dados.fotos_mantidas]
@@ -371,6 +381,8 @@ class PublicarNoMercadoLivre:
             try:
                 self._publicador.atualizar_anuncio(token, codigo, mudancas)
             except FalhaNoMarketplace as erro:
+                if erro.status in (401, 403):
+                    raise
                 if _pede_family_name(erro.corpo) and "title" in mudancas:
                     sem_titulo = {k: v for k, v in mudancas.items() if k != "title"}
                     self._publicador.atualizar_anuncio(token, codigo, {**sem_titulo, "family_name": dados.titulo})
@@ -382,6 +394,8 @@ class PublicarNoMercadoLivre:
                         essencial["title"] = dados.titulo
                     self._publicador.atualizar_anuncio(token, codigo, essencial)
         except FalhaNoMarketplace as erro:
+            if erro.status in (401, 403):
+                raise self._erro_desconectado() from erro
             raise PublicacaoRecusada(_causas(erro.corpo)) from erro
 
         avisos = []
@@ -402,5 +416,7 @@ class PublicarNoMercadoLivre:
         try:
             self._publicador.excluir_anuncio(token, codigo)
         except FalhaNoMarketplace as erro:
+            if erro.status in (401, 403):
+                raise self._erro_desconectado() from erro
             raise PublicacaoRecusada(_causas(erro.corpo)) from erro
         return {"id": codigo, "excluido": True}

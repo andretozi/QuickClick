@@ -17,16 +17,33 @@ import './ChannelsStep.css';
  * Mercado Livre e QuickStore publicam direto pela Quick Click.
  */
 export default function ChannelsStep({ editor }) {
-  const { draft, update, connection, qsConnection, canPublishMl, canPublishQs, priceCents, ai, editing, quota } = editor;
+  const {
+    draft,
+    update,
+    connection,
+    qsConnection,
+    canPublishMl,
+    canPublishQs,
+    channelScope,
+    priceCents,
+    ai,
+    editing,
+    quota
+  } = editor;
   const texts = LISTING_WIZARD.channels;
   const market = ai.analysis?.price?.market;
   const stock = Number(draft.stock) || 0;
   const fromAnalysis = ai.analysis?.channels;
-  const others = (fromAnalysis ?? MARKETPLACE_CATALOG.map((m) => ({ slug: m.slug, connected: false, reason: null })))
-    .filter((channel) => channel.slug !== PRIMARY_CHANNEL && channel.slug !== QUICKSTORE_CHANNEL);
+  const showMl = !channelScope || channelScope === PRIMARY_CHANNEL;
+  const showQs = !channelScope || channelScope === QUICKSTORE_CHANNEL;
+  const others = channelScope
+    ? []
+    : (fromAnalysis ?? MARKETPLACE_CATALOG.map((m) => ({ slug: m.slug, connected: false, reason: null }))).filter(
+        (channel) => channel.slug !== PRIMARY_CHANNEL && channel.slug !== QUICKSTORE_CHANNEL
+      );
   const yours = others.filter((channel) => channel.connected);
   const worth = others.filter((channel) => !channel.connected);
-  const noneSelected = (!canPublishMl || !draft.publishMl) && (!canPublishQs || !draft.publishQs);
+  const noneSelected = (!showMl || !canPublishMl || !draft.publishMl) && (!showQs || !canPublishQs || !draft.publishQs);
 
   return (
     <div className="channels-step">
@@ -54,63 +71,67 @@ export default function ChannelsStep({ editor }) {
         <div className="channels-step__list">
           {/* Sem nenhuma conta conectada, o Mercado Livre e a QuickStore aparecem como onde publicar */}
           <h3 className="channels-step__group">{canPublishMl || canPublishQs || yours.length ? texts.yours : texts.publishHere}</h3>
-          <section className="channels-step__main" aria-labelledby="canal-ml">
-            <div className="channels-step__main-head">
-              <span className="channels-step__logo">
-                <MarketplaceLogo slug={PRIMARY_CHANNEL} size="lg" />
-              </span>
-              <StatusPill tone={canPublishMl ? 'green' : 'honey'} size="sm">
-                {canPublishMl ? texts.connected(connection.nickname) : texts.available}
-              </StatusPill>
-            </div>
-            <h4 id="canal-ml" className="visually-hidden">
-              {texts.toggleLabel}
-            </h4>
-            {canPublishMl ? (
-              <Toggle
-                checked={draft.publishMl}
-                onChange={(checked) => update({ publishMl: checked })}
-                label={texts.toggleLabel}
-                description={noneSelected ? texts.noneSelected : null}
-              />
-            ) : (
-              <div className="channels-step__connect">
-                <p className="channels-step__connect-text">{texts.notConnected}</p>
-                <Button href={texts.connect.href} size="sm" icon="link" iconPosition="start" iconSize={16}>
-                  {texts.connect.label}
-                </Button>
+          {showMl && (
+            <section className="channels-step__main" aria-labelledby="canal-ml">
+              <div className="channels-step__main-head">
+                <span className="channels-step__logo">
+                  <MarketplaceLogo slug={PRIMARY_CHANNEL} size="lg" />
+                </span>
+                <StatusPill tone={canPublishMl ? 'green' : 'honey'} size="sm">
+                  {canPublishMl ? texts.connected(connection.nickname) : texts.available}
+                </StatusPill>
               </div>
-            )}
-          </section>
+              <h4 id="canal-ml" className="visually-hidden">
+                {texts.toggleLabel}
+              </h4>
+              {canPublishMl ? (
+                <Toggle
+                  checked={draft.publishMl}
+                  onChange={(checked) => update({ publishMl: checked })}
+                  label={texts.toggleLabel}
+                  description={noneSelected ? texts.noneSelected : null}
+                />
+              ) : (
+                <div className="channels-step__connect">
+                  <p className="channels-step__connect-text">{texts.notConnected}</p>
+                  <Button href={texts.connect.href} size="sm" icon="link" iconPosition="start" iconSize={16}>
+                    {texts.connect.label}
+                  </Button>
+                </div>
+              )}
+            </section>
+          )}
 
-          <section className="channels-step__main" aria-labelledby="canal-qs">
-            <div className="channels-step__main-head">
-              <span className="channels-step__logo">
-                <MarketplaceLogo slug={QUICKSTORE_CHANNEL} size="lg" />
-              </span>
-              <StatusPill tone={canPublishQs ? 'green' : 'honey'} size="sm">
-                {canPublishQs ? texts.connected(qsConnection?.nickname) : texts.available}
-              </StatusPill>
-            </div>
-            <h4 id="canal-qs" className="visually-hidden">
-              {texts.toggleLabelQs}
-            </h4>
-            {canPublishQs ? (
-              <Toggle
-                checked={draft.publishQs}
-                onChange={(checked) => update({ publishQs: checked })}
-                label={texts.toggleLabelQs}
-                description={noneSelected ? texts.noneSelected : null}
-              />
-            ) : (
-              <div className="channels-step__connect">
-                <p className="channels-step__connect-text">{texts.notConnectedQs}</p>
-                <Button href={texts.connectQs.href} size="sm" icon="link" iconPosition="start" iconSize={16}>
-                  {texts.connectQs.label}
-                </Button>
+          {showQs && (
+            <section className="channels-step__main" aria-labelledby="canal-qs">
+              <div className="channels-step__main-head">
+                <span className="channels-step__logo">
+                  <MarketplaceLogo slug={QUICKSTORE_CHANNEL} size="lg" />
+                </span>
+                <StatusPill tone={canPublishQs ? 'green' : 'honey'} size="sm">
+                  {canPublishQs ? texts.connected(qsConnection?.nickname) : texts.available}
+                </StatusPill>
               </div>
-            )}
-          </section>
+              <h4 id="canal-qs" className="visually-hidden">
+                {texts.toggleLabelQs}
+              </h4>
+              {canPublishQs ? (
+                <Toggle
+                  checked={draft.publishQs}
+                  onChange={(checked) => update({ publishQs: checked })}
+                  label={texts.toggleLabelQs}
+                  description={noneSelected ? texts.noneSelected : null}
+                />
+              ) : (
+                <div className="channels-step__connect">
+                  <p className="channels-step__connect-text">{texts.notConnectedQs}</p>
+                  <Button href={texts.connectQs.href} size="sm" icon="link" iconPosition="start" iconSize={16}>
+                    {texts.connectQs.label}
+                  </Button>
+                </div>
+              )}
+            </section>
+          )}
 
           {yours.map((channel) => (
             <div key={channel.slug} className="channels-step__account" data-enter="3">

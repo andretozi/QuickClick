@@ -1,16 +1,21 @@
 import { formatMoney } from '@/domain/format/format.js';
+import { PRIMARY_CHANNEL, QUICKSTORE_CHANNEL } from '@/domain/listings/listingRules.js';
 import { categoryLabel, conditionLabel, LISTING_WIZARD } from '@/domain/content/listingContent.js';
 import './PublishStep.css';
 
 /** Passo 5: o resumo, com atalho para alterar cada parte. O botão de publicar fica no rodapé. */
 export default function PublishStep({ editor }) {
-  const { draft, priceCents, willPublishMl, willPublishQs, goTo, steps } = editor;
+  const { draft, priceCents, willPublishMl, willPublishQs, channelScope, goTo, steps } = editor;
   const { title, lead, summary, channelsNone, channelsMl, channelsQs, channelsBoth } = LISTING_WIZARD.publish;
   const stepOf = (name) => steps.indexOf(name);
   // a capa vem primeiro (e ocupa o dobro)
   const photos = [draft.photos[draft.coverIndex], ...draft.photos.filter((_, i) => i !== draft.coverIndex)].filter(Boolean);
   let channelsValue = channelsNone;
-  if (willPublishMl && willPublishQs) {
+  if (channelScope === PRIMARY_CHANNEL) {
+    channelsValue = willPublishMl ? channelsMl : channelsNone;
+  } else if (channelScope === QUICKSTORE_CHANNEL) {
+    channelsValue = willPublishQs ? channelsQs : channelsNone;
+  } else if (willPublishMl && willPublishQs) {
     channelsValue = channelsBoth;
   } else if (willPublishMl) {
     channelsValue = channelsMl;

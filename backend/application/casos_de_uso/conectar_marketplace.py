@@ -13,12 +13,23 @@ from datetime import datetime
 from typing import Any
 
 from backend.application.casos_de_uso.comum import MarketplaceDoVendedor, agora_utc, obter_vendedor
-from backend.application.portas import GatewayMarketplace, RepositorioContasVinculadas, RepositorioVendedores
+from backend.application.portas import (
+    FalhaNoMarketplace,
+    GatewayMarketplace,
+    RepositorioContasVinculadas,
+    RepositorioVendedores,
+)
 from backend.domain.conta_vinculada import ContaVinculada, CredenciaisOAuth
-from backend.domain.erros import MarketplaceNaoEncontrado
+from backend.domain.erros import MarketplaceNaoEncontrado, MercadoLivreDesconectado, QuickStoreDesconectada
 from backend.domain.marketplace import Marketplace, obter_marketplace_disponivel
 
 log = logging.getLogger("quickclick.marketplaces")
+
+
+def _erro_desconectado(slug: str) -> Exception:
+    if slug == "quickstore":
+        return QuickStoreDesconectada()
+    return MercadoLivreDesconectado()
 
 
 class ConectarMarketplace:
@@ -46,13 +57,13 @@ class ConectarMarketplace:
         return marketplace, existente
 
     def _obter_conta_e_gateway_ativo(self, vendedor_id: int, slug: str) -> tuple[CredenciaisOAuth, GatewayMarketplace]:
-        conta = self._contas.buscar(vendedor_id, slug)
-        if conta is None:
-            raise MarketplaceNaoEncontrado(f"Conta do marketplace '{slug}' não está conectada.")
-
         gateway = self._gateways.get(slug)
         if gateway is None:
             raise MarketplaceNaoEncontrado(f"Gateway para marketplace '{slug}' não disponível.")
+
+        conta = self._contas.buscar(vendedor_id, slug)
+        if conta is None:
+            raise _erro_desconectado(slug)
 
         credenciais = conta.credenciais
         if credenciais.expirada(self._agora()):
@@ -105,5 +116,14 @@ class ConectarMarketplace:
         return credenciais.access_token if credenciais is not None else None
 
     def listar_produtos(self, vendedor_id: int, slug: str) -> list[dict[str, Any]]:
-        credenciais, gateway = self._obter_conta_e_gateway_ativo(vendedor_id, slug)
-        return gateway.listar_anuncios(credenciais.access_token, credenciais.conta_externa_id)
+        try:
+            credenciais, gateway = self._obter_conta_e_gateway_ativo(vendedor_id, slug)
+        except (RuntimeError, ValueError) as erro:
+            log.warning("Token do %s não renovou (%s).", slug, type(erro).__name__)
+            raise _erro_desconectado(slug) from erro
+        try:
+            return gateway.listar_anuncios(credenciais.access_token, credenciais.conta_externa_id)
+        except FalhaNoMarketplace as erro:
+            if erro.status in (401, 403):
+                raise _erro_desconectado(slug) from erro
+            raise

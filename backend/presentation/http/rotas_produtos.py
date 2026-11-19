@@ -65,8 +65,19 @@ def criar_rotas_produtos(casos: CasosDeUso, VendedorAtual) -> APIRouter:  # noqa
         return produto_saida(await run_in_threadpool(servico().obter, vendedor_id, produto_id))
 
     @rotas.put("/{produto_id}", summary="Cria ou substitui o anúncio e as publicações dele")
-    async def salvar(produto_id: ProdutoId, corpo: ProdutoApi, vendedor_id: VendedorAtual) -> ProdutoApi:
-        produto = await run_in_threadpool(servico().salvar, vendedor_id, produto_do_corpo(corpo, produto_id))
+    async def salvar(
+        produto_id: ProdutoId,
+        corpo: ProdutoApi,
+        vendedor_id: VendedorAtual,
+        sincronizar_quickstore: bool = True,
+    ) -> ProdutoApi:
+        produto = await run_in_threadpool(
+            lambda: servico().salvar(
+                vendedor_id,
+                produto_do_corpo(corpo, produto_id),
+                sincronizar_quickstore=sincronizar_quickstore,
+            )
+        )
         return produto_saida(produto)
 
     @rotas.delete("/{produto_id}", status_code=204, summary="Apaga o anúncio e as publicações dele")

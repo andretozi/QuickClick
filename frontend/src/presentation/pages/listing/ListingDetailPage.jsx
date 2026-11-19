@@ -1,13 +1,15 @@
 import Button from '@/presentation/components/Button/Button.jsx';
 import EmptyState from '@/presentation/components/EmptyState/EmptyState.jsx';
+import FormAlert from '@/presentation/components/FormAlert/FormAlert.jsx';
 import Icon from '@/presentation/components/Icon/Icon.jsx';
+import MarketplaceLogo from '@/presentation/components/MarketplaceLogo/MarketplaceLogo.jsx';
 import Modal from '@/presentation/components/Modal/Modal.jsx';
 import PageHeader from '@/presentation/components/PageHeader/PageHeader.jsx';
 import Panel from '@/presentation/components/Panel/Panel.jsx';
 import StatusPanel from '@/presentation/components/StatusPanel/StatusPanel.jsx';
 import StatusPill from '@/presentation/components/StatusPill/StatusPill.jsx';
 import useListingDetail from '@/application/listings/useListingDetail.js';
-import { hrefForListingEdit } from '@/application/navigation/routes.js';
+import { ROUTE_HASH, ROUTES, hrefForListingEdit } from '@/application/navigation/routes.js';
 import { cx } from '@/presentation/utils/cx.js';
 import {
   LISTING_STATUS,
@@ -52,7 +54,7 @@ export default function ListingDetailPage({ params }) {
     setSelectedPhoto,
     syncNow,
     toggleChannelStatus,
-    publishBothChannels,
+    toggleAllChannels,
     putInStandby,
     duplicate,
     confirmingDelete,
@@ -98,26 +100,35 @@ export default function ListingDetailPage({ params }) {
       ? Math.round(rawHealth <= 1 ? rawHealth * 100 : rawHealth)
       : null;
 
-  const mlButton =
-    mlStatus === LISTING_STATUS.PUBLISHED
-      ? { icon: 'pause', label: LISTING_DETAIL.actions.pause }
-      : mlStatus === LISTING_STATUS.PAUSED
-        ? { icon: 'play', label: LISTING_DETAIL.actions.resume }
-        : { icon: 'upload', label: LISTING_DETAIL.actions.publish };
-
-  const qsButton =
-    qsStatus === LISTING_STATUS.PUBLISHED
-      ? { icon: 'pause', label: LISTING_DETAIL.actions.pauseQs }
-      : qsStatus === LISTING_STATUS.PAUSED
-        ? { icon: 'play', label: LISTING_DETAIL.actions.resumeQs }
-        : { icon: 'upload', label: LISTING_DETAIL.actions.publishQs };
-
   const canSyncAny = (listing.mlItemId && mlConnected) || (listing.qsItemId && qsConnected);
-  const showPublishBoth =
-    mlConnected &&
-    qsConnected &&
-    mlStatus === LISTING_STATUS.UNPUBLISHED &&
-    qsStatus === LISTING_STATUS.UNPUBLISHED;
+
+  const channelCards = [
+    {
+      slug: PRIMARY_CHANNEL,
+      name: 'Mercado Livre',
+      connected: mlConnected,
+      status: mlStatus,
+      badge: mlBadge,
+      itemId: listing.mlItemId,
+      permalink: safePermalink
+    },
+    {
+      slug: QUICKSTORE_CHANNEL,
+      name: 'QuickStore',
+      connected: qsConnected,
+      status: qsStatus,
+      badge: qsBadge,
+      itemId: listing.qsItemId,
+      permalink: safeQsPermalink
+    }
+  ];
+
+  const globalToggle =
+    overallStatus === LISTING_STATUS.PUBLISHED
+      ? { icon: 'pause', label: LISTING_DETAIL.globalActions.pauseAll }
+      : overallStatus === LISTING_STATUS.PAUSED
+        ? { icon: 'play', label: LISTING_DETAIL.globalActions.resumeAll }
+        : { icon: 'upload', label: LISTING_DETAIL.globalActions.publishAll };
 
   return (
     <div className="listing-detail">
@@ -283,95 +294,163 @@ export default function ListingDetailPage({ params }) {
         </Panel>
 
         <div className="listing-detail__aside">
+          <Panel tone="paper" className="listing-detail__channels-panel">
+            <div className="listing-detail__section-head">
+              <div>
+                <h2 className="heading listing-detail__section-title">{LISTING_DETAIL.channels.title}</h2>
+                <p className="listing-detail__section-subtitle">{LISTING_DETAIL.channels.subtitle}</p>
+              </div>
+            </div>
+
+            <div className="listing-detail__channel-cards">
+              {channelCards.map((channel) => {
+                const toggleBtn =
+                  channel.status === LISTING_STATUS.PUBLISHED
+                    ? { icon: 'pause', label: LISTING_DETAIL.channels.pauseChannel(channel.name) }
+                    : channel.status === LISTING_STATUS.PAUSED
+                      ? { icon: 'play', label: LISTING_DETAIL.channels.resumeChannel(channel.name) }
+                      : { icon: 'upload', label: LISTING_DETAIL.channels.publishChannel(channel.name) };
+
+                return (
+                  <section
+                    key={channel.slug}
+                    className={cx(
+                      'listing-detail__channel-card',
+                      !channel.connected && 'listing-detail__channel-card--disconnected'
+                    )}
+                    aria-label={channel.name}
+                  >
+                    <div className="listing-detail__channel-head">
+                      <div className="listing-detail__channel-identity">
+                        <span className="listing-detail__channel-logo">
+                          <MarketplaceLogo slug={channel.slug} size="md" decorative />
+                        </span>
+                        <div className="listing-detail__channel-titles">
+                          <h3 className="heading listing-detail__channel-name">{channel.name}</h3>
+                          <span className="listing-detail__channel-connection">
+                            {channel.connected
+                              ? LISTING_DETAIL.channels.connected
+                              : LISTING_DETAIL.channels.disconnected}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="listing-detail__channel-badges">
+                        <StatusPill tone={channel.badge.tone} size="sm">
+                          {channel.badge.label}
+                        </StatusPill>
+                        {channel.itemId && (
+                          <StatusPill tone="cream" size="sm">
+                            {LISTING_DETAIL.channels.itemCode(channel.itemId)}
+                          </StatusPill>
+                        )}
+                      </div>
+                    </div>
+
+                    {!channel.connected && (
+                      <div className="listing-detail__channel-alert">
+                        <FormAlert title={LISTING_DETAIL.channels.disconnectedAlertTitle(channel.name)}>
+                          {LISTING_DETAIL.channels.disconnectedAlertText(channel.name)}
+                        </FormAlert>
+                        <Button
+                          href={ROUTE_HASH[ROUTES.MARKETPLACES]}
+                          size="sm"
+                          icon="link"
+                          iconPosition="start"
+                          iconSize={15}
+                        >
+                          {LISTING_DETAIL.channels.connectCta}
+                        </Button>
+                      </div>
+                    )}
+
+                    <div className="listing-detail__channel-actions">
+                      <Button
+                        variant={channel.status === LISTING_STATUS.UNPUBLISHED ? 'primary' : 'outline'}
+                        size="sm"
+                        icon={toggleBtn.icon}
+                        iconPosition="start"
+                        iconSize={15}
+                        onClick={() => toggleChannelStatus(channel.slug)}
+                        disabled={busy}
+                      >
+                        {toggleBtn.label}
+                      </Button>
+
+                      <Button
+                        href={hrefForListingEdit(listing.id, channel.slug)}
+                        variant="outline"
+                        size="sm"
+                        icon="edit"
+                        iconPosition="start"
+                        iconSize={15}
+                      >
+                        {LISTING_DETAIL.channels.editChannel(channel.name)}
+                      </Button>
+
+                      {channel.status !== LISTING_STATUS.UNPUBLISHED && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          icon="close"
+                          iconPosition="start"
+                          iconSize={15}
+                          onClick={() => putInStandby(channel.slug)}
+                          disabled={busy}
+                        >
+                          {LISTING_DETAIL.channels.standbyChannel}
+                        </Button>
+                      )}
+
+                      {channel.permalink && (
+                        <Button
+                          href={channel.permalink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          variant="outline"
+                          size="sm"
+                          icon="external"
+                          iconPosition="start"
+                          iconSize={15}
+                        >
+                          {LISTING_DETAIL.channels.openChannel(channel.name)}
+                        </Button>
+                      )}
+                    </div>
+                  </section>
+                );
+              })}
+            </div>
+          </Panel>
+
           <Panel tone="paper" className="listing-detail__actions-panel">
+            <div className="listing-detail__section-head">
+              <div>
+                <h2 className="heading listing-detail__section-title">{LISTING_DETAIL.globalActions.title}</h2>
+                <p className="listing-detail__section-subtitle">{LISTING_DETAIL.globalActions.subtitle}</p>
+              </div>
+            </div>
+
             <div className="listing-detail__action-buttons">
-              {showPublishBoth && (
-                <Button
-                  icon="sparkles"
-                  iconPosition="start"
-                  iconSize={16}
-                  onClick={publishBothChannels}
-                  disabled={busy}
-                >
-                  {LISTING_DETAIL.actions.publishBoth}
-                </Button>
-              )}
-
               <Button
-                variant={mlStatus === LISTING_STATUS.UNPUBLISHED && !showPublishBoth ? 'primary' : 'outline'}
-                icon={mlButton.icon}
+                variant={overallStatus === LISTING_STATUS.UNPUBLISHED ? 'primary' : 'outline'}
+                icon={globalToggle.icon}
                 iconPosition="start"
                 iconSize={16}
-                onClick={() => toggleChannelStatus(PRIMARY_CHANNEL)}
-                disabled={busy || !mlConnected}
+                onClick={toggleAllChannels}
+                disabled={busy}
               >
-                {mlButton.label}
+                {globalToggle.label}
               </Button>
-
-              {mlStatus !== LISTING_STATUS.UNPUBLISHED && (
-                <Button
-                  variant="outline"
-                  icon="close"
-                  iconPosition="start"
-                  iconSize={16}
-                  onClick={() => putInStandby(PRIMARY_CHANNEL)}
-                  disabled={busy}
-                >
-                  {LISTING_DETAIL.actions.standbyMl}
-                </Button>
-              )}
-
-              {safePermalink && (
-                <Button
-                  href={safePermalink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  variant="outline"
-                  icon="external"
-                  iconPosition="start"
-                  iconSize={16}
-                >
-                  {LISTING_DETAIL.actions.viewOnMl}
-                </Button>
-              )}
 
               <Button
-                variant={qsStatus === LISTING_STATUS.UNPUBLISHED && !showPublishBoth ? 'primary' : 'outline'}
-                icon={qsButton.icon}
+                href={hrefForListingEdit(listing.id)}
+                variant="outline"
+                icon="edit"
                 iconPosition="start"
                 iconSize={16}
-                onClick={() => toggleChannelStatus(QUICKSTORE_CHANNEL)}
-                disabled={busy || !qsConnected}
               >
-                {qsButton.label}
+                {LISTING_DETAIL.globalActions.editAll}
               </Button>
-
-              {qsStatus !== LISTING_STATUS.UNPUBLISHED && (
-                <Button
-                  variant="outline"
-                  icon="close"
-                  iconPosition="start"
-                  iconSize={16}
-                  onClick={() => putInStandby(QUICKSTORE_CHANNEL)}
-                  disabled={busy}
-                >
-                  {LISTING_DETAIL.actions.standbyQs}
-                </Button>
-              )}
-
-              {safeQsPermalink && (
-                <Button
-                  href={safeQsPermalink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  variant="outline"
-                  icon="external"
-                  iconPosition="start"
-                  iconSize={16}
-                >
-                  {LISTING_DETAIL.actions.viewOnQs}
-                </Button>
-              )}
 
               <Button
                 variant="outline"

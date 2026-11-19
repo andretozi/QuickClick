@@ -239,14 +239,18 @@ class MercadoLivreDesconectado(ErroDeDominio):
     codigo = "mercado_livre_desconectado"
 
     def __init__(self):
-        super().__init__("Conecte sua conta do Mercado Livre para publicar e ver os preços da concorrência.")
+        super().__init__(
+            "Você não está logado ou conectado no Mercado Livre. Conecte sua conta em Marketplaces para publicar, retomar ou gerenciar o anúncio."
+        )
 
 
 class QuickStoreDesconectada(ErroDeDominio):
     codigo = "quickstore_desconectada"
 
     def __init__(self):
-        super().__init__("Conecte sua conta da QuickStore para publicar e sincronizar os anúncios.")
+        super().__init__(
+            "Você não está logado ou conectado na QuickStore. Conecte sua conta em Marketplaces para publicar, retomar ou gerenciar o anúncio."
+        )
 
 
 class AnaliseNaoEncontrada(ErroDeDominio):
