@@ -25,6 +25,7 @@ from backend.presentation.http.esquemas import (
     ListaDeMarketplaces,
     ListaDePlanos,
     MarketplaceSaida,
+    NotificacaoWebhookQuickStore,
     RequisicaoAlterarSenha,
     RequisicaoAtualizarPerfil,
     RequisicaoCadastro,
@@ -58,6 +59,10 @@ LIMITE_FALHAS_LOGIN = 8
 JANELA_LOGIN_S = 300.0
 LIMITE_CADASTROS_IP = 10
 JANELA_CADASTRO_S = 600.0
+MAX_BYTES_WEBHOOK = 32_768
+LIMITE_WEBHOOK_IP = 120
+LIMITE_FALHAS_WEBHOOK_IP = 15
+JANELA_WEBHOOK_S = 60.0
 
 ERRO_401 = {401: {"model": RespostaDeErro, "description": "Token inválido, expirado ou ausente"}}
 ERRO_404 = {404: {"model": RespostaDeErro, "description": "Marketplace ou vendedor não encontrado"}}
@@ -457,6 +462,68 @@ def criar_rotas(
         except Exception as erro:
             log.warning("Falha ao concluir callback OAuth de %s (%s).", slug_seguro, type(erro).__name__)
             return RedirectResponse(url="/#/marketplaces?erro=falha_ao_conectar", status_code=302)
+
+    @rotas.get(
+        "/quickstore/callback",
+        tags=["marketplaces"],
+        summary="Callback OAuth 2.0 oficial da QuickStore (/api/quickstore/callback)",
+    )
+    def callback_quickstore(
+        code: str | None = None,
+        state: str | None = None,
+        error: str | None = None,
+        error_description: str | None = None,
+    ) -> RedirectResponse:
+        return callback_marketplace(
+            slug="quickstore",
+            code=code,
+            state=state,
+            error=error,
+            error_description=error_description,
+        )
+
+    @rotas.post(
+        "/quickstore/webhook",
+        tags=["marketplaces"],
+        summary="Receptor de Webhooks de Vendas (orders_v2) da QuickStore",
+        responses={**ERRO_401, **ERRO_429},
+    )
+    async def webhook_quickstore(request: Request) -> dict[str, Any]:
+        if casos.webhook_quickstore is None:
+            return {"status": "ok"}
+        ip_cliente = _ip_do_cliente(request)
+        chave_ip = f"webhook_qs:ip:{ip_cliente}"
+        chave_falha_ip = f"webhook_qs_falha:ip:{ip_cliente}"
+        limitador.conferir(chave_ip, LIMITE_WEBHOOK_IP, JANELA_WEBHOOK_S)
+        limitador.conferir(chave_falha_ip, LIMITE_FALHAS_WEBHOOK_IP, JANELA_LOGIN_S)
+        limitador.registrar(chave_ip, JANELA_WEBHOOK_S)
+
+        corpo_bruto = await request.body()
+        if not corpo_bruto or len(corpo_bruto) > MAX_BYTES_WEBHOOK:
+            limitador.registrar(chave_falha_ip, JANELA_LOGIN_S)
+            raise ValueError("Payload do webhook inválido ou excede o tamanho permitido.")
+
+        assinatura = request.headers.get("x-quickstore-signature")
+        topico = request.headers.get("x-quickstore-topic")
+        try:
+            casos.webhook_quickstore.validar_assinatura(corpo_bruto, assinatura)
+        except CredenciaisInvalidas:
+            limitador.registrar(chave_falha_ip, JANELA_LOGIN_S)
+            raise
+
+        try:
+            notificacao_bruta = await request.json()
+            if not isinstance(notificacao_bruta, dict):
+                raise ValueError("Payload do webhook inválido.")
+            validada = NotificacaoWebhookQuickStore.model_validate(notificacao_bruta)
+        except Exception as erro:
+            limitador.registrar(chave_falha_ip, JANELA_LOGIN_S)
+            raise ValueError("Payload do webhook inválido.") from erro
+
+        return casos.webhook_quickstore.executar(
+            validada.model_dump(by_alias=True),
+            topico_header=topico,
+        )
 
     @rotas.post(
         "/marketplaces/{slug}/connection",

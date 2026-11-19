@@ -54,6 +54,16 @@ class RepositorioContasVinculadasSQL:
             )
             return None if linha is None else self._para_conta(linha)
 
+    def buscar_por_conta_externa(self, marketplace: str, conta_externa_id: str) -> list[ContaVinculada]:
+        with self._session_factory() as session:
+            linhas = (
+                session.query(ContaVinculadaModel)
+                .filter_by(marketplace=marketplace, conta_externa_id=str(conta_externa_id))
+                .order_by(ContaVinculadaModel.conectada_em)
+                .all()
+            )
+            return [self._para_conta(linha) for linha in linhas]
+
     def salvar(self, conta: ContaVinculada) -> None:
         access_token = self._cifrador.cifrar(conta.credenciais.access_token)
         refresh_token = self._cifrador.cifrar(conta.credenciais.refresh_token)

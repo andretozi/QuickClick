@@ -96,6 +96,40 @@ class RequisicaoConectar(BaseModel):
     codigo_autorizacao: str | None = Field(default=None, max_length=512, description="Código retornado pelo fluxo OAuth oficial")
 
 
+class NotificacaoWebhookQuickStore(BaseModel):
+    """Schema de validação estrita para notificações de vendas (orders_v2) da QuickStore."""
+
+    id: str | None = Field(default=None, alias="_id", max_length=120)
+    resource: str = Field(min_length=8, max_length=160)
+    user_id: int | str = Field(description="Identificador externo do vendedor na QuickStore")
+    topic: str = Field(default="orders_v2", max_length=60)
+    application_id: str | None = Field(default=None, max_length=120)
+    attempts: int | None = Field(default=None, ge=0, le=1000)
+    sent: str | None = Field(default=None, max_length=80)
+    received: str | None = Field(default=None, max_length=80)
+
+    @field_validator("resource")
+    @classmethod
+    def _validar_recurso(cls, valor: str) -> str:
+        texto = valor.strip()
+        if not (texto.startswith("/orders/") or texto.startswith("orders/")):
+            raise ValueError("Recurso do webhook inválido.")
+        order_id = texto.removeprefix("/").removeprefix("orders/").strip("/")
+        if not order_id or len(order_id) > 64 or "/" in order_id or ".." in order_id:
+            raise ValueError("Identificador do pedido inválido no webhook.")
+        if not order_id.replace("-", "").replace("_", "").isalnum():
+            raise ValueError("Identificador do pedido inválido no webhook.")
+        return f"/orders/{order_id}"
+
+    @field_validator("user_id")
+    @classmethod
+    def _validar_user_id(cls, valor: int | str) -> str:
+        texto = str(valor).strip()
+        if not texto or len(texto) > 64 or not texto.replace("-", "").replace("_", "").isalnum():
+            raise ValueError("Identificador do vendedor inválido no webhook.")
+        return texto
+
+
 class UsuarioSaida(BaseModel):
     id: int
     email: str

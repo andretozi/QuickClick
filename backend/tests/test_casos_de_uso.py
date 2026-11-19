@@ -69,6 +69,13 @@ class RepositorioContasEmMemoria:
     def remover(self, vendedor_id, marketplace):
         self._dados.pop((vendedor_id, marketplace), None)
 
+    def buscar_por_conta_externa(self, marketplace, conta_externa_id):
+        return [
+            conta
+            for (_, slug), conta in self._dados.items()
+            if slug == marketplace and str(conta.credenciais.conta_externa_id) == str(conta_externa_id)
+        ]
+
 
 class GatewayFalso:
     """Anota o que o caso de uso pediu, na ordem do OAuth 2.0."""
@@ -222,7 +229,7 @@ class TestConsultas(BaseCasosDeUso):
 
         itens = ListarMarketplaces(self.contas).executar(VENDEDOR_ID)
 
-        self.assertEqual(len(itens), 9)
+        self.assertEqual(len(itens), 10)
         self.assertEqual([item.marketplace.slug for item in itens if item.conectado], ["shopee"])
 
     def test_resumo_do_vendedor_mostra_o_uso_do_plano(self):

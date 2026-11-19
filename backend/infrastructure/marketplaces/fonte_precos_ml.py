@@ -19,9 +19,10 @@ from typing import Any
 
 from backend.application.ia.modelos import CategoriaSugerida, PrecoObservado
 from backend.application.ia.portas import CacheDeCategoriasML
+from backend.application.portas import FalhaNoMarketplace
 from backend.domain.canais.esquema import EsquemaDoCanal
 from backend.domain.ia.atributos_ml import AtributoML, esquema_do_ml
-from backend.infrastructure.marketplaces.mercado_livre import ErroDoMercadoLivre, GatewayMercadoLivre
+from backend.infrastructure.marketplaces.mercado_livre import GatewayMercadoLivre
 
 log = logging.getLogger("quickclick.marketplaces")
 
@@ -51,7 +52,7 @@ def _resumo_do_atributo(bruto: dict[str, Any]) -> dict[str, Any]:
 
 
 class FontePrecosMercadoLivre:
-    def __init__(self, gateway: GatewayMercadoLivre, cache: CacheDeCategoriasML,
+    def __init__(self, gateway: GatewayMercadoLivre | Any, cache: CacheDeCategoriasML,
                  relogio: Callable[[], datetime] = _agora):
         self._gateway = gateway
         self._cache = cache
@@ -63,7 +64,7 @@ class FontePrecosMercadoLivre:
         for termo in candidatos:
             try:
                 achados = self._gateway.descobrir_dominio(termo, access_token)
-            except ErroDoMercadoLivre as erro:
+            except FalhaNoMarketplace as erro:
                 log.warning("Mercado Livre: categoria não descoberta (%s).", erro.status or "sem resposta")
                 return None
             primeiro = next((a for a in achados if isinstance(a, dict) and a.get("category_id")), None)
@@ -79,7 +80,7 @@ class FontePrecosMercadoLivre:
         if guardados is None:
             try:
                 brutos = self._gateway.atributos_da_categoria(categoria_id, access_token)
-            except ErroDoMercadoLivre as erro:
+            except FalhaNoMarketplace as erro:
                 log.warning("Mercado Livre: atributos da categoria não lidos (%s).", erro.status or "sem resposta")
                 return None
             guardados = [_resumo_do_atributo(b) for b in brutos if isinstance(b, dict) and b.get("id")]
@@ -101,7 +102,7 @@ class FontePrecosMercadoLivre:
             return None
         try:
             dados = self._gateway.buscar_itens(termos[0], categoria_id, CONDICAO_NO_ML.get(condicao), access_token)
-        except ErroDoMercadoLivre as erro:
+        except FalhaNoMarketplace as erro:
             if erro.status in (401, 403):
                 self._busca_pausada_ate = agora + PAUSA_DEPOIS_DE_403
                 log.warning("Mercado Livre: a busca de itens está restrita para este app (%s). "
@@ -125,7 +126,7 @@ class FontePrecosMercadoLivre:
     def tarifa(self, preco_centavos: int, categoria_id: str, access_token: str) -> int | None:
         try:
             dados = self._gateway.custo_de_venda(preco_centavos / 100, categoria_id, access_token)
-        except ErroDoMercadoLivre as erro:
+        except FalhaNoMarketplace as erro:
             log.warning("Mercado Livre: tarifa não consultada (%s).", erro.status or "sem resposta")
             return None
         if isinstance(dados, list):

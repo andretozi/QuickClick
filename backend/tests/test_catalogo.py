@@ -10,7 +10,7 @@ from backend.tests.test_plano import FORA_DA_REGRA
 class TestCatalogo(unittest.TestCase):
     def test_disponiveis_e_mercado_livre(self):
         disponiveis = [m.nome for m in CATALOGO if m.status is StatusMarketplace.DISPONIVEL]
-        self.assertEqual(disponiveis, ["Mercado Livre"])
+        self.assertEqual(disponiveis, ["Mercado Livre", "QuickStore"])
 
     def test_em_breve(self):
         em_breve = [m.nome for m in CATALOGO if m.status is StatusMarketplace.EM_BREVE]
@@ -25,6 +25,7 @@ class TestCatalogo(unittest.TestCase):
 
     def test_obter_marketplace_disponivel(self):
         self.assertEqual(obter_marketplace_disponivel("mercado-livre").nome, "Mercado Livre")
+        self.assertEqual(obter_marketplace_disponivel("quickstore").nome, "QuickStore")
 
     def test_em_breve_nao_conecta_e_explica(self):
         with self.assertRaises(MarketplaceEmBreve) as contexto:
@@ -32,7 +33,7 @@ class TestCatalogo(unittest.TestCase):
         self.assertEqual(contexto.exception.codigo, "marketplace_em_breve")
         self.assertEqual(
             contexto.exception.mensagem,
-            "A integração com Shein ainda está chegando. Por enquanto dá pra conectar Mercado Livre.",
+            "A integração com Shein ainda está chegando. Por enquanto dá pra conectar Mercado Livre e QuickStore.",
         )
 
     def test_inexistente(self):

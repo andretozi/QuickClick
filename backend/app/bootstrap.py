@@ -27,6 +27,7 @@ from backend.application.casos_de_uso import (
     ModerarContas,
     ObterUsuarioAtual,
     ObterVendedorAtual,
+    ProcessarWebhookQuickStore,
     PublicarNoMercadoLivre,
     RegistrarUsuario,
     TrocarPlano,
@@ -112,6 +113,7 @@ def criar_app(
     contas = RepositorioContasVinculadasSQL(session_factory, cifrador)
     usuarios = RepositorioUsuariosSQL(session_factory)
     moderacao = RepositorioModeracaoSQL(session_factory)
+    repositorio_produtos = RepositorioDeProdutosSQL(session_factory)
 
     hasher = HasherPBKDF2()
     token_service = ServicoJWT(segredo_jwt(leitor))
@@ -120,9 +122,10 @@ def criar_app(
     conectar = ConectarMarketplace(vendedores, contas, gateways)
 
     registro_de_uso = RegistroDeUsoSQL(session_factory)
+    cache_categorias = CacheDeCategoriasMLSQL(session_factory)
     if fonte_ml is None:
-        fonte_ml = FontePrecosMercadoLivre(gateways["mercado-livre"], CacheDeCategoriasMLSQL(session_factory),
-                                           relogio=relogio)
+        fonte_ml = FontePrecosMercadoLivre(gateways["mercado-livre"], cache_categorias, relogio=relogio)
+    fonte_quickstore = FontePrecosMercadoLivre(gateways["quickstore"], cache_categorias, relogio=relogio)
     executor_padrao = executor is None
     executor = executor or ThreadPoolExecutor(max_workers=TRABALHADORES_DA_ANALISE, thread_name_prefix="analise")
     analises = RepositorioDeAnalisesSQL(session_factory)
@@ -139,7 +142,7 @@ def criar_app(
             pesquisas=CacheDePesquisasSQL(session_factory),
             config=configuracao_da_ia(leitor),
             relogio=relogio,
-            fontes_de_esquema={"mercado-livre": fonte_ml},
+            fontes_de_esquema={"mercado-livre": fonte_ml, "quickstore": fonte_quickstore},
             orcamento=registro_de_uso,
         ),
         vendedores=vendedores,
@@ -168,7 +171,23 @@ def criar_app(
         analises_ia=analises_ia,
         publicar_no_mercado_livre=PublicarNoMercadoLivre(conectar, gateways["mercado-livre"], fonte_ml, analises,
                                                          preparador),
-        produtos=GerenciarProdutos(RepositorioDeProdutosSQL(session_factory), relogio),
+        publicar_na_quickstore=PublicarNoMercadoLivre(
+            conectar,
+            gateways["quickstore"],
+            fonte_quickstore,
+            analises,
+            preparador,
+            canal="quickstore",
+        ),
+        webhook_quickstore=ProcessarWebhookQuickStore(
+            gateway_quickstore=gateways["quickstore"],
+            contas=contas,
+            conectar=conectar,
+            produtos=repositorio_produtos,
+            publicadores={"mercado-livre": gateways["mercado-livre"], "quickstore": gateways["quickstore"]},
+            relogio=relogio,
+        ),
+        produtos=GerenciarProdutos(repositorio_produtos, relogio),
     )
 
     documentacao_ativa = leitor.booleano("DOCUMENTACAO_API_ATIVA", False)

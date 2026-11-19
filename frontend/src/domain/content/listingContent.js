@@ -409,6 +409,7 @@ export function attributeLabel(key) {
 /** Por que cada marketplace combina, no plano Grátis (no pago, a frase vem da IA). */
 export const CHANNEL_REASONS = {
   'mercado-livre': 'O maior público do país, para quase todo tipo de produto.',
+  quickstore: 'Marketplace parceiro integrado à Quick Click, com baixa automática de estoque.',
   shopee: 'Muito procurado para moda, casa e beleza com preço baixo.',
   amazon: 'Forte em eletrônicos, livros e casa, para produtos novos.',
   magalu: 'Bom para eletrônicos, casa e cozinha, com público fiel.',
@@ -425,6 +426,7 @@ export const CHANNEL_REASONS = {
  */
 export const CHANNEL_SIGNUP = {
   'mercado-livre': 'https://vendedores.mercadolivre.com.br',
+  quickstore: 'https://quickstore.azurewebsites.net',
   shopee: 'https://seller.shopee.com.br',
   amazon: 'https://venda.amazon.com.br',
   magalu: 'https://universo.magalu.com',
@@ -445,6 +447,7 @@ export const AI_ERRORS = {
   fotos_necessarias: { title: 'Precisamos das fotos de novo.', text: 'Elas saíram da memória. Mande de novo para continuar.' },
   interrompida: { title: 'A análise parou no meio.', text: 'O servidor reiniciou. Toque em tentar de novo.' },
   mercado_livre_desconectado: { title: 'O Mercado Livre não está conectado.', text: 'Conecte a sua conta para publicar.' },
+  quickstore_desconectada: { title: 'A QuickStore não está conectada.', text: 'Conecte a sua conta para publicar.' },
   publicacao_recusada: { title: 'O Mercado Livre recusou a operação.', text: 'Confira os dados do anúncio e tente de novo.' },
   anuncio_nao_encontrado: { title: 'Anúncio não encontrado no Mercado Livre.', text: 'Ele pode já ter sido removido por lá.' },
   descricao_nao_gravada: { title: 'O anúncio foi salvo, mas a descrição não entrou.', text: 'Confira no Mercado Livre.' },
