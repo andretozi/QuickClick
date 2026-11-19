@@ -180,7 +180,9 @@ async function saveMatchedRecords(accountId, records, next) {
     next.map(async (record) => {
       const old = before.get(record.id);
       if (old && sameRecord(old, record)) return old;
-      return saveRecord(accountId, record, old?.atualizado_em ?? record.atualizado_em, old?.fotos ?? []);
+      return saveRecord(accountId, record, old?.atualizado_em ?? record.atualizado_em, old?.fotos ?? [], {
+        syncQuickStore: false
+      });
     })
   );
   const failure = results.find((result) => result.status === 'rejected' && result.reason?.status !== 409);
@@ -220,7 +222,7 @@ export async function mergeMercadoLivreItem(accountId, id, mlItem) {
   const updated = applyMlItemToStoreRecord(current, mlItem);
   // Abrir o anúncio não grava nada se o ML não mudou (gravar levaria o anúncio para o topo do painel)
   if (sameRecord(current, updated)) return toListing(current);
-  return toListing(await saveRecord(accountId, updated, current.atualizado_em, current.fotos));
+  return toListing(await saveRecord(accountId, updated, current.atualizado_em, current.fotos, { syncQuickStore: false }));
 }
 
 /** Atualiza um anúncio específico com os dados frescos vindos da QuickStore. */
@@ -228,7 +230,19 @@ export async function mergeQuickStoreItem(accountId, id, qsItem) {
   const current = await fetchRecord(accountId, id);
   const updated = applyQuickStoreItemToStoreRecord(current, qsItem);
   if (sameRecord(current, updated)) return toListing(current);
-  return toListing(await saveRecord(accountId, updated, current.atualizado_em, current.fotos));
+  return toListing(await saveRecord(accountId, updated, current.atualizado_em, current.fotos, { syncQuickStore: false }));
+}
+
+/** Reconcilia um anúncio local com a lista da QuickStore (por qs_item_id ou título normalizado). */
+export async function reconcileListingWithQuickStore(accountId, listingId, qsProducts) {
+  if (!Array.isArray(qsProducts) || !qsProducts.length) return getListing(accountId, listingId);
+  const current = await fetchRecord(accountId, listingId);
+  const matchedList = matchQuickStoreItems([current], qsProducts);
+  const reconciled = matchedList.find((item) => item.id === current.id) ?? current;
+  if (sameRecord(current, reconciled)) return toListing(current);
+  return toListing(
+    await saveRecord(accountId, reconciled, current.atualizado_em, current.fotos, { syncQuickStore: false })
+  );
 }
 
 export async function createListing(accountId, data) {

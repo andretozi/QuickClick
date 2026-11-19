@@ -11,9 +11,13 @@ import {
   getListing,
   mergeMercadoLivreItem,
   mergeQuickStoreItem,
+  reconcileListingWithQuickStore,
   updateListing
 } from '@/infrastructure/storage/listingsRepository.js';
-import { fetchConnectedMarketplaces } from '@/infrastructure/marketplaces/marketplacesService.js';
+import {
+  fetchConnectedMarketplaces,
+  fetchMarketplaceProducts
+} from '@/infrastructure/marketplaces/marketplacesService.js';
 import {
   fetchMercadoLivreItem,
   fetchQuickStoreItem,
@@ -132,6 +136,14 @@ export default function useListingEditor({ listingId, channelScope: rawChannelSc
               listing = await mergeMercadoLivreItem(accountId, listingId, mlFresh);
             } catch (error) {
               if (error?.code === 'mercado_livre_desconectado') mlConn = null;
+            }
+          }
+          if (syncQs && qsConn && !listing.qsItemId) {
+            try {
+              const qsProducts = await fetchMarketplaceProducts(QUICKSTORE_CHANNEL);
+              listing = await reconcileListingWithQuickStore(accountId, listingId, qsProducts);
+            } catch (error) {
+              if (error?.code === 'quickstore_desconectada') qsConn = null;
             }
           }
           if (syncQs && qsConn && listing.qsItemId) {
@@ -388,6 +400,7 @@ export default function useListingEditor({ listingId, channelScope: rawChannelSc
       const keptPhotos = ordered.filter((p) => String(p).startsWith('https://'));
       return {
         payload: {
+          ...(editing && listingId ? { id: listingId } : {}),
           title: data.title,
           description: data.description,
           priceCents: data.priceCents,
@@ -401,7 +414,7 @@ export default function useListingEditor({ listingId, channelScope: rawChannelSc
         blobs: photos.readingBlobs(ordered)
       };
     },
-    [draft.analysisId, draft.attributes, draft.mlCategoryId, photos]
+    [draft.analysisId, draft.attributes, draft.mlCategoryId, editing, listingId, photos]
   );
 
   const publishOnMl = useCallback(
@@ -477,7 +490,7 @@ export default function useListingEditor({ listingId, channelScope: rawChannelSc
         let mlPatch = {};
         let finalMlStatus = nextMlStatus;
         if (shouldRunMl && canPublishMl) {
-          if (original.mlItemId && previousMlStatus !== LISTING_STATUS.UNPUBLISHED) {
+          if (original.mlItemId) {
             try {
               const mlUpdated = await updateOnMl(original.mlItemId, data);
               if (!draft.publishMl && previousMlStatus === LISTING_STATUS.PUBLISHED) {
@@ -499,7 +512,7 @@ export default function useListingEditor({ listingId, channelScope: rawChannelSc
                 coverIndex: 0
               };
             } catch (error) {
-              if (draft.publishMl && (error?.code === 'anuncio_nao_encontrado' || error?.code === 'publicacao_recusada')) {
+              if (draft.publishMl && error?.code === 'anuncio_nao_encontrado') {
                 const published = await publishOnMl(data);
                 finalMlStatus = LISTING_STATUS.PUBLISHED;
                 mlPatch = {
@@ -533,7 +546,7 @@ export default function useListingEditor({ listingId, channelScope: rawChannelSc
         let qsPatch = {};
         let finalQsStatus = nextQsStatus;
         if (shouldRunQs && canPublishQs) {
-          if (original.qsItemId && previousQsStatus !== LISTING_STATUS.UNPUBLISHED) {
+          if (original.qsItemId) {
             try {
               const qsUpdated = await updateOnQs(original.qsItemId, data);
               if (!draft.publishQs && previousQsStatus === LISTING_STATUS.PUBLISHED) {
@@ -557,11 +570,7 @@ export default function useListingEditor({ listingId, channelScope: rawChannelSc
                 ...(qsHttpsPhotos.length && !mlPatch.photos ? { photos: qsHttpsPhotos, coverIndex: 0 } : {})
               };
             } catch (error) {
-              if (
-                draft.publishQs &&
-                previousQsStatus === LISTING_STATUS.PUBLISHED &&
-                (error?.code === 'anuncio_nao_encontrado' || error?.code === 'publicacao_recusada')
-              ) {
+              if (draft.publishQs && error?.code === 'anuncio_nao_encontrado') {
                 const publishedQs = await publishOnQs(data);
                 finalQsStatus = LISTING_STATUS.PUBLISHED;
                 qsPatch = {
@@ -717,10 +726,19 @@ export default function useListingEditor({ listingId, channelScope: rawChannelSc
     clearSavedAt();
   }, [accountId, ai, clearSavedAt, mounted, photos]);
 
+  const linkedIds = useMemo(
+    () => ({
+      mlItemId: original?.mlItemId ?? null,
+      qsItemId: original?.qsItemId ?? null
+    }),
+    [original?.mlItemId, original?.qsItemId]
+  );
+
   return {
     editing,
     channelScope,
     channelDisconnected,
+    linkedIds,
     status,
     steps,
     step,

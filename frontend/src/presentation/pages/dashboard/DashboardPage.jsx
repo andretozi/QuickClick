@@ -119,12 +119,47 @@ export default function DashboardPage() {
         iconTone="danger"
         size="sm"
         title={LISTINGS_PANEL.confirmDelete.title}
-        description={pendingRemoval ? LISTINGS_PANEL.confirmDelete.text(pendingRemoval.title) : ''}
+        description={
+          pendingRemoval
+            ? pendingRemoval.mlItemId ||
+              pendingRemoval.qsItemId ||
+              pendingRemoval.channels?.['mercado-livre'] === 'published' ||
+              pendingRemoval.channels?.['mercado-livre'] === 'paused' ||
+              pendingRemoval.channels?.quickstore === 'published' ||
+              pendingRemoval.channels?.quickstore === 'paused'
+              ? LISTINGS_PANEL.confirmDelete.textWithChannels(pendingRemoval.title)
+              : LISTINGS_PANEL.confirmDelete.text(pendingRemoval.title)
+            : ''
+        }
         actions={
           <>
             <Button variant="outline" onClick={dashboard.cancelRemoval} disabled={removing} data-autofocus>
               {LISTINGS_PANEL.confirmDelete.cancel}
             </Button>
+            {pendingRemoval &&
+              (Boolean(pendingRemoval.mlItemId) ||
+                pendingRemoval.channels?.['mercado-livre'] === 'published' ||
+                pendingRemoval.channels?.['mercado-livre'] === 'paused') && (
+                <Button
+                  variant="outline"
+                  onClick={() => dashboard.confirmChannelRemoval('mercado-livre')}
+                  disabled={removing}
+                >
+                  {LISTINGS_PANEL.confirmDelete.deleteOnlyChannel('Mercado Livre')}
+                </Button>
+              )}
+            {pendingRemoval &&
+              (Boolean(pendingRemoval.qsItemId) ||
+                pendingRemoval.channels?.quickstore === 'published' ||
+                pendingRemoval.channels?.quickstore === 'paused') && (
+                <Button
+                  variant="outline"
+                  onClick={() => dashboard.confirmChannelRemoval('quickstore')}
+                  disabled={removing}
+                >
+                  {LISTINGS_PANEL.confirmDelete.deleteOnlyChannel('QuickStore')}
+                </Button>
+              )}
             <Button
               onClick={dashboard.confirmRemoval}
               loading={removing}

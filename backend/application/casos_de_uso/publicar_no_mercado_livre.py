@@ -18,7 +18,7 @@ from urllib.parse import urlparse
 from backend.application.casos_de_uso.conectar_marketplace import ConectarMarketplace
 from backend.application.ia.modelos import ArquivoDeFoto, FotoPreparada
 from backend.application.ia.portas import FontePrecosMarketplace, PreparadorDeFotos, RepositorioDeAnalises
-from backend.application.portas import FalhaNoMarketplace, PublicadorMercadoLivre
+from backend.application.portas import FalhaNoMarketplace, PublicadorMercadoLivre, RepositorioDeProdutos
 from backend.domain.erros import (
     AnuncioNaoEncontrado,
     FotoInvalida,
@@ -48,6 +48,7 @@ PRECO_MINIMO_CENTAVOS = 100
 ESTOQUE_MAXIMO = 99_999
 DESCRICAO_MAX_ML = 50_000
 _FORMATO_ITEM_ID = re.compile(r"^MLB\d{5,20}$")
+_FORMATO_ITEM_ID_QUICKSTORE = re.compile(r"^[A-Za-z0-9_-]{1,60}$")
 
 
 @dataclass(frozen=True)
@@ -61,6 +62,7 @@ class AnuncioParaPublicar:
     analise_id: str | None = None
     ml_categoria_id: str | None = None
     fotos_mantidas: tuple[str, ...] = ()
+    produto_id: str | None = None
 
 
 def _validar_item_id(item_id: str) -> str:
@@ -134,6 +136,7 @@ def anuncio_de_dict(dados: dict[str, Any], *, exigir_mlstatic: bool = True) -> A
         )
         if url
     )[:6]
+    produto_id_bruto = str(dados.get("produto_id") or "").strip()
     return AnuncioParaPublicar(
         titulo=titulo,
         descricao=str(dados.get("descricao") or "").strip()[:DESCRICAO_MAX_ML],
@@ -144,6 +147,7 @@ def anuncio_de_dict(dados: dict[str, Any], *, exigir_mlstatic: bool = True) -> A
         analise_id=str(dados["analise_id"]) if dados.get("analise_id") else None,
         ml_categoria_id=str(dados["ml_categoria_id"]) if dados.get("ml_categoria_id") else None,
         fotos_mantidas=mantidas,
+        produto_id=produto_id_bruto or None,
     )
 
 
@@ -177,6 +181,7 @@ class PublicarNoMercadoLivre:
         preparador: PreparadorDeFotos,
         *,
         canal: str = MERCADO_LIVRE,
+        produtos: RepositorioDeProdutos | None = None,
     ):
         self._conectar = conectar
         self._publicador = publicador
@@ -184,6 +189,7 @@ class PublicarNoMercadoLivre:
         self._analises = analises
         self._preparador = preparador
         self._canal = canal
+        self._produtos = produtos
 
     @property
     def _exigir_mlstatic(self) -> bool:
@@ -193,6 +199,14 @@ class PublicarNoMercadoLivre:
         if self._canal == QUICKSTORE:
             return QuickStoreDesconectada()
         return MercadoLivreDesconectado()
+
+    def _validar_item_id_canal(self, item_id: str) -> str:
+        if self._canal == QUICKSTORE:
+            codigo = str(item_id or "").strip()
+            if not _FORMATO_ITEM_ID_QUICKSTORE.match(codigo):
+                raise ValueError("Identificador do anúncio inválido.")
+            return codigo
+        return _validar_item_id(item_id)
 
     def _subir_imagens(self, token: str, preparadas: list[FotoPreparada]) -> list[dict[str, str]]:
         enviadas: list[dict[str, str]] = []
@@ -222,7 +236,7 @@ class PublicarNoMercadoLivre:
         return (analise.get("leitura") or {}).get("ml") or {}
 
     def _conferir_dono(self, vendedor_id: int, item_id: str) -> tuple[str, dict[str, Any]]:
-        codigo = _validar_item_id(item_id)
+        codigo = self._validar_item_id_canal(item_id)
         credenciais = self._conectar.credenciais_ativas(vendedor_id, self._canal)
         if credenciais is None or not credenciais.access_token:
             raise self._erro_desconectado()
@@ -249,6 +263,33 @@ class PublicarNoMercadoLivre:
         token = self._conectar.token_ativo(vendedor_id, self._canal)
         if not token:
             raise self._erro_desconectado()
+
+        if dados.produto_id and self._produtos is not None:
+            produto = self._produtos.obter(vendedor_id, dados.produto_id)
+            if produto is not None:
+                publicacao = next((p for p in produto.publicacoes if p.canal == self._canal), None)
+                id_existente = str(publicacao.id_externo or "").strip() if publicacao else ""
+                if publicacao and id_existente and publicacao.status != "nao_publicado":
+                    try:
+                        remoto = self._publicador.obter_anuncio(token, id_existente)
+                        status_remoto = str(remoto.get("status") or "").strip().lower()
+                        sub_status = remoto.get("sub_status") or []
+                        excluido_remoto = status_remoto == "closed" or (
+                            isinstance(sub_status, list) and "deleted" in sub_status
+                        )
+                    except FalhaNoMarketplace as erro:
+                        if erro.status == 404:
+                            excluido_remoto = True
+                        else:
+                            excluido_remoto = False
+                    if not excluido_remoto:
+                        raise PublicacaoRecusada(
+                            [
+                                "Este produto já está publicado neste canal com um ID vinculado. "
+                                "Atualize o anúncio existente em vez de criar outro."
+                            ]
+                        )
+
         preparadas = self._preparador.preparar(fotos) if fotos else []  # confere o conteúdo e tira os metadados
 
         ml = self._ml_da_analise(vendedor_id, dados.analise_id)

@@ -50,6 +50,7 @@ export default function ListingRow({
       <ListingChannels
         status={status}
         channels={listing.channels}
+        itemIds={{ 'mercado-livre': listing.mlItemId, quickstore: listing.qsItemId }}
         connectedByChannel={connectedByChannel}
         onPublishChannel={onToggleChannel ? (channel) => onToggleChannel(listing, channel) : undefined}
         disabled={busy}

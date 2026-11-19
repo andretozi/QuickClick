@@ -80,6 +80,11 @@ export default function ChannelsStep({ editor }) {
                 <StatusPill tone={canPublishMl ? 'green' : 'honey'} size="sm">
                   {canPublishMl ? texts.connected(connection.nickname) : texts.available}
                 </StatusPill>
+                {editing && editor.linkedIds?.mlItemId && (
+                  <StatusPill tone="cream" size="sm">
+                    {texts.linkedCode(editor.linkedIds.mlItemId)}
+                  </StatusPill>
+                )}
               </div>
               <h4 id="canal-ml" className="visually-hidden">
                 {texts.toggleLabel}
@@ -111,6 +116,11 @@ export default function ChannelsStep({ editor }) {
                 <StatusPill tone={canPublishQs ? 'green' : 'honey'} size="sm">
                   {canPublishQs ? texts.connected(qsConnection?.nickname) : texts.available}
                 </StatusPill>
+                {editing && editor.linkedIds?.qsItemId && (
+                  <StatusPill tone="cream" size="sm">
+                    {texts.linkedCode(editor.linkedIds.qsItemId)}
+                  </StatusPill>
+                )}
               </div>
               <h4 id="canal-qs" className="visually-hidden">
                 {texts.toggleLabelQs}

@@ -171,7 +171,8 @@ function toAnuncioPayload(listing) {
     atributos: (listing.attributes ?? []).map((a) => ({ chave: a.key ?? a.name ?? '', valor: a.value ?? '' })),
     analise_id: listing.analysisId ?? null,
     ml_categoria_id: listing.mlCategoryId ?? null,
-    fotos_mantidas: listing.keptPhotos ?? []
+    fotos_mantidas: listing.keptPhotos ?? [],
+    ...(listing.id ? { produto_id: String(listing.id) } : {})
   };
 }
 

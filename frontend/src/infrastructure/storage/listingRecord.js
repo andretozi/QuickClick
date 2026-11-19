@@ -27,9 +27,21 @@ const normalizeTitle = (text) =>
     .toLowerCase()
     .trim();
 
+const asExternalId = (value) => (value != null && String(value).trim() !== '' ? String(value).trim() : null);
+
+const safeHttpsUrl = (url, fallback = null) =>
+  typeof url === 'string' && url.trim().startsWith('https://') ? url.trim() : fallback;
+
+const clampHealth = (value, fallback = null) => {
+  if (value === null || value === undefined || value === '') return fallback;
+  const num = Number(value);
+  return Number.isFinite(num) && num >= 0 && num <= 100 ? num : fallback;
+};
+
 function mlStatusToStore(status) {
-  if (status === 'active') return 'publicado';
-  if (status === 'paused' || status === 'under_review') return 'pausado';
+  const clean = String(status ?? '').trim().toLowerCase();
+  if (clean === 'active') return 'publicado';
+  if (clean === 'paused' || clean === 'under_review') return 'pausado';
   return 'nao_publicado';
 }
 
@@ -147,10 +159,10 @@ export function applyMlItemToStoreRecord(existing, mlItem) {
   return {
     ...(existing ?? {}),
     id: existing?.id ?? newId('a'),
-    ml_item_id: closed ? null : (mlItem.id ?? existing?.ml_item_id ?? null),
-    permalink: closed ? null : (mlItem.permalink ?? existing?.permalink ?? null),
+    ml_item_id: closed ? null : (asExternalId(mlItem.id) ?? asExternalId(existing?.ml_item_id)),
+    permalink: closed ? null : safeHttpsUrl(mlItem.permalink, safeHttpsUrl(existing?.permalink)),
     ml_categoria_id: mlItem.category_id ?? existing?.ml_categoria_id ?? null,
-    saude_ml: closed ? null : (mlItem.health ?? existing?.saude_ml ?? null),
+    saude_ml: closed ? null : clampHealth(mlItem.health, clampHealth(existing?.saude_ml)),
     vendidos: Number(mlItem.sold_quantity ?? existing?.vendidos ?? 0),
     qs_item_id: existing?.qs_item_id ?? null,
     qs_permalink: existing?.qs_permalink ?? null,
@@ -212,10 +224,10 @@ export function applyQuickStoreItemToStoreRecord(existing, qsItem) {
     ml_categoria_id: existing?.ml_categoria_id ?? null,
     saude_ml: existing?.saude_ml ?? null,
     vendidos: Number(existing?.vendidos ?? 0),
-    qs_item_id: closed ? null : (qsItem.id ?? existing?.qs_item_id ?? null),
-    qs_permalink: closed ? null : (qsItem.permalink ?? existing?.qs_permalink ?? null),
+    qs_item_id: closed ? null : (asExternalId(qsItem.id) ?? asExternalId(existing?.qs_item_id)),
+    qs_permalink: closed ? null : safeHttpsUrl(qsItem.permalink, safeHttpsUrl(existing?.qs_permalink)),
     qs_categoria_id: qsItem.category_id ?? existing?.qs_categoria_id ?? null,
-    saude_qs: closed ? null : (qsItem.health ?? existing?.saude_qs ?? null),
+    saude_qs: closed ? null : clampHealth(qsItem.health, clampHealth(existing?.saude_qs)),
     vendidos_qs: Number(qsItem.sold_quantity ?? existing?.vendidos_qs ?? 0),
     titulo: title,
     descricao: description,
@@ -245,14 +257,16 @@ export function applyQuickStoreItemToStoreRecord(existing, qsItem) {
 export function matchMlItems(records, mlProducts) {
   const next = [...records];
   const matched = new Set();
-  const seenIds = new Set((mlProducts ?? []).map((item) => item?.id).filter(Boolean));
-  for (const mlItem of mlProducts) {
-    if (!mlItem?.id) continue;
-    let index = next.findIndex((item) => item.ml_item_id === mlItem.id);
+  const list = mlProducts ?? [];
+  const seenIds = new Set(list.map((item) => asExternalId(item?.id)).filter(Boolean));
+  for (const mlItem of list) {
+    const extId = asExternalId(mlItem?.id);
+    if (!extId) continue;
+    let index = next.findIndex((item) => asExternalId(item.ml_item_id) === extId);
     if (index < 0) {
       const targetTitle = normalizeTitle(mlItem.title);
       index = next.findIndex(
-        (item) => !matched.has(item.id) && !item.ml_item_id && normalizeTitle(item.titulo) === targetTitle
+        (item) => !matched.has(item.id) && !asExternalId(item.ml_item_id) && normalizeTitle(item.titulo) === targetTitle
       );
     }
     if (index < 0 && isClosedExternalStatus(mlItem.status)) continue;
@@ -261,8 +275,10 @@ export function matchMlItems(records, mlProducts) {
     if (index >= 0) next[index] = updated;
     else next.unshift(updated);
   }
+  const canClearMissing = list.length < 50;
   return next.map((record) => {
-    if (!record.ml_item_id || seenIds.has(record.ml_item_id)) return record;
+    const recId = asExternalId(record.ml_item_id);
+    if (!recId || seenIds.has(recId) || !canClearMissing) return record;
     return {
       ...record,
       ml_item_id: null,
@@ -279,14 +295,16 @@ export function matchMlItems(records, mlProducts) {
 export function matchQuickStoreItems(records, qsProducts) {
   const next = [...records];
   const matched = new Set();
-  const seenIds = new Set((qsProducts ?? []).map((item) => item?.id).filter(Boolean));
-  for (const qsItem of qsProducts) {
-    if (!qsItem?.id) continue;
-    let index = next.findIndex((item) => item.qs_item_id === qsItem.id);
+  const list = qsProducts ?? [];
+  const seenIds = new Set(list.map((item) => asExternalId(item?.id)).filter(Boolean));
+  for (const qsItem of list) {
+    const extId = asExternalId(qsItem?.id);
+    if (!extId) continue;
+    let index = next.findIndex((item) => asExternalId(item.qs_item_id) === extId);
     if (index < 0) {
       const targetTitle = normalizeTitle(qsItem.title);
       index = next.findIndex(
-        (item) => !matched.has(item.id) && !item.qs_item_id && normalizeTitle(item.titulo) === targetTitle
+        (item) => !matched.has(item.id) && !asExternalId(item.qs_item_id) && normalizeTitle(item.titulo) === targetTitle
       );
     }
     if (index < 0 && isClosedExternalStatus(qsItem.status)) continue;
@@ -295,8 +313,10 @@ export function matchQuickStoreItems(records, qsProducts) {
     if (index >= 0) next[index] = updated;
     else next.unshift(updated);
   }
+  const canClearMissing = list.length < 50;
   return next.map((record) => {
-    if (!record.qs_item_id || seenIds.has(record.qs_item_id)) return record;
+    const recId = asExternalId(record.qs_item_id);
+    if (!recId || seenIds.has(recId) || !canClearMissing) return record;
     return {
       ...record,
       qs_item_id: null,

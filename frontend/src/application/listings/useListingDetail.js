@@ -9,10 +9,14 @@ import {
   getListing,
   mergeMercadoLivreItem,
   mergeQuickStoreItem,
+  reconcileListingWithQuickStore,
   removeListing,
   updateListing
 } from '@/infrastructure/storage/listingsRepository.js';
-import { fetchConnectedMarketplaces } from '@/infrastructure/marketplaces/marketplacesService.js';
+import {
+  fetchConnectedMarketplaces,
+  fetchMarketplaceProducts
+} from '@/infrastructure/marketplaces/marketplacesService.js';
 import {
   deleteMercadoLivreItem,
   deleteQuickStoreItem,
@@ -50,6 +54,7 @@ function buildPublishInputs(listing) {
     .map((p) => dataUrlToBlob(p));
   return {
     payload: {
+      id: listing.id,
       title: listing.title,
       description: listing.description,
       priceCents: listing.priceCents,
@@ -68,7 +73,7 @@ function buildPublishInputs(listing) {
  *
  * Carrega o anúncio local e sincroniza automaticamente com o Mercado Livre e a QuickStore
  * (quando publicado e conectado) para exibir fotos, descrição, ficha técnica, preço, estoque,
- * vendas e status sempre atualizados. Também permite publicar, pausar, reativar, colocar em standby,
+ * vendas e status sempre atualizados. Também permite publicar, pausar, reativar, excluir por canal,
  * duplicar e excluir.
  */
 export default function useListingDetail(listingId) {
@@ -84,6 +89,8 @@ export default function useListingDetail(listingId) {
   const [busy, setBusy] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [pendingChannelRemoval, setPendingChannelRemoval] = useState(null);
+  const [removingChannel, setRemovingChannel] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState(0);
 
   const mounted = useMountedRef();
@@ -159,7 +166,7 @@ export default function useListingDetail(listingId) {
     setStatus('loading');
     (async () => {
       try {
-        const [local, connections] = await Promise.all([
+        const [localRaw, connections] = await Promise.all([
           getListing(accountId, listingId),
           fetchConnectedMarketplaces().catch(() => [])
         ]);
@@ -169,9 +176,26 @@ export default function useListingDetail(listingId) {
         setMlConnected(hasMl);
         setQsConnected(hasQs);
         setAuthErrorByChannel({});
+        let local = localRaw;
         setListing(local);
         setSelectedPhoto(local.coverIndex ?? 0);
         setStatus('ready');
+
+        if (hasQs && !local.qsItemId) {
+          try {
+            const qsProducts = await fetchMarketplaceProducts(QUICKSTORE_CHANNEL);
+            if (!mounted.current) return;
+            local = await reconcileListingWithQuickStore(accountId, listingId, qsProducts);
+            if (mounted.current) {
+              setListing(local);
+              setSelectedPhoto(local.coverIndex ?? 0);
+            }
+          } catch (error) {
+            if (mounted.current && error?.code === 'quickstore_desconectada') {
+              setAuthErrorByChannel((prev) => ({ ...prev, [QUICKSTORE_CHANNEL]: true }));
+            }
+          }
+        }
 
         if ((hasMl && local.mlItemId) || (hasQs && local.qsItemId)) {
           setSyncing(true);
@@ -217,9 +241,8 @@ export default function useListingDetail(listingId) {
   const applyChannelTransition = useCallback(
     async (currentListing, channel, targetStatus) => {
       const isQs = channel === QUICKSTORE_CHANNEL;
-      const current = channelStatus(currentListing, channel);
       const itemId = isQs ? currentListing.qsItemId : currentListing.mlItemId;
-      const shouldCreateFresh = !itemId || current === LISTING_STATUS.UNPUBLISHED;
+      const shouldCreateFresh = !itemId;
 
       if (!shouldCreateFresh) {
         try {
@@ -230,10 +253,7 @@ export default function useListingDetail(listingId) {
           const mlItem = await updateMercadoLivreStatus(itemId, targetStatus);
           return mergeMercadoLivreItem(accountId, currentListing.id, mlItem);
         } catch (error) {
-          if (
-            targetStatus === LISTING_STATUS.PUBLISHED &&
-            (error?.code === 'anuncio_nao_encontrado' || error?.code === 'publicacao_recusada')
-          ) {
+          if (targetStatus === LISTING_STATUS.PUBLISHED && error?.code === 'anuncio_nao_encontrado') {
             const { payload, photoBlobs } = buildPublishInputs(currentListing);
             const published = isQs
               ? await publishToQuickStore(payload, photoBlobs)
@@ -446,21 +466,34 @@ export default function useListingDetail(listingId) {
     }
   }, [accountId, busy, effectiveMlConnected, effectiveQsConnected, failed, listing, mounted]);
 
-  /** Tira o produto de venda em um canal e deixa-o em standby na Quick Click (para republicar quando quiser). */
-  const putInStandby = useCallback(
-    async (channel = PRIMARY_CHANNEL) => {
+  const requestChannelRemoval = useCallback((channel = PRIMARY_CHANNEL) => {
+    setPendingChannelRemoval(channel);
+  }, []);
+
+  const cancelChannelRemoval = useCallback(() => {
+    if (!removingChannel) setPendingChannelRemoval(null);
+  }, [removingChannel]);
+
+  /** Exclui o produto apenas na plataforma selecionada, mantendo-o salvo na Quick Click e nos outros canais. */
+  const confirmChannelRemoval = useCallback(
+    async (explicitChannel) => {
+      const channel = explicitChannel || pendingChannelRemoval;
+      if (!channel || !listing || removingChannel) return;
       const isQs = channel === QUICKSTORE_CHANNEL;
-      if (!listing || busy) return;
       const itemId = isQs ? listing.qsItemId : listing.mlItemId;
       const connected = isQs ? effectiveQsConnected : effectiveMlConnected;
+      const channelName = CHANNEL_NAMES[channel] ?? channel;
       if (itemId && !connected) {
+        const toastMsg = LISTING_DETAIL.toasts.deleteChannelDisconnected
+          ? LISTING_DETAIL.toasts.deleteChannelDisconnected(channelName)
+          : LISTING_DETAIL.toasts.standbyDisconnected(channelName);
         showToast({
           tone: TOAST_TONES.ERROR,
-          ...LISTING_DETAIL.toasts.standbyDisconnected(CHANNEL_NAMES[channel] ?? channel)
+          ...toastMsg
         });
         return;
       }
-      setBusy(true);
+      setRemovingChannel(true);
       try {
         if (itemId) {
           try {
@@ -490,14 +523,27 @@ export default function useListingDetail(listingId) {
         );
         if (!mounted.current) return;
         setListing(updated);
-        showToast({ tone: TOAST_TONES.INFO, ...LISTING_DETAIL.toasts.standby });
+        setPendingChannelRemoval(null);
+        const toastDone = LISTING_DETAIL.toasts.deletedChannel
+          ? LISTING_DETAIL.toasts.deletedChannel(channelName)
+          : LISTING_DETAIL.toasts.standby;
+        showToast({ tone: TOAST_TONES.SUCCESS, ...toastDone });
       } catch (error) {
         if (mounted.current) failed(error);
       } finally {
-        if (mounted.current) setBusy(false);
+        if (mounted.current) setRemovingChannel(false);
       }
     },
-    [accountId, busy, effectiveMlConnected, effectiveQsConnected, failed, listing, mounted]
+    [
+      accountId,
+      effectiveMlConnected,
+      effectiveQsConnected,
+      failed,
+      listing,
+      mounted,
+      pendingChannelRemoval,
+      removingChannel
+    ]
   );
 
   const duplicate = useCallback(async () => {
@@ -567,7 +613,12 @@ export default function useListingDetail(listingId) {
     toggleChannelStatus,
     toggleAllChannels,
     publishBothChannels,
-    putInStandby,
+    putInStandby: requestChannelRemoval,
+    pendingChannelRemoval,
+    removingChannel,
+    requestChannelRemoval,
+    cancelChannelRemoval,
+    confirmChannelRemoval,
     duplicate,
     confirmingDelete,
     removing,

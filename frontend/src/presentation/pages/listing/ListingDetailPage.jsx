@@ -55,7 +55,11 @@ export default function ListingDetailPage({ params }) {
     syncNow,
     toggleChannelStatus,
     toggleAllChannels,
-    putInStandby,
+    pendingChannelRemoval,
+    removingChannel,
+    requestChannelRemoval,
+    cancelChannelRemoval,
+    confirmChannelRemoval,
     duplicate,
     confirmingDelete,
     removing,
@@ -387,17 +391,18 @@ export default function ListingDetailPage({ params }) {
                         {LISTING_DETAIL.channels.editChannel(channel.name)}
                       </Button>
 
-                      {channel.status !== LISTING_STATUS.UNPUBLISHED && (
+                      {(channel.status !== LISTING_STATUS.UNPUBLISHED || Boolean(channel.itemId)) && (
                         <Button
                           variant="outline"
                           size="sm"
-                          icon="close"
+                          icon="trash"
                           iconPosition="start"
                           iconSize={15}
-                          onClick={() => putInStandby(channel.slug)}
-                          disabled={busy}
+                          onClick={() => requestChannelRemoval(channel.slug)}
+                          disabled={busy || removingChannel}
+                          className="listing-detail__channel-delete-btn"
                         >
-                          {LISTING_DETAIL.channels.standbyChannel}
+                          {LISTING_DETAIL.channels.deleteChannel(channel.name)}
                         </Button>
                       )}
 
@@ -526,6 +531,45 @@ export default function ListingDetailPage({ params }) {
           <p className="listing-detail__empty-text">{LISTING_DETAIL.description.empty}</p>
         )}
       </Panel>
+
+      {(() => {
+        const targetChannel = channelCards.find((ch) => ch.slug === pendingChannelRemoval) ?? null;
+        const targetName = targetChannel?.name ?? '';
+        return (
+          <Modal
+            open={Boolean(pendingChannelRemoval)}
+            onClose={cancelChannelRemoval}
+            dismissible={!removingChannel}
+            icon="trash"
+            iconTone="danger"
+            size="sm"
+            title={targetName ? LISTING_DETAIL.channels.confirmDeleteChannel.title(targetName) : ''}
+            description={
+              targetName ? LISTING_DETAIL.channels.confirmDeleteChannel.text(listing.title, targetName) : ''
+            }
+            actions={
+              <>
+                <Button
+                  variant="outline"
+                  onClick={cancelChannelRemoval}
+                  disabled={removingChannel}
+                  data-autofocus
+                >
+                  {LISTING_DETAIL.channels.confirmDeleteChannel.cancel}
+                </Button>
+                <Button
+                  onClick={() => confirmChannelRemoval(pendingChannelRemoval)}
+                  loading={removingChannel}
+                  loadingText={LISTING_DETAIL.channels.confirmDeleteChannel.deleting}
+                  disabled={removingChannel}
+                >
+                  {targetName ? LISTING_DETAIL.channels.confirmDeleteChannel.confirm(targetName) : ''}
+                </Button>
+              </>
+            }
+          />
+        );
+      })()}
 
       <Modal
         open={confirmingDelete}

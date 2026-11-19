@@ -64,7 +64,7 @@ def _resumo_do_item(body: dict[str, Any], descricao: str = "") -> dict[str, Any]
         or _extrair_descricao(body.get("plain_text"))
     )
     return {
-        "id": body.get("id"),
+        "id": str(body.get("id")) if body.get("id") is not None else None,
         "title": body.get("title") or body.get("family_name") or "",
         "family_name": body.get("family_name"),
         "description": descricao_final,
@@ -306,7 +306,12 @@ class GatewayQuickStore:
             params={"limit": 50},
             mensagem_erro="Falha ao listar anúncios da QuickStore",
         )
-        resultados = busca_dados.get("results", []) if isinstance(busca_dados, dict) else []
+        if isinstance(busca_dados, dict):
+            resultados = busca_dados.get("results") or busca_dados.get("items") or []
+        elif isinstance(busca_dados, list):
+            resultados = busca_dados
+        else:
+            resultados = []
         if not resultados:
             return []
 
@@ -326,41 +331,43 @@ class GatewayQuickStore:
                 produtos.append(_resumo_do_item(item, descricao))
             return produtos
 
-        lote = [str(item_id) for item_id in resultados[:20] if item_id]
-        try:
-            respostas = self._executar_requisicao(
-                "GET",
-                f"{self._base_url}/items",
-                access_token=access_token,
-                params={"ids": ",".join(lote)},
-                mensagem_erro="Falha ao buscar detalhes dos anúncios na QuickStore",
-            )
-        except ErroDaQuickStore:
-            respostas = None
-
+        todos_ids = [str(item_id) for item_id in resultados[:50] if item_id]
         produtos = []
-        if isinstance(respostas, list):
-            for item_bloco in respostas:
-                if isinstance(item_bloco, dict) and item_bloco.get("code") == 200:
-                    body = item_bloco.get("body", {})
-                elif isinstance(item_bloco, dict) and item_bloco.get("id"):
-                    body = item_bloco
-                else:
-                    continue
-                sub_status = body.get("sub_status") or []
-                if isinstance(sub_status, list) and "deleted" in sub_status:
-                    continue
-                descricao = _extrair_descricao(body.get("description")) or _extrair_descricao(body.get("plain_text"))
-                if not descricao:
-                    descricao = self._ler_descricao(access_token, str(body.get("id") or ""))
-                produtos.append(_resumo_do_item(body, descricao))
-            return produtos
-
-        for item_id in lote:
+        for inicio in range(0, len(todos_ids), 20):
+            lote = todos_ids[inicio : inicio + 20]
             try:
-                produtos.append(self.obter_anuncio(access_token, item_id))
+                respostas = self._executar_requisicao(
+                    "GET",
+                    f"{self._base_url}/items",
+                    access_token=access_token,
+                    params={"ids": ",".join(lote)},
+                    mensagem_erro="Falha ao buscar detalhes dos anúncios na QuickStore",
+                )
             except ErroDaQuickStore:
+                respostas = None
+
+            if isinstance(respostas, list):
+                for item_bloco in respostas:
+                    if isinstance(item_bloco, dict) and item_bloco.get("code") == 200:
+                        body = item_bloco.get("body", {})
+                    elif isinstance(item_bloco, dict) and item_bloco.get("id"):
+                        body = item_bloco
+                    else:
+                        continue
+                    sub_status = body.get("sub_status") or []
+                    if isinstance(sub_status, list) and "deleted" in sub_status:
+                        continue
+                    descricao = _extrair_descricao(body.get("description")) or _extrair_descricao(body.get("plain_text"))
+                    if not descricao:
+                        descricao = self._ler_descricao(access_token, str(body.get("id") or ""))
+                    produtos.append(_resumo_do_item(body, descricao))
                 continue
+
+            for item_id in lote:
+                try:
+                    produtos.append(self.obter_anuncio(access_token, item_id))
+                except ErroDaQuickStore:
+                    continue
         return produtos
 
     def obter_anuncio(self, access_token: str, item_id: str) -> dict[str, Any]:
