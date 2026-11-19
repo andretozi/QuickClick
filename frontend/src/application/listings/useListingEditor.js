@@ -10,14 +10,19 @@ import {
   createListing,
   getListing,
   mergeMercadoLivreItem,
+  mergeQuickStoreItem,
   updateListing
 } from '@/infrastructure/storage/listingsRepository.js';
 import { fetchConnectedMarketplaces } from '@/infrastructure/marketplaces/marketplacesService.js';
 import {
   fetchMercadoLivreItem,
+  fetchQuickStoreItem,
   publishToMercadoLivre,
+  publishToQuickStore,
   updateMercadoLivreItem,
-  updateMercadoLivreStatus
+  updateMercadoLivreStatus,
+  updateQuickStoreItem,
+  updateQuickStoreStatus
 } from '@/infrastructure/ai/iaService.js';
 import { clearDraft, getDraft, saveDraft } from '@/infrastructure/storage/draftsRepository.js';
 import { StorageFullError } from '@/infrastructure/storage/localStore.js';
@@ -26,8 +31,9 @@ import {
   AI_STEPS,
   LISTING_STATUS,
   PRIMARY_CHANNEL,
+  QUICKSTORE_CHANNEL,
   WIZARD_STEPS,
-  listingStatus,
+  channelStatus,
   validateListingStep
 } from '@/domain/listings/listingRules.js';
 import {
@@ -67,8 +73,8 @@ const photosKey = (photos) => photos.map((photo) => photo.slice(-24)).join('|');
  *
  * Criar: fotos → análise da IA (no back, em etapas) → confirmar o que a IA viu → detalhes
  * (título e descrição escritos pela IA) → preço (faixa real) → canais → publicar (o back
- * monta o anúncio do Mercado Livre). Editar: só os passos do anúncio, sem IA, sincronizando
- * com o Mercado Livre quando o anúncio já está publicado.
+ * monta o anúncio do Mercado Livre e da QuickStore). Editar: só os passos do anúncio, sem IA,
+ * sincronizando com o Mercado Livre e a QuickStore quando o anúncio já está publicado.
  *
  * - listingId: com id, abre o anúncio para editar; sem id, é um anúncio novo
  * - celebrate(word): animação de publicar (cursor, clique e partículas); devolve uma Promise
@@ -85,6 +91,7 @@ export default function useListingEditor({ listingId, celebrate }) {
   const [errors, setErrors] = useState({});
   const [original, setOriginal] = useState(null);
   const [connection, setConnection] = useState(null);
+  const [qsConnection, setQsConnection] = useState(null);
   const [publishing, setPublishing] = useState(false);
   const [result, setResult] = useState(null);
   const [visited, setVisited] = useState(0);
@@ -105,13 +112,23 @@ export default function useListingEditor({ listingId, celebrate }) {
         const connections = await fetchConnectedMarketplaces().catch(() => []);
         if (!mounted.current) return;
         const mlConn = connections.find((item) => item.slug === PRIMARY_CHANNEL) ?? null;
+        const qsConn = connections.find((item) => item.slug === QUICKSTORE_CHANNEL) ?? null;
         setConnection(mlConn);
+        setQsConnection(qsConn);
         if (editing) {
           let listing = await getListing(accountId, listingId);
           if (mlConn && listing.mlItemId) {
             try {
               const mlFresh = await fetchMercadoLivreItem(listing.mlItemId);
               listing = await mergeMercadoLivreItem(accountId, listingId, mlFresh);
+            } catch {
+              // Mantém os dados locais se a sincronização falhar
+            }
+          }
+          if (qsConn && listing.qsItemId) {
+            try {
+              const qsFresh = await fetchQuickStoreItem(listing.qsItemId);
+              listing = await mergeQuickStoreItem(accountId, listingId, qsFresh);
             } catch {
               // Mantém os dados locais se a sincronização falhar
             }
@@ -339,15 +356,18 @@ export default function useListingEditor({ listingId, celebrate }) {
 
   // ---------- Publicar ou salvar ----------
   const canPublishMl = Boolean(connection);
-  const willPublish = draft.publishMl && canPublishMl;
+  const canPublishQs = Boolean(qsConnection);
+  const willPublishMl = Boolean(draft.publishMl && canPublishMl);
+  const willPublishQs = Boolean(draft.publishQs && canPublishQs);
+  const willPublish = willPublishMl || willPublishQs;
 
-  const publishOnMl = useCallback(
-    async (data) => {
+  const prepareChannelPayload = useCallback(
+    (data, categoryFallback) => {
       const cover = data.photos[data.coverIndex] ?? data.photos[0];
       const ordered = [cover, ...data.photos.filter((photo) => photo !== cover)];
       const keptPhotos = ordered.filter((p) => String(p).startsWith('https://'));
-      return publishToMercadoLivre(
-        {
+      return {
+        payload: {
           title: data.title,
           description: data.description,
           priceCents: data.priceCents,
@@ -355,37 +375,45 @@ export default function useListingEditor({ listingId, celebrate }) {
           condition: data.condition,
           attributes: draft.attributes,
           analysisId: draft.analysisId,
-          mlCategoryId: draft.mlCategoryId,
+          mlCategoryId: draft.mlCategoryId ?? categoryFallback,
           keptPhotos
         },
-        photos.readingBlobs(ordered)
-      );
+        blobs: photos.readingBlobs(ordered)
+      };
     },
     [draft.analysisId, draft.attributes, draft.mlCategoryId, photos]
   );
 
+  const publishOnMl = useCallback(
+    async (data) => {
+      const { payload, blobs } = prepareChannelPayload(data, original?.mlCategoryId);
+      return publishToMercadoLivre(payload, blobs);
+    },
+    [original?.mlCategoryId, prepareChannelPayload]
+  );
+
   const updateOnMl = useCallback(
     async (itemId, data) => {
-      const cover = data.photos[data.coverIndex] ?? data.photos[0];
-      const ordered = [cover, ...data.photos.filter((photo) => photo !== cover)];
-      const keptPhotos = ordered.filter((p) => String(p).startsWith('https://'));
-      return updateMercadoLivreItem(
-        itemId,
-        {
-          title: data.title,
-          description: data.description,
-          priceCents: data.priceCents,
-          stock: data.stock,
-          condition: data.condition,
-          attributes: draft.attributes,
-          analysisId: draft.analysisId,
-          mlCategoryId: draft.mlCategoryId ?? original?.mlCategoryId,
-          keptPhotos
-        },
-        photos.readingBlobs(ordered)
-      );
+      const { payload, blobs } = prepareChannelPayload(data, original?.mlCategoryId);
+      return updateMercadoLivreItem(itemId, payload, blobs);
     },
-    [draft.analysisId, draft.attributes, draft.mlCategoryId, original?.mlCategoryId, photos]
+    [original?.mlCategoryId, prepareChannelPayload]
+  );
+
+  const publishOnQs = useCallback(
+    async (data) => {
+      const { payload, blobs } = prepareChannelPayload(data, original?.qsCategoryId ?? original?.mlCategoryId);
+      return publishToQuickStore(payload, blobs);
+    },
+    [original?.mlCategoryId, original?.qsCategoryId, prepareChannelPayload]
+  );
+
+  const updateOnQs = useCallback(
+    async (itemId, data) => {
+      const { payload, blobs } = prepareChannelPayload(data, original?.qsCategoryId ?? original?.mlCategoryId);
+      return updateQuickStoreItem(itemId, payload, blobs);
+    },
+    [original?.mlCategoryId, original?.qsCategoryId, prepareChannelPayload]
   );
 
   const finish = useCallback(async () => {
@@ -403,44 +431,129 @@ export default function useListingEditor({ listingId, celebrate }) {
     const data = toListingData(draft, range.status === 'ready' ? range : null);
     try {
       if (editing) {
-        const previousStatus = listingStatus(original);
-        const nextStatus = statusAfterSave({
-          previous: previousStatus,
+        const previousMlStatus = channelStatus(original, PRIMARY_CHANNEL);
+        const nextMlStatus = statusAfterSave({
+          previous: previousMlStatus,
           publish: draft.publishMl,
           canPublish: canPublishMl
         });
         let mlPatch = {};
-        if (original.mlItemId && canPublishMl) {
-          const mlUpdated = await updateOnMl(original.mlItemId, data);
-          if (!draft.publishMl && previousStatus === LISTING_STATUS.PUBLISHED) {
-            await updateMercadoLivreStatus(original.mlItemId, LISTING_STATUS.PAUSED);
-          } else if (draft.publishMl && previousStatus !== LISTING_STATUS.PUBLISHED) {
-            await updateMercadoLivreStatus(original.mlItemId, LISTING_STATUS.PUBLISHED);
+        let finalMlStatus = nextMlStatus;
+        if (canPublishMl) {
+          if (original.mlItemId && previousMlStatus !== LISTING_STATUS.UNPUBLISHED) {
+            try {
+              const mlUpdated = await updateOnMl(original.mlItemId, data);
+              if (!draft.publishMl && previousMlStatus === LISTING_STATUS.PUBLISHED) {
+                await updateMercadoLivreStatus(original.mlItemId, LISTING_STATUS.PAUSED);
+                finalMlStatus = LISTING_STATUS.PAUSED;
+              } else if (draft.publishMl && previousMlStatus !== LISTING_STATUS.PUBLISHED) {
+                await updateMercadoLivreStatus(original.mlItemId, LISTING_STATUS.PUBLISHED);
+                finalMlStatus = LISTING_STATUS.PUBLISHED;
+              } else {
+                finalMlStatus = previousMlStatus;
+              }
+              mlPatch = {
+                mlItemId: mlUpdated.id ?? original.mlItemId,
+                permalink: mlUpdated.permalink ?? original.permalink,
+                mlCategoryId: mlUpdated.category_id ?? original.mlCategoryId,
+                health: mlUpdated.health ?? original.health,
+                mlSoldQuantity: mlUpdated.sold_quantity ?? original.mlSoldQuantity ?? original.soldQuantity,
+                photos: Array.isArray(mlUpdated.pictures) && mlUpdated.pictures.length ? mlUpdated.pictures : data.photos,
+                coverIndex: 0
+              };
+            } catch (error) {
+              if (draft.publishMl && (error?.code === 'anuncio_nao_encontrado' || error?.code === 'publicacao_recusada')) {
+                const published = await publishOnMl(data);
+                finalMlStatus = LISTING_STATUS.PUBLISHED;
+                mlPatch = {
+                  mlItemId: published.id,
+                  permalink: published.permalink,
+                  mlCategoryId: published.categoryId ?? data.mlCategoryId
+                };
+              } else {
+                throw error;
+              }
+            }
+          } else if (draft.publishMl) {
+            const published = await publishOnMl(data);
+            finalMlStatus = LISTING_STATUS.PUBLISHED;
+            mlPatch = {
+              mlItemId: published.id,
+              permalink: published.permalink,
+              mlCategoryId: published.categoryId ?? data.mlCategoryId
+            };
           }
-          mlPatch = {
-            mlItemId: mlUpdated.id ?? original.mlItemId,
-            permalink: mlUpdated.permalink ?? original.permalink,
-            mlCategoryId: mlUpdated.category_id ?? original.mlCategoryId,
-            health: mlUpdated.health ?? original.health,
-            soldQuantity: mlUpdated.sold_quantity ?? original.soldQuantity,
-            photos: Array.isArray(mlUpdated.pictures) && mlUpdated.pictures.length ? mlUpdated.pictures : data.photos,
-            coverIndex: 0
-          };
-        } else if (nextStatus === LISTING_STATUS.PUBLISHED && previousStatus === LISTING_STATUS.UNPUBLISHED) {
-          const published = await publishOnMl(data);
-          mlPatch = {
-            mlItemId: published.id,
-            permalink: published.permalink,
-            mlCategoryId: published.categoryId ?? data.mlCategoryId
-          };
         }
-        const finalChannelStatus =
-          original.mlItemId && !draft.publishMl ? LISTING_STATUS.PAUSED : nextStatus;
+
+        const previousQsStatus = channelStatus(original, QUICKSTORE_CHANNEL);
+        const nextQsStatus = statusAfterSave({
+          previous: previousQsStatus,
+          publish: draft.publishQs,
+          canPublish: canPublishQs
+        });
+        let qsPatch = {};
+        let finalQsStatus = nextQsStatus;
+        if (canPublishQs) {
+          if (original.qsItemId && previousQsStatus !== LISTING_STATUS.UNPUBLISHED) {
+            try {
+              const qsUpdated = await updateOnQs(original.qsItemId, data);
+              if (!draft.publishQs && previousQsStatus === LISTING_STATUS.PUBLISHED) {
+                await updateQuickStoreStatus(original.qsItemId, LISTING_STATUS.PAUSED);
+                finalQsStatus = LISTING_STATUS.PAUSED;
+              } else if (draft.publishQs && previousQsStatus !== LISTING_STATUS.PUBLISHED) {
+                await updateQuickStoreStatus(original.qsItemId, LISTING_STATUS.PUBLISHED);
+                finalQsStatus = LISTING_STATUS.PUBLISHED;
+              } else {
+                finalQsStatus = previousQsStatus;
+              }
+              const qsHttpsPhotos = (Array.isArray(qsUpdated.pictures) ? qsUpdated.pictures : []).filter((p) =>
+                String(p).startsWith('https://')
+              );
+              qsPatch = {
+                qsItemId: qsUpdated.id ?? original.qsItemId,
+                qsPermalink: qsUpdated.permalink ?? original.qsPermalink,
+                qsCategoryId: qsUpdated.category_id ?? original.qsCategoryId ?? data.qsCategoryId,
+                qsHealth: qsUpdated.health ?? original.qsHealth,
+                qsSoldQuantity: qsUpdated.sold_quantity ?? original.qsSoldQuantity ?? 0,
+                ...(qsHttpsPhotos.length && !mlPatch.photos ? { photos: qsHttpsPhotos, coverIndex: 0 } : {})
+              };
+            } catch (error) {
+              if (draft.publishQs && (error?.code === 'anuncio_nao_encontrado' || error?.code === 'publicacao_recusada')) {
+                const publishedQs = await publishOnQs(data);
+                finalQsStatus = LISTING_STATUS.PUBLISHED;
+                qsPatch = {
+                  qsItemId: publishedQs.id,
+                  qsPermalink: publishedQs.permalink,
+                  qsCategoryId: publishedQs.categoryId ?? data.qsCategoryId ?? data.mlCategoryId
+                };
+              } else {
+                throw error;
+              }
+            }
+          } else if (draft.publishQs) {
+            const publishedQs = await publishOnQs(data);
+            finalQsStatus = LISTING_STATUS.PUBLISHED;
+            qsPatch = {
+              qsItemId: publishedQs.id,
+              qsPermalink: publishedQs.permalink,
+              qsCategoryId: publishedQs.categoryId ?? data.qsCategoryId ?? data.mlCategoryId
+            };
+          }
+        }
+
+        const updatedChannels = {
+          ...original.channels,
+          [PRIMARY_CHANNEL]: finalMlStatus,
+          ...(canPublishQs || original.channels?.[QUICKSTORE_CHANNEL] !== undefined
+            ? { [QUICKSTORE_CHANNEL]: finalQsStatus }
+            : {})
+        };
         const updated = await updateListing(accountId, listingId, {
           ...data,
           ...mlPatch,
+          ...qsPatch,
           suggestedPriceCents: data.suggestedPriceCents ?? original.suggestedPriceCents,
-          channels: { ...original.channels, [PRIMARY_CHANNEL]: finalChannelStatus }
+          channels: updatedChannels
         });
         photos.release();
         finishing.current = false;
@@ -450,18 +563,31 @@ export default function useListingEditor({ listingId, celebrate }) {
         showToast({ tone: TOAST_TONES.SUCCESS, ...LISTING_EDITOR.saved });
         return;
       }
-      // Publicar de verdade primeiro: se o Mercado Livre recusar, nada é gravado e o rascunho fica
-      const published = willPublish ? await publishOnMl(data) : null;
+
+      // Publicar de verdade primeiro nos canais escolhidos
+      const [publishedMl, publishedQs] = await Promise.all([
+        willPublishMl ? publishOnMl(data) : Promise.resolve(null),
+        willPublishQs ? publishOnQs(data) : Promise.resolve(null)
+      ]);
+      const anyPublished = Boolean(publishedMl || publishedQs);
       // O rascunho sai antes: as fotos não ocupam o espaço duas vezes na hora de gravar.
       await clearDraft(accountId);
       let created;
       try {
         created = await createListing(accountId, {
           ...data,
-          mlItemId: published?.id ?? null,
-          permalink: published?.permalink ?? null,
-          mlCategoryId: published?.categoryId ?? data.mlCategoryId ?? null,
-          channels: { [PRIMARY_CHANNEL]: published ? LISTING_STATUS.PUBLISHED : LISTING_STATUS.UNPUBLISHED }
+          mlItemId: publishedMl?.id ?? null,
+          permalink: publishedMl?.permalink ?? null,
+          mlCategoryId: publishedMl?.categoryId ?? data.mlCategoryId ?? null,
+          qsItemId: publishedQs?.id ?? null,
+          qsPermalink: publishedQs?.permalink ?? null,
+          qsCategoryId: publishedQs?.categoryId ?? data.qsCategoryId ?? data.mlCategoryId ?? null,
+          channels: {
+            [PRIMARY_CHANNEL]: publishedMl ? LISTING_STATUS.PUBLISHED : LISTING_STATUS.UNPUBLISHED,
+            ...(canPublishQs || publishedQs
+              ? { [QUICKSTORE_CHANNEL]: publishedQs ? LISTING_STATUS.PUBLISHED : LISTING_STATUS.UNPUBLISHED }
+              : {})
+          }
         });
       } catch (error) {
         // Não gravou: o rascunho volta, para nada se perder.
@@ -470,12 +596,22 @@ export default function useListingEditor({ listingId, celebrate }) {
       }
       photos.release();
       // A comemoração só depois de gravar de verdade.
-      const word = published ? LISTING_WIZARD.publish.word : LISTING_WIZARD.publish.wordSaved;
+      const word = anyPublished ? LISTING_WIZARD.publish.word : LISTING_WIZARD.publish.wordSaved;
       if (celebrate) await celebrate(word).catch(() => {});
       if (!mounted.current) return;
       setPublishing(false);
-      setResult({ published: Boolean(published), id: created.id, permalink: published?.permalink ?? null });
-      published?.notices?.forEach((notice) => showToast({ tone: TOAST_TONES.INFO, ...aiErrorText(notice.code, notice.message) }));
+      setResult({
+        published: anyPublished,
+        id: created.id,
+        permalink: publishedMl?.permalink ?? null,
+        qsPermalink: publishedQs?.permalink ?? null
+      });
+      publishedMl?.notices?.forEach((notice) =>
+        showToast({ tone: TOAST_TONES.INFO, ...aiErrorText(notice.code, notice.message) })
+      );
+      publishedQs?.notices?.forEach((notice) =>
+        showToast({ tone: TOAST_TONES.INFO, ...aiErrorText(notice.code, notice.message) })
+      );
     } catch (error) {
       finishing.current = false;
       if (!mounted.current) return;
@@ -488,6 +624,7 @@ export default function useListingEditor({ listingId, celebrate }) {
   }, [
     accountId,
     canPublishMl,
+    canPublishQs,
     celebrate,
     draft,
     editing,
@@ -495,14 +632,17 @@ export default function useListingEditor({ listingId, celebrate }) {
     original,
     photos,
     publishOnMl,
+    publishOnQs,
     publishing,
     range,
     showErrors,
     stepIndex,
     steps,
     updateOnMl,
+    updateOnQs,
     validateStep,
-    willPublish,
+    willPublishMl,
+    willPublishQs,
     mounted
   ]);
 
@@ -555,7 +695,11 @@ export default function useListingEditor({ listingId, celebrate }) {
     pricePosition,
     acceptSuggestedPrice,
     connection,
+    qsConnection,
     canPublishMl,
+    canPublishQs,
+    willPublishMl,
+    willPublishQs,
     willPublish,
     finish,
     publishing,

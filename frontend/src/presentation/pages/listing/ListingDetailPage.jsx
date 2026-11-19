@@ -9,7 +9,13 @@ import StatusPill from '@/presentation/components/StatusPill/StatusPill.jsx';
 import useListingDetail from '@/application/listings/useListingDetail.js';
 import { hrefForListingEdit } from '@/application/navigation/routes.js';
 import { cx } from '@/presentation/utils/cx.js';
-import { LISTING_STATUS, listingStatus } from '@/domain/listings/listingRules.js';
+import {
+  LISTING_STATUS,
+  PRIMARY_CHANNEL,
+  QUICKSTORE_CHANNEL,
+  channelStatus,
+  listingStatus
+} from '@/domain/listings/listingRules.js';
 import { formatMoney, formatRelative } from '@/domain/format/format.js';
 import {
   LISTING_DETAIL,
@@ -30,8 +36,8 @@ function safeExternalUrl(url) {
 
 /**
  * Visão geral das macroinformações de um produto (#/anuncios/:id):
- * galeria de fotos, preço, estoque, vendas, pontuação de qualidade no Mercado Livre,
- * ficha técnica completa, descrição e ações diretas (editar, sincronizar, pausar e excluir).
+ * galeria de fotos, preço, estoque, vendas, pontuação de qualidade,
+ * ficha técnica completa, descrição e ações diretas nos canais (Mercado Livre e QuickStore).
  */
 export default function ListingDetailPage({ params }) {
   const detail = useListingDetail(params?.id);
@@ -39,12 +45,15 @@ export default function ListingDetailPage({ params }) {
     status,
     listing,
     mlConnected,
+    qsConnected,
     syncing,
     busy,
     selectedPhoto,
     setSelectedPhoto,
     syncNow,
-    toggleStatus,
+    toggleChannelStatus,
+    publishBothChannels,
+    putInStandby,
     duplicate,
     confirmingDelete,
     removing,
@@ -73,22 +82,42 @@ export default function ListingDetailPage({ params }) {
     );
   }
 
-  const channelStatus = listingStatus(listing);
-  const statusBadge = LISTING_STATUS_LABELS[channelStatus] ?? LISTING_STATUS_LABELS.unpublished;
+  const overallStatus = listingStatus(listing);
+  const mlStatus = channelStatus(listing, PRIMARY_CHANNEL);
+  const qsStatus = channelStatus(listing, QUICKSTORE_CHANNEL);
+  const statusBadge = LISTING_STATUS_LABELS[overallStatus] ?? LISTING_STATUS_LABELS.unpublished;
+  const mlBadge = LISTING_STATUS_LABELS[mlStatus] ?? LISTING_STATUS_LABELS.unpublished;
+  const qsBadge = LISTING_STATUS_LABELS[qsStatus] ?? LISTING_STATUS_LABELS.unpublished;
   const photos = listing.photos ?? [];
   const activePhoto = photos[selectedPhoto] ?? photos[0] ?? null;
   const safePermalink = safeExternalUrl(listing.permalink);
+  const safeQsPermalink = safeExternalUrl(listing.qsPermalink);
+  const rawHealth = listing.health ?? listing.qsHealth;
   const healthPct =
-    typeof listing.health === 'number' && listing.health > 0
-      ? Math.round(listing.health <= 1 ? listing.health * 100 : listing.health)
+    typeof rawHealth === 'number' && rawHealth > 0
+      ? Math.round(rawHealth <= 1 ? rawHealth * 100 : rawHealth)
       : null;
 
-  const toggleButton =
-    channelStatus === LISTING_STATUS.PUBLISHED
+  const mlButton =
+    mlStatus === LISTING_STATUS.PUBLISHED
       ? { icon: 'pause', label: LISTING_DETAIL.actions.pause }
-      : channelStatus === LISTING_STATUS.PAUSED
+      : mlStatus === LISTING_STATUS.PAUSED
         ? { icon: 'play', label: LISTING_DETAIL.actions.resume }
         : { icon: 'upload', label: LISTING_DETAIL.actions.publish };
+
+  const qsButton =
+    qsStatus === LISTING_STATUS.PUBLISHED
+      ? { icon: 'pause', label: LISTING_DETAIL.actions.pauseQs }
+      : qsStatus === LISTING_STATUS.PAUSED
+        ? { icon: 'play', label: LISTING_DETAIL.actions.resumeQs }
+        : { icon: 'upload', label: LISTING_DETAIL.actions.publishQs };
+
+  const canSyncAny = (listing.mlItemId && mlConnected) || (listing.qsItemId && qsConnected);
+  const showPublishBoth =
+    mlConnected &&
+    qsConnected &&
+    mlStatus === LISTING_STATUS.UNPUBLISHED &&
+    qsStatus === LISTING_STATUS.UNPUBLISHED;
 
   return (
     <div className="listing-detail">
@@ -108,7 +137,7 @@ export default function ListingDetailPage({ params }) {
             >
               {LISTING_DETAIL.back.label}
             </Button>
-            {listing.mlItemId && mlConnected && (
+            {canSyncAny && (
               <Button
                 variant="outline"
                 size="sm"
@@ -138,9 +167,20 @@ export default function ListingDetailPage({ params }) {
         <StatusPill tone={statusBadge.tone} size="sm">
           {statusBadge.label}
         </StatusPill>
+        <StatusPill tone={mlBadge.tone} size="sm">
+          {`Mercado Livre: ${mlBadge.label}`}
+        </StatusPill>
+        <StatusPill tone={qsBadge.tone} size="sm">
+          {`QuickStore: ${qsBadge.label}`}
+        </StatusPill>
         {listing.mlItemId && (
           <StatusPill tone="cream" size="sm">
-            {listing.mlItemId}
+            {`ML ${listing.mlItemId}`}
+          </StatusPill>
+        )}
+        {listing.qsItemId && (
+          <StatusPill tone="cream" size="sm">
+            {`QS ${listing.qsItemId}`}
           </StatusPill>
         )}
         {healthPct !== null && (
@@ -245,16 +285,41 @@ export default function ListingDetailPage({ params }) {
         <div className="listing-detail__aside">
           <Panel tone="paper" className="listing-detail__actions-panel">
             <div className="listing-detail__action-buttons">
+              {showPublishBoth && (
+                <Button
+                  icon="sparkles"
+                  iconPosition="start"
+                  iconSize={16}
+                  onClick={publishBothChannels}
+                  disabled={busy}
+                >
+                  {LISTING_DETAIL.actions.publishBoth}
+                </Button>
+              )}
+
               <Button
-                variant="outline"
-                icon={toggleButton.icon}
+                variant={mlStatus === LISTING_STATUS.UNPUBLISHED && !showPublishBoth ? 'primary' : 'outline'}
+                icon={mlButton.icon}
                 iconPosition="start"
                 iconSize={16}
-                onClick={toggleStatus}
+                onClick={() => toggleChannelStatus(PRIMARY_CHANNEL)}
                 disabled={busy || !mlConnected}
               >
-                {toggleButton.label}
+                {mlButton.label}
               </Button>
+
+              {mlStatus !== LISTING_STATUS.UNPUBLISHED && (
+                <Button
+                  variant="outline"
+                  icon="close"
+                  iconPosition="start"
+                  iconSize={16}
+                  onClick={() => putInStandby(PRIMARY_CHANNEL)}
+                  disabled={busy}
+                >
+                  {LISTING_DETAIL.actions.standbyMl}
+                </Button>
+              )}
 
               {safePermalink && (
                 <Button
@@ -267,6 +332,44 @@ export default function ListingDetailPage({ params }) {
                   iconSize={16}
                 >
                   {LISTING_DETAIL.actions.viewOnMl}
+                </Button>
+              )}
+
+              <Button
+                variant={qsStatus === LISTING_STATUS.UNPUBLISHED && !showPublishBoth ? 'primary' : 'outline'}
+                icon={qsButton.icon}
+                iconPosition="start"
+                iconSize={16}
+                onClick={() => toggleChannelStatus(QUICKSTORE_CHANNEL)}
+                disabled={busy || !qsConnected}
+              >
+                {qsButton.label}
+              </Button>
+
+              {qsStatus !== LISTING_STATUS.UNPUBLISHED && (
+                <Button
+                  variant="outline"
+                  icon="close"
+                  iconPosition="start"
+                  iconSize={16}
+                  onClick={() => putInStandby(QUICKSTORE_CHANNEL)}
+                  disabled={busy}
+                >
+                  {LISTING_DETAIL.actions.standbyQs}
+                </Button>
+              )}
+
+              {safeQsPermalink && (
+                <Button
+                  href={safeQsPermalink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  variant="outline"
+                  icon="external"
+                  iconPosition="start"
+                  iconSize={16}
+                >
+                  {LISTING_DETAIL.actions.viewOnQs}
                 </Button>
               )}
 
@@ -307,6 +410,12 @@ export default function ListingDetailPage({ params }) {
                   <dd className="listing-detail__spec-value">{listing.mlItemId}</dd>
                 </div>
               )}
+              {listing.qsItemId && (
+                <div className="listing-detail__spec-row">
+                  <dt className="listing-detail__spec-term">{LISTING_DETAIL.specs.qsCode}</dt>
+                  <dd className="listing-detail__spec-value">{listing.qsItemId}</dd>
+                </div>
+              )}
               {listing.mlCategoryId && (
                 <div className="listing-detail__spec-row">
                   <dt className="listing-detail__spec-term">{LISTING_DETAIL.specs.mlCategory}</dt>
@@ -321,7 +430,7 @@ export default function ListingDetailPage({ params }) {
               ))}
             </dl>
 
-            {(!listing.attributes || listing.attributes.length === 0) && !listing.mlItemId && (
+            {(!listing.attributes || listing.attributes.length === 0) && !listing.mlItemId && !listing.qsItemId && (
               <p className="listing-detail__empty-text">{LISTING_DETAIL.specs.empty}</p>
             )}
           </Panel>

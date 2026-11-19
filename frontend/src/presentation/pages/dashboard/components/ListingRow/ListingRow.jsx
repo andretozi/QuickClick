@@ -13,7 +13,16 @@ import './ListingRow.css';
  * Clicar na linha abre a visão geral das macroinformações (#/anuncios/:id); o botão de editar
  * leva direto ao editor (#/anuncios/:id/editar).
  */
-export default function ListingRow({ listing, busy, canPublish, onToggle, onDuplicate, onRemove }) {
+export default function ListingRow({
+  listing,
+  busy,
+  canPublish,
+  connectedByChannel,
+  onToggle,
+  onToggleChannel,
+  onDuplicate,
+  onRemove
+}) {
   const status = listingStatus(listing);
   const { actions, actionLabel } = LISTINGS_PANEL;
   const toggle =
@@ -39,7 +48,14 @@ export default function ListingRow({ listing, busy, canPublish, onToggle, onDupl
         {LISTINGS_PANEL.stock(listing.stock)}
       </p>
 
-      <ListingChannels status={status} className="listing-row__channels" />
+      <ListingChannels
+        status={status}
+        channels={listing.channels}
+        connectedByChannel={connectedByChannel}
+        onPublishChannel={onToggleChannel ? (channel) => onToggleChannel(listing, channel) : undefined}
+        disabled={busy}
+        className="listing-row__channels"
+      />
 
       <div className="listing-row__actions">
         <IconButton

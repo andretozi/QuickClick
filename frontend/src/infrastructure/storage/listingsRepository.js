@@ -13,10 +13,12 @@ import { STORAGE_KEYS, USER_KEYS, newId, nowIso, readJson, removeKey, userKey, w
 import {
   allHttps,
   applyMlItemToStoreRecord,
+  applyQuickStoreItemToStoreRecord,
   byUpdatedDesc,
   fromApi,
   mapChannels,
   matchMlItems,
+  matchQuickStoreItems,
   pickPhotos,
   samePhotos,
   sameRecord,
@@ -171,16 +173,8 @@ export async function getListing(accountId, id) {
   return toListing(await fetchRecord(accountId, id));
 }
 
-/**
- * Sincroniza os anúncios com os produtos reais retornados pelo Mercado Livre.
- * Grava (em paralelo) só os que mudaram; 409 é pulado (o próximo sync acerta) e outro erro
- * sobe depois de todos terminarem.
- */
-export async function syncListingsWithMercadoLivre(accountId, mlProducts) {
-  if (!Array.isArray(mlProducts)) return listListings(accountId);
-  const records = await loadRecords(accountId);
+async function saveMatchedRecords(accountId, records, next) {
   const before = new Map(records.map((record) => [record.id, record]));
-  const next = matchMlItems(records, mlProducts);
   const results = await Promise.allSettled(
     next.map(async (record) => {
       const old = before.get(record.id);
@@ -197,11 +191,41 @@ export async function syncListingsWithMercadoLivre(accountId, mlProducts) {
     .map(toListing);
 }
 
+/**
+ * Sincroniza os anúncios com os produtos reais retornados pelo Mercado Livre.
+ * Grava (em paralelo) só os que mudaram; 409 é pulado (o próximo sync acerta) e outro erro
+ * sobe depois de todos terminarem.
+ */
+export async function syncListingsWithMercadoLivre(accountId, mlProducts) {
+  if (!Array.isArray(mlProducts)) return listListings(accountId);
+  const records = await loadRecords(accountId);
+  const next = matchMlItems(records, mlProducts);
+  return saveMatchedRecords(accountId, records, next);
+}
+
+/**
+ * Sincroniza os anúncios com os produtos reais retornados pela QuickStore.
+ */
+export async function syncListingsWithQuickStore(accountId, qsProducts) {
+  if (!Array.isArray(qsProducts)) return listListings(accountId);
+  const records = await loadRecords(accountId);
+  const next = matchQuickStoreItems(records, qsProducts);
+  return saveMatchedRecords(accountId, records, next);
+}
+
 /** Atualiza um anúncio específico com os dados frescos vindos do Mercado Livre. */
 export async function mergeMercadoLivreItem(accountId, id, mlItem) {
   const current = await fetchRecord(accountId, id);
   const updated = applyMlItemToStoreRecord(current, mlItem);
   // Abrir o anúncio não grava nada se o ML não mudou (gravar levaria o anúncio para o topo do painel)
+  if (sameRecord(current, updated)) return toListing(current);
+  return toListing(await saveRecord(accountId, updated, current.atualizado_em, current.fotos));
+}
+
+/** Atualiza um anúncio específico com os dados frescos vindos da QuickStore. */
+export async function mergeQuickStoreItem(accountId, id, qsItem) {
+  const current = await fetchRecord(accountId, id);
+  const updated = applyQuickStoreItemToStoreRecord(current, qsItem);
   if (sameRecord(current, updated)) return toListing(current);
   return toListing(await saveRecord(accountId, updated, current.atualizado_em, current.fotos));
 }
@@ -215,6 +239,11 @@ export async function createListing(accountId, data) {
     ml_categoria_id: null,
     saude_ml: null,
     vendidos: 0,
+    qs_item_id: null,
+    qs_permalink: null,
+    qs_categoria_id: null,
+    saude_qs: null,
+    vendidos_qs: 0,
     titulo: '',
     descricao: '',
     categoria: 'outros',
@@ -240,7 +269,7 @@ export async function updateListing(accountId, id, patch) {
   return toListing(await saveRecord(accountId, updated, current.atualizado_em, current.fotos));
 }
 
-/** Copia um anúncio. A cópia nasce fora do ar (não publicada), sem vínculo com o item original do ML. */
+/** Copia um anúncio. A cópia nasce fora do ar (não publicada), sem vínculo com o item original do ML ou da QuickStore. */
 export async function duplicateListing(accountId, id, { title }) {
   const original = await fetchRecord(accountId, id);
   const now = nowIso();
@@ -251,6 +280,10 @@ export async function duplicateListing(accountId, id, { title }) {
     permalink: null,
     saude_ml: null,
     vendidos: 0,
+    qs_item_id: null,
+    qs_permalink: null,
+    saude_qs: null,
+    vendidos_qs: 0,
     titulo: title,
     canais: mapChannels(original.canais, { publicado: 'nao_publicado', pausado: 'nao_publicado' }),
     criado_em: now,

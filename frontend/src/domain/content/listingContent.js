@@ -253,7 +253,7 @@ export const LISTING_WIZARD = {
   },
   channels: {
     title: 'Onde você quer vender?',
-    lead: 'Por enquanto, a Quick Click publica no Mercado Livre. Os outros estão chegando.',
+    lead: 'Escolha em quais canais conectados este produto ficará à venda. O estoque sincroniza entre todos.',
     yours: 'Suas contas',
     publishHere: 'Publicar pela Quick Click',
     worthOpening: 'Vale abrir conta',
@@ -263,15 +263,18 @@ export const LISTING_WIZARD = {
     soon: 'Em breve',
     connected: (nickname) => `Conectado como ${nickname}`,
     notConnected: 'Conecte sua conta do Mercado Livre para publicar.',
+    notConnectedQs: 'Conecte sua conta da QuickStore para publicar.',
     connect: { label: 'Conectar o Mercado Livre', href: '#/marketplaces' },
+    connectQs: { label: 'Conectar a QuickStore', href: '#/marketplaces' },
     toggleLabel: 'Publicar no Mercado Livre',
+    toggleLabelQs: 'Publicar na QuickStore',
     preview: 'Prévia no Mercado Livre',
     previewFree: 'Frete calculado no anúncio',
     previewStock: (units) => (units === 1 ? 'Último disponível!' : `${units} disponíveis`),
     previewNew: 'Novo',
     previewUsed: 'Usado',
     previewBuy: 'Comprar agora',
-    noneSelected: 'Sem canal escolhido, o anúncio fica salvo no painel, fora do ar.'
+    noneSelected: 'Sem canal escolhido, o anúncio fica salvo no painel em standby (fora do ar).'
   },
   publish: {
     title: 'Tudo pronto. Bora vender?',
@@ -289,6 +292,8 @@ export const LISTING_WIZARD = {
     },
     channelsNone: 'Nenhum (fica salvo fora do ar)',
     channelsMl: 'Mercado Livre',
+    channelsQs: 'QuickStore',
+    channelsBoth: 'Mercado Livre e QuickStore',
     word: 'Publicado',
     wordSaved: 'Salvo'
   },
@@ -296,10 +301,11 @@ export const LISTING_WIZARD = {
     eyebrow: 'CLICOU, VENDEU.',
     title: 'Seu anúncio está no ar!',
     titleSaved: 'Seu anúncio foi salvo!',
-    text: 'Ele já aparece no Mercado Livre. Quando vender, o estoque baixa sozinho.',
+    text: 'Ele já aparece nos canais escolhidos. Quando vender ou alterar, tudo sincroniza sozinho.',
     textSaved: 'Ele ficou no painel, fora do ar. Publique quando quiser.',
     dashboard: { label: 'Ver no painel', href: '#/painel' },
     viewOnMl: 'Ver no Mercado Livre',
+    viewOnQs: 'Ver na QuickStore',
     another: 'Criar outro'
   },
   errors: {
@@ -315,7 +321,7 @@ export const LISTING_WIZARD = {
 export const LISTING_EDITOR = {
   eyebrow: 'SEU ANÚNCIO',
   title: 'Editar anúncio',
-  lead: 'Mexa em qualquer passo e salve. O anúncio no Mercado Livre se atualiza junto.',
+  lead: 'Mexa em qualquer passo e salve. O anúncio no Mercado Livre e na QuickStore se atualiza junto.',
   back: { label: 'Voltar ao painel', href: '#/painel' },
   loading: 'Carregando o anúncio…',
   notFound: {
@@ -323,7 +329,7 @@ export const LISTING_EDITOR = {
     text: 'Ele pode ter sido excluído. Que tal voltar ao painel?',
     action: { label: 'Voltar ao painel', href: '#/painel' }
   },
-  saved: { title: 'Alterações salvas.', text: 'O anúncio já está atualizado.' }
+  saved: { title: 'Alterações salvas.', text: 'O anúncio já está atualizado em todos os canais.' }
 };
 
 /** Visão geral das macroinformações de um anúncio (#/anuncios/:id). */
@@ -331,14 +337,21 @@ export const LISTING_DETAIL = {
   eyebrow: 'VISÃO GERAL DO ANÚNCIO',
   back: { label: 'Voltar ao painel', href: '#/painel' },
   loading: 'Carregando os dados do anúncio…',
-  syncing: 'Sincronizando com o Mercado Livre…',
+  syncing: 'Sincronizando canais…',
   actions: {
     edit: 'Editar anúncio',
     sync: 'Sincronizar agora',
     viewOnMl: 'Abrir no Mercado Livre',
-    pause: 'Pausar anúncio',
-    resume: 'Reativar anúncio',
+    viewOnQs: 'Abrir na QuickStore',
+    pause: 'Pausar no Mercado Livre',
+    resume: 'Reativar no Mercado Livre',
     publish: 'Publicar no Mercado Livre',
+    pauseQs: 'Pausar na QuickStore',
+    resumeQs: 'Reativar na QuickStore',
+    publishQs: 'Adicionar na QuickStore',
+    publishBoth: 'Publicar no Mercado Livre e na QuickStore',
+    standbyMl: 'Tirar de venda no Mercado Livre (Standby)',
+    standbyQs: 'Tirar de venda na QuickStore (Standby)',
     duplicate: 'Duplicar',
     remove: 'Excluir'
   },
@@ -350,7 +363,7 @@ export const LISTING_DETAIL = {
     sold: 'Unidades vendidas',
     soldUnits: (count) => `${count} ${plural(count, 'venda', 'vendas')}`,
     condition: 'Condição e categoria',
-    quality: 'Qualidade no Mercado Livre',
+    quality: 'Qualidade do anúncio',
     qualityScore: (pct) => `${pct}% de preenchimento`,
     qualityEmpty: 'Aguardando publicação'
   },
@@ -364,6 +377,7 @@ export const LISTING_DETAIL = {
     title: 'Ficha técnica e atributos',
     empty: 'Nenhuma característica técnica cadastrada ainda.',
     mlCode: 'Código no Mercado Livre',
+    qsCode: 'Código na QuickStore',
     mlCategory: 'Categoria no Mercado Livre',
     updatedAt: 'Última atualização'
   },
@@ -372,7 +386,8 @@ export const LISTING_DETAIL = {
     empty: 'Este anúncio ainda não tem descrição cadastrada.'
   },
   toasts: {
-    synced: { title: 'Anúncio sincronizado.', text: 'As informações vieram direto do Mercado Livre.' },
+    synced: { title: 'Anúncio sincronizado.', text: 'As informações vieram direto dos canais conectados.' },
+    standby: { title: 'Produto em standby.', text: 'Ele foi retirado de venda nesse canal e pode voltar quando você quiser.' },
     syncError: { title: 'Não deu pra sincronizar agora.', text: 'Mostrando os últimos dados salvos no painel.' }
   }
 };

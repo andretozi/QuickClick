@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import {
   fromApi,
   matchMlItems,
+  matchQuickStoreItems,
   pickPhotos,
   sameRecord,
   toApi,
@@ -118,3 +119,23 @@ const single = matchMlItems([twins[0]], [mlItem('MLB901', 'Caneca azul'), mlItem
 assert.equal(single.length, 2);
 assert.notEqual(single[0].id, single[1].id);
 assert.equal(single.find((record) => record.id === 'a_1').ml_item_id, 'MLB901');
+
+// standby: quando um item foi retirado de venda (closed ou excluído no ML/QuickStore), o anúncio entra em standby (nao_publicado)
+const afterRemovalMl = matchMlItems([published], []);
+assert.equal(afterRemovalMl[0].canais['mercado-livre'], 'nao_publicado');
+assert.equal(afterRemovalMl[0].ml_item_id, null);
+
+const qsLinked = matchQuickStoreItems([afterRemovalMl[0]], [
+  { id: 'QS777', title: 'Caneca azul', status: 'active', price: 55.0, available_quantity: 8, pictures: [ML_PHOTO] }
+]);
+assert.equal(qsLinked[0].qs_item_id, 'QS777');
+assert.equal(qsLinked[0].canais.quickstore, 'publicado');
+assert.equal(qsLinked[0].preco_centavos, 5500);
+assert.equal(qsLinked[0].estoque, 8);
+
+const qsClosed = matchQuickStoreItems(qsLinked, [
+  { id: 'QS777', title: 'Caneca azul', status: 'closed', price: 55.0, available_quantity: 0, pictures: [ML_PHOTO] }
+]);
+assert.equal(qsClosed[0].canais.quickstore, 'nao_publicado');
+assert.equal(qsClosed[0].qs_item_id, null);
+

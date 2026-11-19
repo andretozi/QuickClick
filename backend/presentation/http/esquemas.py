@@ -97,10 +97,10 @@ class RequisicaoConectar(BaseModel):
 
 
 class NotificacaoWebhookQuickStore(BaseModel):
-    """Schema de validação estrita para notificações de vendas (orders_v2) da QuickStore."""
+    """Schema de validação estrita para notificações de vendas (orders_v2) e anúncios (items) da QuickStore."""
 
     id: str | None = Field(default=None, alias="_id", max_length=120)
-    resource: str = Field(min_length=8, max_length=160)
+    resource: str = Field(min_length=7, max_length=160)
     user_id: int | str = Field(description="Identificador externo do vendedor na QuickStore")
     topic: str = Field(default="orders_v2", max_length=60)
     application_id: str | None = Field(default=None, max_length=120)
@@ -112,14 +112,19 @@ class NotificacaoWebhookQuickStore(BaseModel):
     @classmethod
     def _validar_recurso(cls, valor: str) -> str:
         texto = valor.strip()
-        if not (texto.startswith("/orders/") or texto.startswith("orders/")):
+        if texto.startswith("/orders/") or texto.startswith("orders/"):
+            prefixo = "orders"
+            codigo = texto.removeprefix("/").removeprefix("orders/").strip("/")
+        elif texto.startswith("/items/") or texto.startswith("items/"):
+            prefixo = "items"
+            codigo = texto.removeprefix("/").removeprefix("items/").strip("/")
+        else:
             raise ValueError("Recurso do webhook inválido.")
-        order_id = texto.removeprefix("/").removeprefix("orders/").strip("/")
-        if not order_id or len(order_id) > 64 or "/" in order_id or ".." in order_id:
-            raise ValueError("Identificador do pedido inválido no webhook.")
-        if not order_id.replace("-", "").replace("_", "").isalnum():
-            raise ValueError("Identificador do pedido inválido no webhook.")
-        return f"/orders/{order_id}"
+        if not codigo or len(codigo) > 64 or "/" in codigo or ".." in codigo:
+            raise ValueError("Identificador do recurso inválido no webhook.")
+        if not codigo.replace("-", "").replace("_", "").isalnum():
+            raise ValueError("Identificador do recurso inválido no webhook.")
+        return f"/{prefixo}/{codigo}"
 
     @field_validator("user_id")
     @classmethod

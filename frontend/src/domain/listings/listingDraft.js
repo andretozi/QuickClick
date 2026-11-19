@@ -4,7 +4,7 @@
  * Quem usa: os casos de uso do editor (application/listings).
  */
 import { centsToInput, parseMoney } from '@/domain/format/format.js';
-import { LISTING_STATUS, listingStatus } from '@/domain/listings/listingRules.js';
+import { LISTING_STATUS, PRIMARY_CHANNEL, QUICKSTORE_CHANNEL, channelStatus } from '@/domain/listings/listingRules.js';
 
 /** Rascunho vazio: um anúncio novo começa assim. */
 export const EMPTY_DRAFT = {
@@ -17,6 +17,7 @@ export const EMPTY_DRAFT = {
   stock: '1',
   priceInput: '',
   publishMl: true,
+  publishQs: true,
   // IA (só no criar): a análise, o que o vendedor confirmou e o que a IA preencheu
   analysisId: null,
   analysisPhotos: '', // marca das fotos que foram para a análise
@@ -25,9 +26,10 @@ export const EMPTY_DRAFT = {
   cards: [],
   defects: [],
   requirementAnswers: {}, // exigências dos canais: { [id]: { value, confirmed } }
-  attributes: [], // confirmados: [{ key, value }], vão para o anúncio e para o Mercado Livre
+  attributes: [], // confirmados: [{ key, value }], vão para o anúncio e para o Mercado Livre / QuickStore
   specs: [],
   mlCategoryId: null,
+  qsCategoryId: null,
   aiFilled: {}
 };
 
@@ -49,6 +51,7 @@ export function toListingData(draft, range) {
       value: attribute.value
     })),
     mlCategoryId: draft.mlCategoryId ?? null,
+    qsCategoryId: draft.qsCategoryId ?? draft.mlCategoryId ?? null,
     analysisId: draft.analysisId ?? null
   };
 }
@@ -64,8 +67,10 @@ export function toDraft(listing) {
     condition: listing.condition,
     stock: String(listing.stock),
     priceInput: centsToInput(listing.priceCents),
-    publishMl: listingStatus(listing) !== LISTING_STATUS.UNPUBLISHED,
+    publishMl: channelStatus(listing, PRIMARY_CHANNEL) !== LISTING_STATUS.UNPUBLISHED,
+    publishQs: channelStatus(listing, QUICKSTORE_CHANNEL) !== LISTING_STATUS.UNPUBLISHED,
     mlCategoryId: listing.mlCategoryId ?? null,
+    qsCategoryId: listing.qsCategoryId ?? listing.mlCategoryId ?? null,
     attributes: (listing.attributes ?? []).map((attribute) => ({
       id: attribute.id ?? null,
       key: attribute.name,

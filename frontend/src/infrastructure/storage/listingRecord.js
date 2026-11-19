@@ -10,6 +10,7 @@
 import { newId, nowIso } from './localStore.js';
 
 const ML_CHANNEL = 'mercado-livre';
+const QS_CHANNEL = 'quickstore';
 const STATUS_TO_FRONT = { publicado: 'published', pausado: 'paused', nao_publicado: 'unpublished' };
 const STATUS_TO_STORE = { published: 'publicado', paused: 'pausado', unpublished: 'nao_publicado' };
 const CONDITION_TO_FRONT = { novo: 'new', usado: 'used' };
@@ -32,6 +33,11 @@ function mlStatusToStore(status) {
   return 'nao_publicado';
 }
 
+function isClosedExternalStatus(status) {
+  const clean = String(status ?? '').toLowerCase();
+  return clean === 'closed' || clean === 'inactive';
+}
+
 function inferCategoryFromTitle(title) {
   const normalized = normalizeTitle(title);
   if (/\b(caneca|xicara|copo|prato|panela|talher|tigela|garrafa|pote)\b/.test(normalized)) return 'cozinha';
@@ -45,28 +51,38 @@ function inferCategoryFromTitle(title) {
 }
 
 /** JSON guardado → anúncio do front. */
-export const toListing = (anuncio) => ({
-  id: anuncio.id,
-  mlItemId: anuncio.ml_item_id ?? null,
-  permalink: anuncio.permalink ?? null,
-  mlCategoryId: anuncio.ml_categoria_id ?? null,
-  health: anuncio.saude_ml ?? null,
-  soldQuantity: Number(anuncio.vendidos ?? 0),
-  title: anuncio.titulo,
-  description: anuncio.descricao ?? '',
-  category: anuncio.categoria || inferCategoryFromTitle(anuncio.titulo),
-  condition: CONDITION_TO_FRONT[anuncio.condicao] ?? 'new',
-  priceCents: anuncio.preco_centavos,
-  suggestedPriceCents: anuncio.preco_sugerido_centavos ?? null,
-  stock: anuncio.estoque,
-  photos: anuncio.fotos ?? [],
-  coverIndex: anuncio.capa ?? 0,
-  attributes: (anuncio.atributos ?? []).map(({ id, nome, valor }) => ({ id: id ?? null, name: nome, value: valor })),
-  analysisId: anuncio.analise_id ?? null,
-  channels: mapChannels(anuncio.canais, STATUS_TO_FRONT),
-  createdAt: anuncio.criado_em,
-  updatedAt: anuncio.atualizado_em
-});
+export const toListing = (anuncio) => {
+  const mlSold = Number(anuncio.vendidos ?? 0);
+  const qsSold = Number(anuncio.vendidos_qs ?? 0);
+  return {
+    id: anuncio.id,
+    mlItemId: anuncio.ml_item_id ?? null,
+    permalink: anuncio.permalink ?? null,
+    mlCategoryId: anuncio.ml_categoria_id ?? null,
+    health: anuncio.saude_ml ?? null,
+    mlSoldQuantity: mlSold,
+    qsItemId: anuncio.qs_item_id ?? null,
+    qsPermalink: anuncio.qs_permalink ?? null,
+    qsCategoryId: anuncio.qs_categoria_id ?? null,
+    qsHealth: anuncio.saude_qs ?? null,
+    qsSoldQuantity: qsSold,
+    soldQuantity: mlSold + qsSold,
+    title: anuncio.titulo,
+    description: anuncio.descricao ?? '',
+    category: anuncio.categoria || inferCategoryFromTitle(anuncio.titulo),
+    condition: CONDITION_TO_FRONT[anuncio.condicao] ?? 'new',
+    priceCents: anuncio.preco_centavos,
+    suggestedPriceCents: anuncio.preco_sugerido_centavos ?? null,
+    stock: anuncio.estoque,
+    photos: anuncio.fotos ?? [],
+    coverIndex: anuncio.capa ?? 0,
+    attributes: (anuncio.atributos ?? []).map(({ id, nome, valor }) => ({ id: id ?? null, name: nome, value: valor })),
+    analysisId: anuncio.analise_id ?? null,
+    channels: mapChannels(anuncio.canais, STATUS_TO_FRONT),
+    createdAt: anuncio.criado_em,
+    updatedAt: anuncio.atualizado_em
+  };
+};
 
 /** Campos do front (só os presentes) → campos guardados. */
 export function toStoreFields(data) {
@@ -75,7 +91,13 @@ export function toStoreFields(data) {
   if (data.permalink !== undefined) fields.permalink = data.permalink;
   if (data.mlCategoryId !== undefined) fields.ml_categoria_id = data.mlCategoryId;
   if (data.health !== undefined) fields.saude_ml = data.health;
-  if (data.soldQuantity !== undefined) fields.vendidos = Number(data.soldQuantity);
+  if (data.mlSoldQuantity !== undefined) fields.vendidos = Number(data.mlSoldQuantity);
+  else if (data.soldQuantity !== undefined && data.qsSoldQuantity === undefined) fields.vendidos = Number(data.soldQuantity);
+  if (data.qsItemId !== undefined) fields.qs_item_id = data.qsItemId;
+  if (data.qsPermalink !== undefined) fields.qs_permalink = data.qsPermalink;
+  if (data.qsCategoryId !== undefined) fields.qs_categoria_id = data.qsCategoryId;
+  if (data.qsHealth !== undefined) fields.saude_qs = data.qsHealth;
+  if (data.qsSoldQuantity !== undefined) fields.vendidos_qs = Number(data.qsSoldQuantity);
   if (data.title !== undefined) fields.titulo = data.title.trim();
   if (data.description !== undefined) fields.descricao = data.description.trim();
   if (data.category !== undefined) fields.categoria = data.category;
@@ -100,6 +122,7 @@ export function toStoreFields(data) {
 
 export function applyMlItemToStoreRecord(existing, mlItem) {
   const now = nowIso();
+  const closed = isClosedExternalStatus(mlItem.status);
   const pictures = Array.isArray(mlItem.pictures) && mlItem.pictures.length
     ? mlItem.pictures.slice(0, 12) // o servidor aceita até 12 fotos; acima disso o sync daria 422
     : mlItem.thumbnail
@@ -115,17 +138,25 @@ export function applyMlItemToStoreRecord(existing, mlItem) {
   const priceCents = mlItem.price !== undefined && mlItem.price !== null
     ? Math.round(Number(mlItem.price) * 100)
     : existing?.preco_centavos ?? 0;
-  const stock = mlItem.available_quantity !== undefined && mlItem.available_quantity !== null
-    ? Number(mlItem.available_quantity)
-    : existing?.estoque ?? 0;
+  const stock = closed
+    ? (existing?.estoque ?? Number(mlItem.available_quantity ?? 1))
+    : mlItem.available_quantity !== undefined && mlItem.available_quantity !== null
+      ? Number(mlItem.available_quantity)
+      : existing?.estoque ?? 0;
 
   return {
+    ...(existing ?? {}),
     id: existing?.id ?? newId('a'),
-    ml_item_id: mlItem.id ?? existing?.ml_item_id ?? null,
-    permalink: mlItem.permalink ?? existing?.permalink ?? null,
+    ml_item_id: closed ? null : (mlItem.id ?? existing?.ml_item_id ?? null),
+    permalink: closed ? null : (mlItem.permalink ?? existing?.permalink ?? null),
     ml_categoria_id: mlItem.category_id ?? existing?.ml_categoria_id ?? null,
-    saude_ml: mlItem.health ?? existing?.saude_ml ?? null,
+    saude_ml: closed ? null : (mlItem.health ?? existing?.saude_ml ?? null),
     vendidos: Number(mlItem.sold_quantity ?? existing?.vendidos ?? 0),
+    qs_item_id: existing?.qs_item_id ?? null,
+    qs_permalink: existing?.qs_permalink ?? null,
+    qs_categoria_id: existing?.qs_categoria_id ?? null,
+    saude_qs: existing?.saude_qs ?? null,
+    vendidos_qs: Number(existing?.vendidos_qs ?? 0),
     titulo: title,
     descricao: description,
     categoria: existing?.categoria || inferCategoryFromTitle(title),
@@ -134,7 +165,7 @@ export function applyMlItemToStoreRecord(existing, mlItem) {
     preco_sugerido_centavos: existing?.preco_sugerido_centavos ?? null,
     estoque: stock,
     fotos: pictures,
-    capa: 0,
+    capa: existing?.capa ?? 0,
     atributos: attributes,
     analise_id: existing?.analise_id ?? null,
     canais: {
@@ -146,6 +177,66 @@ export function applyMlItemToStoreRecord(existing, mlItem) {
   };
 }
 
+export function applyQuickStoreItemToStoreRecord(existing, qsItem) {
+  const now = nowIso();
+  const closed = isClosedExternalStatus(qsItem.status);
+  const httpsPictures = (Array.isArray(qsItem.pictures) ? qsItem.pictures : [])
+    .filter((p) => typeof p === 'string' && p.startsWith('https://'))
+    .slice(0, 12);
+  const pictures = httpsPictures.length
+    ? httpsPictures
+    : (typeof qsItem.thumbnail === 'string' && qsItem.thumbnail.startsWith('https://'))
+      ? [qsItem.thumbnail]
+      : existing?.fotos ?? [];
+  const attributes = Array.isArray(qsItem.attributes) && qsItem.attributes.length
+    ? qsItem.attributes.map((a) => ({ id: a.id ?? null, nome: a.name ?? a.id ?? '', valor: a.value ?? '' }))
+    : existing?.atributos ?? [];
+  const title = String(qsItem.title || existing?.titulo || '').trim();
+  const description = qsItem.description !== undefined && qsItem.description !== ''
+    ? String(qsItem.description)
+    : existing?.descricao ?? '';
+  const priceCents = qsItem.price !== undefined && qsItem.price !== null
+    ? Math.round(Number(qsItem.price) * 100)
+    : existing?.preco_centavos ?? 0;
+  const stock = closed
+    ? (existing?.estoque ?? Number(qsItem.available_quantity ?? 1))
+    : qsItem.available_quantity !== undefined && qsItem.available_quantity !== null
+      ? Number(qsItem.available_quantity)
+      : existing?.estoque ?? 0;
+
+  return {
+    ...(existing ?? {}),
+    id: existing?.id ?? newId('a'),
+    ml_item_id: existing?.ml_item_id ?? null,
+    permalink: existing?.permalink ?? null,
+    ml_categoria_id: existing?.ml_categoria_id ?? null,
+    saude_ml: existing?.saude_ml ?? null,
+    vendidos: Number(existing?.vendidos ?? 0),
+    qs_item_id: closed ? null : (qsItem.id ?? existing?.qs_item_id ?? null),
+    qs_permalink: closed ? null : (qsItem.permalink ?? existing?.qs_permalink ?? null),
+    qs_categoria_id: qsItem.category_id ?? existing?.qs_categoria_id ?? null,
+    saude_qs: closed ? null : (qsItem.health ?? existing?.saude_qs ?? null),
+    vendidos_qs: Number(qsItem.sold_quantity ?? existing?.vendidos_qs ?? 0),
+    titulo: title,
+    descricao: description,
+    categoria: existing?.categoria || inferCategoryFromTitle(title),
+    condicao: qsItem.condition === 'used' ? 'usado' : 'novo',
+    preco_centavos: priceCents,
+    preco_sugerido_centavos: existing?.preco_sugerido_centavos ?? null,
+    estoque: stock,
+    fotos: pictures,
+    capa: existing?.capa ?? 0,
+    atributos: attributes,
+    analise_id: existing?.analise_id ?? null,
+    canais: {
+      ...(existing?.canais ?? {}),
+      [QS_CHANNEL]: mlStatusToStore(qsItem.status)
+    },
+    criado_em: existing?.criado_em ?? qsItem.last_updated ?? now,
+    atualizado_em: qsItem.last_updated ?? existing?.atualizado_em ?? now
+  };
+}
+
 /**
  * Casa os itens do Mercado Livre com os registros: pelo ml_item_id e, sem ele, pelo título
  * normalizado. Os já casados ficam marcados por id (não por posição, que anda quando um item novo
@@ -154,6 +245,7 @@ export function applyMlItemToStoreRecord(existing, mlItem) {
 export function matchMlItems(records, mlProducts) {
   const next = [...records];
   const matched = new Set();
+  const seenIds = new Set((mlProducts ?? []).map((item) => item?.id).filter(Boolean));
   for (const mlItem of mlProducts) {
     if (!mlItem?.id) continue;
     let index = next.findIndex((item) => item.ml_item_id === mlItem.id);
@@ -163,12 +255,56 @@ export function matchMlItems(records, mlProducts) {
         (item) => !matched.has(item.id) && !item.ml_item_id && normalizeTitle(item.titulo) === targetTitle
       );
     }
+    if (index < 0 && isClosedExternalStatus(mlItem.status)) continue;
     const updated = applyMlItemToStoreRecord(index >= 0 ? next[index] : null, mlItem);
     matched.add(updated.id);
     if (index >= 0) next[index] = updated;
     else next.unshift(updated);
   }
-  return next;
+  return next.map((record) => {
+    if (!record.ml_item_id || seenIds.has(record.ml_item_id)) return record;
+    return {
+      ...record,
+      ml_item_id: null,
+      permalink: null,
+      saude_ml: null,
+      canais: { ...(record.canais ?? {}), [ML_CHANNEL]: 'nao_publicado' }
+    };
+  });
+}
+
+/**
+ * Casa os itens da QuickStore com os registros: pelo qs_item_id e, sem ele, pelo título normalizado.
+ */
+export function matchQuickStoreItems(records, qsProducts) {
+  const next = [...records];
+  const matched = new Set();
+  const seenIds = new Set((qsProducts ?? []).map((item) => item?.id).filter(Boolean));
+  for (const qsItem of qsProducts) {
+    if (!qsItem?.id) continue;
+    let index = next.findIndex((item) => item.qs_item_id === qsItem.id);
+    if (index < 0) {
+      const targetTitle = normalizeTitle(qsItem.title);
+      index = next.findIndex(
+        (item) => !matched.has(item.id) && !item.qs_item_id && normalizeTitle(item.titulo) === targetTitle
+      );
+    }
+    if (index < 0 && isClosedExternalStatus(qsItem.status)) continue;
+    const updated = applyQuickStoreItemToStoreRecord(index >= 0 ? next[index] : null, qsItem);
+    matched.add(updated.id);
+    if (index >= 0) next[index] = updated;
+    else next.unshift(updated);
+  }
+  return next.map((record) => {
+    if (!record.qs_item_id || seenIds.has(record.qs_item_id)) return record;
+    return {
+      ...record,
+      qs_item_id: null,
+      qs_permalink: null,
+      saude_qs: null,
+      canais: { ...(record.canais ?? {}), [QS_CHANNEL]: 'nao_publicado' }
+    };
+  });
 }
 
 export const byUpdatedDesc = (a, b) => (Date.parse(b.atualizado_em) || 0) - (Date.parse(a.atualizado_em) || 0);
@@ -187,6 +323,28 @@ export function pickPhotos(record, localPhotos, legacyRecord) {
   if (Array.isArray(localPhotos) && localPhotos.length) return localPhotos;
   const legacy = legacyRecord?.fotos ?? [];
   return legacy.length && !allHttps(legacy) ? legacy : [];
+}
+
+function externalDataForChannel(record, canal) {
+  if (canal === ML_CHANNEL) {
+    return {
+      id_externo: record.ml_item_id ?? null,
+      permalink: record.permalink ?? null,
+      categoria_id: record.ml_categoria_id ?? null,
+      saude: record.saude_ml ?? null,
+      vendidos: Number(record.vendidos ?? 0)
+    };
+  }
+  if (canal === QS_CHANNEL) {
+    return {
+      id_externo: record.qs_item_id ?? null,
+      permalink: record.qs_permalink ?? null,
+      categoria_id: record.qs_categoria_id ?? null,
+      saude: record.saude_qs ?? null,
+      vendidos: Number(record.vendidos_qs ?? 0)
+    };
+  }
+  return NO_EXTERNAL_DATA;
 }
 
 /** Registro → Produto completo (fotos como estão, publicações em ordem fixa). */
@@ -212,15 +370,7 @@ function toProduct(record) {
       .map((canal) => ({
         canal,
         status: STATUS_TO_STORE[canais[canal]] ?? canais[canal],
-        ...(canal === ML_CHANNEL
-          ? {
-              id_externo: record.ml_item_id ?? null,
-              permalink: record.permalink ?? null,
-              categoria_id: record.ml_categoria_id ?? null,
-              saude: record.saude_ml ?? null,
-              vendidos: Number(record.vendidos ?? 0)
-            }
-          : NO_EXTERNAL_DATA)
+        ...externalDataForChannel(record, canal)
       }))
   };
 }
@@ -234,6 +384,7 @@ export function toApi(record) {
 export function fromApi(produto) {
   const publicacoes = produto.publicacoes ?? [];
   const ml = publicacoes.find((publicacao) => publicacao.canal === ML_CHANNEL);
+  const qs = publicacoes.find((publicacao) => publicacao.canal === QS_CHANNEL);
   return {
     id: produto.id,
     ml_item_id: ml?.id_externo ?? null,
@@ -241,6 +392,11 @@ export function fromApi(produto) {
     ml_categoria_id: ml?.categoria_id ?? null,
     saude_ml: ml?.saude ?? null,
     vendidos: Number(ml?.vendidos ?? 0),
+    qs_item_id: qs?.id_externo ?? null,
+    qs_permalink: qs?.permalink ?? null,
+    qs_categoria_id: qs?.categoria_id ?? null,
+    saude_qs: qs?.saude ?? null,
+    vendidos_qs: Number(qs?.vendidos ?? 0),
     titulo: produto.titulo,
     descricao: produto.descricao ?? '',
     categoria: produto.categoria,
