@@ -19,6 +19,7 @@ class Publicacao:
     categoria_id: str | None = None
     saude: float | None = None
     vendidos: int = 0
+    preco_centavos: int | None = None
 
 
 @dataclass(frozen=True)

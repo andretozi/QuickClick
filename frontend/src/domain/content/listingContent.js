@@ -412,8 +412,13 @@ export const LISTING_DETAIL = {
   metrics: {
     price: 'Preço de venda',
     suggested: (value) => `Sugerido pela IA: ${value}`,
+    channelPrices: (mlValue, qsValue) => `ML: ${mlValue} · QuickStore: ${qsValue}`,
     stock: 'Estoque disponível',
     units: (count) => `${count} ${plural(count, 'unidade', 'unidades')}`,
+    stockSave: 'Salvar estoque',
+    stockSaving: 'Sincronizando…',
+    stockInputLabel: 'Quantidade em estoque',
+    stockSyncHint: 'Sincroniza automaticamente nas plataformas conectadas',
     sold: 'Unidades vendidas',
     soldUnits: (count) => `${count} ${plural(count, 'venda', 'vendas')}`,
     condition: 'Condição e categoria',
@@ -441,6 +446,15 @@ export const LISTING_DETAIL = {
   },
   toasts: {
     synced: { title: 'Anúncio sincronizado.', text: 'As informações vieram direto dos canais conectados.' },
+    stockSaved: { title: 'Estoque atualizado.', text: 'A quantidade disponível já foi salva no anúncio.' },
+    stockSynced: (names) => ({
+      title: 'Estoque sincronizado.',
+      text: `A nova quantidade foi aplicada em ${names} e salva na Quick Click.`
+    }),
+    stockInvalid: {
+      title: 'Quantidade inválida.',
+      text: 'Informe um número inteiro de unidades disponível em estoque.'
+    },
     standby: { title: 'Produto em standby.', text: 'Ele foi retirado de venda nesse canal e pode voltar quando você quiser.' },
     standbyDisconnected: (name) => ({
       title: `Você não está conectado em ${name}.`,

@@ -13,6 +13,7 @@ import {
   removeListing,
   updateListing
 } from '@/infrastructure/storage/listingsRepository.js';
+import { clampHealth, safeHttpsUrl } from '@/infrastructure/storage/listingRecord.js';
 import {
   fetchConnectedMarketplaces,
   fetchMarketplaceProducts
@@ -24,11 +25,14 @@ import {
   fetchQuickStoreItem,
   publishToMercadoLivre,
   publishToQuickStore,
+  updateMercadoLivreItem,
   updateMercadoLivreStatus,
+  updateQuickStoreItem,
   updateQuickStoreStatus
 } from '@/infrastructure/ai/iaService.js';
 import { dataUrlToBlob } from '@/infrastructure/media/imageResizer.js';
 import {
+  LISTING_LIMITS,
   LISTING_STATUS,
   PRIMARY_CHANNEL,
   QUICKSTORE_CHANNEL,
@@ -46,18 +50,24 @@ const CHANNEL_NAMES = {
 
 const formatChannelNames = (slugs) => slugs.map((slug) => CHANNEL_NAMES[slug] ?? slug).join(' e ');
 
-function buildPublishInputs(listing) {
+function buildPublishInputs(listing, channel = null) {
   const orderedPhotos = listing.photos ?? [];
   const keptPhotos = orderedPhotos.filter((p) => String(p).startsWith('https://'));
   const photoBlobs = orderedPhotos
     .filter((p) => String(p).startsWith('data:'))
     .map((p) => dataUrlToBlob(p));
+  const channelPriceCents =
+    channel === QUICKSTORE_CHANNEL
+      ? (listing.qsPriceCents ?? listing.priceCents)
+      : channel === PRIMARY_CHANNEL
+        ? (listing.mlPriceCents ?? listing.priceCents)
+        : listing.priceCents;
   return {
     payload: {
       id: listing.id,
       title: listing.title,
       description: listing.description,
-      priceCents: listing.priceCents,
+      priceCents: channelPriceCents,
       stock: Math.max(1, Number(listing.stock) || 1),
       condition: listing.condition,
       attributes: listing.attributes,
@@ -254,7 +264,7 @@ export default function useListingDetail(listingId) {
           return mergeMercadoLivreItem(accountId, currentListing.id, mlItem);
         } catch (error) {
           if (targetStatus === LISTING_STATUS.PUBLISHED && error?.code === 'anuncio_nao_encontrado') {
-            const { payload, photoBlobs } = buildPublishInputs(currentListing);
+            const { payload, photoBlobs } = buildPublishInputs(currentListing, channel);
             const published = isQs
               ? await publishToQuickStore(payload, photoBlobs)
               : await publishToMercadoLivre(payload, photoBlobs);
@@ -264,13 +274,13 @@ export default function useListingDetail(listingId) {
               isQs
                 ? {
                     qsItemId: published.id,
-                    qsPermalink: published.permalink,
+                    qsPermalink: safeHttpsUrl(published.permalink),
                     qsCategoryId: published.categoryId ?? currentListing.qsCategoryId ?? currentListing.mlCategoryId,
                     channels: { ...currentListing.channels, [QUICKSTORE_CHANNEL]: LISTING_STATUS.PUBLISHED }
                   }
                 : {
                     mlItemId: published.id,
-                    permalink: published.permalink,
+                    permalink: safeHttpsUrl(published.permalink),
                     mlCategoryId: published.categoryId ?? currentListing.mlCategoryId,
                     channels: { ...currentListing.channels, [PRIMARY_CHANNEL]: LISTING_STATUS.PUBLISHED }
                   },
@@ -281,7 +291,7 @@ export default function useListingDetail(listingId) {
         }
       }
 
-      const { payload, photoBlobs } = buildPublishInputs(currentListing);
+      const { payload, photoBlobs } = buildPublishInputs(currentListing, channel);
       const published = isQs
         ? await publishToQuickStore(payload, photoBlobs)
         : await publishToMercadoLivre(payload, photoBlobs);
@@ -291,13 +301,13 @@ export default function useListingDetail(listingId) {
         isQs
           ? {
               qsItemId: published.id,
-              qsPermalink: published.permalink,
+              qsPermalink: safeHttpsUrl(published.permalink),
               qsCategoryId: published.categoryId ?? currentListing.qsCategoryId ?? currentListing.mlCategoryId,
               channels: { ...currentListing.channels, [QUICKSTORE_CHANNEL]: targetStatus }
             }
           : {
               mlItemId: published.id,
-              permalink: published.permalink,
+              permalink: safeHttpsUrl(published.permalink),
               mlCategoryId: published.categoryId ?? currentListing.mlCategoryId,
               channels: { ...currentListing.channels, [PRIMARY_CHANNEL]: targetStatus }
             },
@@ -421,13 +431,14 @@ export default function useListingDetail(listingId) {
     if (!listing || !effectiveMlConnected || !effectiveQsConnected || busy) return;
     setBusy(true);
     try {
-      const { payload, photoBlobs } = buildPublishInputs(listing);
+      const mlInputs = buildPublishInputs(listing, PRIMARY_CHANNEL);
+      const qsInputs = buildPublishInputs(listing, QUICKSTORE_CHANNEL);
       const mlUnpublished = channelStatus(listing, PRIMARY_CHANNEL) === LISTING_STATUS.UNPUBLISHED || !listing.mlItemId;
       const qsUnpublished = channelStatus(listing, QUICKSTORE_CHANNEL) === LISTING_STATUS.UNPUBLISHED || !listing.qsItemId;
 
       const [pubMl, pubQs] = await Promise.all([
-        mlUnpublished ? publishToMercadoLivre(payload, photoBlobs) : Promise.resolve(null),
-        qsUnpublished ? publishToQuickStore(payload, photoBlobs) : Promise.resolve(null)
+        mlUnpublished ? publishToMercadoLivre(mlInputs.payload, mlInputs.photoBlobs) : Promise.resolve(null),
+        qsUnpublished ? publishToQuickStore(qsInputs.payload, qsInputs.photoBlobs) : Promise.resolve(null)
       ]);
 
       const updated = await updateListing(
@@ -437,14 +448,14 @@ export default function useListingDetail(listingId) {
           ...(pubMl
             ? {
                 mlItemId: pubMl.id,
-                permalink: pubMl.permalink,
+                permalink: safeHttpsUrl(pubMl.permalink),
                 mlCategoryId: pubMl.categoryId ?? listing.mlCategoryId
               }
             : {}),
           ...(pubQs
             ? {
                 qsItemId: pubQs.id,
-                qsPermalink: pubQs.permalink,
+                qsPermalink: safeHttpsUrl(pubQs.permalink),
                 qsCategoryId: pubQs.categoryId ?? listing.qsCategoryId ?? listing.mlCategoryId
               }
             : {}),
@@ -465,6 +476,128 @@ export default function useListingDetail(listingId) {
       if (mounted.current) setBusy(false);
     }
   }, [accountId, busy, effectiveMlConnected, effectiveQsConnected, failed, listing, mounted]);
+
+  /** Atualiza o estoque na visão geral e sincroniza automaticamente nos canais conectados. */
+  const updateStock = useCallback(
+    async (rawQuantity) => {
+      if (!listing || busy) return false;
+      const parsed = Number(rawQuantity);
+      if (!Number.isInteger(parsed) || parsed < 0 || parsed > LISTING_LIMITS.STOCK_MAX) {
+        showToast({
+          tone: TOAST_TONES.ERROR,
+          ...(LISTING_DETAIL.toasts.stockInvalid ?? {
+            title: 'Estoque inválido.',
+            text: `Informe um número inteiro entre 0 e ${LISTING_LIMITS.STOCK_MAX}.`
+          })
+        });
+        return false;
+      }
+
+      setBusy(true);
+      try {
+        const nextChannels = { ...listing.channels };
+        let mlPatch = {};
+        let qsPatch = {};
+        const syncedChannels = [];
+        const keptPhotos = (listing.photos ?? []).filter((p) => String(p).startsWith('https://')).slice(0, 12);
+
+        if (effectiveMlConnected && listing.mlItemId) {
+          const prevMlStatus = channelStatus(listing, PRIMARY_CHANNEL);
+          const mlPayload = {
+            id: listing.id,
+            title: listing.title,
+            description: listing.description,
+            priceCents: listing.mlPriceCents ?? listing.priceCents,
+            stock: parsed,
+            condition: listing.condition,
+            attributes: listing.attributes,
+            mlCategoryId: listing.mlCategoryId,
+            keptPhotos
+          };
+          let mlResult = null;
+          if (parsed === 0) {
+            if (prevMlStatus === LISTING_STATUS.PUBLISHED) {
+              mlResult = await updateMercadoLivreStatus(listing.mlItemId, LISTING_STATUS.PAUSED);
+            }
+            mlResult = await updateMercadoLivreItem(listing.mlItemId, mlPayload, []);
+            nextChannels[PRIMARY_CHANNEL] = LISTING_STATUS.PAUSED;
+          } else {
+            mlResult = await updateMercadoLivreItem(listing.mlItemId, mlPayload, []);
+            if (prevMlStatus === LISTING_STATUS.PAUSED) {
+              mlResult = await updateMercadoLivreStatus(listing.mlItemId, LISTING_STATUS.PUBLISHED);
+              nextChannels[PRIMARY_CHANNEL] = LISTING_STATUS.PUBLISHED;
+            }
+          }
+          if (mlResult) {
+            mlPatch = {
+              permalink: safeHttpsUrl(mlResult.permalink ?? listing.permalink),
+              health: clampHealth(mlResult.health ?? listing.health)
+            };
+          }
+          syncedChannels.push(CHANNEL_NAMES[PRIMARY_CHANNEL]);
+        }
+
+        if (effectiveQsConnected && listing.qsItemId) {
+          const prevQsStatus = channelStatus(listing, QUICKSTORE_CHANNEL);
+          const qsPayload = {
+            id: listing.id,
+            title: listing.title,
+            description: listing.description,
+            priceCents: listing.qsPriceCents ?? listing.priceCents,
+            stock: parsed,
+            condition: listing.condition,
+            attributes: listing.attributes,
+            mlCategoryId: listing.qsCategoryId ?? listing.mlCategoryId,
+            keptPhotos
+          };
+          let qsResult = await updateQuickStoreItem(listing.qsItemId, qsPayload, []);
+          if (parsed === 0 && prevQsStatus === LISTING_STATUS.PUBLISHED) {
+            qsResult = await updateQuickStoreStatus(listing.qsItemId, LISTING_STATUS.PAUSED);
+            nextChannels[QUICKSTORE_CHANNEL] = LISTING_STATUS.PAUSED;
+          } else if (parsed > 0 && prevQsStatus === LISTING_STATUS.PAUSED) {
+            qsResult = await updateQuickStoreStatus(listing.qsItemId, LISTING_STATUS.PUBLISHED);
+            nextChannels[QUICKSTORE_CHANNEL] = LISTING_STATUS.PUBLISHED;
+          }
+          if (qsResult) {
+            qsPatch = {
+              qsPermalink: safeHttpsUrl(qsResult.permalink ?? listing.qsPermalink),
+              qsHealth: clampHealth(qsResult.health ?? listing.qsHealth)
+            };
+          }
+          syncedChannels.push(CHANNEL_NAMES[QUICKSTORE_CHANNEL]);
+        }
+
+        const updated = await updateListing(
+          accountId,
+          listing.id,
+          {
+            stock: parsed,
+            ...mlPatch,
+            ...qsPatch,
+            channels: nextChannels
+          },
+          { syncQuickStore: false }
+        );
+        if (!mounted.current) return false;
+        setListing(updated);
+        const toastMsg =
+          syncedChannels.length > 0 && LISTING_DETAIL.toasts.stockSynced
+            ? LISTING_DETAIL.toasts.stockSynced(syncedChannels.join(' e '))
+            : (LISTING_DETAIL.toasts.stockSaved ?? {
+                title: 'Estoque atualizado.',
+                text: 'A quantidade disponível já foi salva no anúncio.'
+              });
+        showToast({ tone: TOAST_TONES.SUCCESS, ...toastMsg });
+        return true;
+      } catch (error) {
+        if (mounted.current) failed(error);
+        return false;
+      } finally {
+        if (mounted.current) setBusy(false);
+      }
+    },
+    [accountId, busy, effectiveMlConnected, effectiveQsConnected, failed, listing, mounted]
+  );
 
   const requestChannelRemoval = useCallback((channel = PRIMARY_CHANNEL) => {
     setPendingChannelRemoval(channel);
@@ -609,6 +742,7 @@ export default function useListingDetail(listingId) {
     selectedPhoto,
     setSelectedPhoto,
     syncNow,
+    updateStock,
     toggleStatus,
     toggleChannelStatus,
     toggleAllChannels,

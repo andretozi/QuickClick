@@ -65,3 +65,10 @@
   --pill-dot: var(--color-green-light);
   --pill-fg: var(--color-green-light);
 }
+
+/* Sobre fundo claro */
+.status-pill--neutral {
+  --pill-rgb: var(--rgb-ink);
+  --pill-dot: rgb(var(--rgb-ink) / 0.45);
+  --pill-fg: var(--color-ink);
+}

@@ -29,13 +29,27 @@ const normalizeTitle = (text) =>
 
 const asExternalId = (value) => (value != null && String(value).trim() !== '' ? String(value).trim() : null);
 
-const safeHttpsUrl = (url, fallback = null) =>
-  typeof url === 'string' && url.trim().startsWith('https://') ? url.trim() : fallback;
+export const safeHttpsUrl = (url, fallback = null) => {
+  if (typeof url !== 'string') return fallback;
+  const clean = url.trim();
+  return clean.startsWith('https://') && clean.length <= 500 ? clean : fallback;
+};
 
-const clampHealth = (value, fallback = null) => {
-  if (value === null || value === undefined || value === '') return fallback;
+export const clampHealth = (value, fallback = null) => {
+  if (value === null || value === undefined || value === '' || typeof value === 'boolean') return fallback;
   const num = Number(value);
   return Number.isFinite(num) && num >= 0 && num <= 100 ? num : fallback;
+};
+
+const optionalCents = (value) => {
+  if (value === null || value === undefined || value === '') return null;
+  const num = Number(value);
+  return Number.isFinite(num) && num >= 0 ? Math.round(num) : null;
+};
+
+const isChannelActiveInStore = (canais, slug) => {
+  const st = canais?.[slug];
+  return st === 'publicado' || st === 'pausado' || st === 'published' || st === 'paused';
 };
 
 function mlStatusToStore(status) {
@@ -73,11 +87,13 @@ export const toListing = (anuncio) => {
     mlCategoryId: anuncio.ml_categoria_id ?? null,
     health: anuncio.saude_ml ?? null,
     mlSoldQuantity: mlSold,
+    mlPriceCents: optionalCents(anuncio.preco_centavos_ml),
     qsItemId: anuncio.qs_item_id ?? null,
     qsPermalink: anuncio.qs_permalink ?? null,
     qsCategoryId: anuncio.qs_categoria_id ?? null,
     qsHealth: anuncio.saude_qs ?? null,
     qsSoldQuantity: qsSold,
+    qsPriceCents: optionalCents(anuncio.preco_centavos_qs),
     soldQuantity: mlSold + qsSold,
     title: anuncio.titulo,
     description: anuncio.descricao ?? '',
@@ -99,17 +115,19 @@ export const toListing = (anuncio) => {
 /** Campos do front (só os presentes) → campos guardados. */
 export function toStoreFields(data) {
   const fields = {};
-  if (data.mlItemId !== undefined) fields.ml_item_id = data.mlItemId;
-  if (data.permalink !== undefined) fields.permalink = data.permalink;
+  if (data.mlItemId !== undefined) fields.ml_item_id = asExternalId(data.mlItemId);
+  if (data.permalink !== undefined) fields.permalink = safeHttpsUrl(data.permalink);
   if (data.mlCategoryId !== undefined) fields.ml_categoria_id = data.mlCategoryId;
-  if (data.health !== undefined) fields.saude_ml = data.health;
+  if (data.health !== undefined) fields.saude_ml = clampHealth(data.health);
   if (data.mlSoldQuantity !== undefined) fields.vendidos = Number(data.mlSoldQuantity);
   else if (data.soldQuantity !== undefined && data.qsSoldQuantity === undefined) fields.vendidos = Number(data.soldQuantity);
-  if (data.qsItemId !== undefined) fields.qs_item_id = data.qsItemId;
-  if (data.qsPermalink !== undefined) fields.qs_permalink = data.qsPermalink;
+  if (data.mlPriceCents !== undefined) fields.preco_centavos_ml = optionalCents(data.mlPriceCents);
+  if (data.qsItemId !== undefined) fields.qs_item_id = asExternalId(data.qsItemId);
+  if (data.qsPermalink !== undefined) fields.qs_permalink = safeHttpsUrl(data.qsPermalink);
   if (data.qsCategoryId !== undefined) fields.qs_categoria_id = data.qsCategoryId;
-  if (data.qsHealth !== undefined) fields.saude_qs = data.qsHealth;
+  if (data.qsHealth !== undefined) fields.saude_qs = clampHealth(data.qsHealth);
   if (data.qsSoldQuantity !== undefined) fields.vendidos_qs = Number(data.qsSoldQuantity);
+  if (data.qsPriceCents !== undefined) fields.preco_centavos_qs = optionalCents(data.qsPriceCents);
   if (data.title !== undefined) fields.titulo = data.title.trim();
   if (data.description !== undefined) fields.descricao = data.description.trim();
   if (data.category !== undefined) fields.categoria = data.category;
@@ -147,9 +165,27 @@ export function applyMlItemToStoreRecord(existing, mlItem) {
   const description = mlItem.description !== undefined && mlItem.description !== ''
     ? String(mlItem.description)
     : existing?.descricao ?? '';
-  const priceCents = mlItem.price !== undefined && mlItem.price !== null
+  const hasIncomingPrice = mlItem.price !== undefined && mlItem.price !== null;
+  const incomingPriceCents = hasIncomingPrice
     ? Math.round(Number(mlItem.price) * 100)
-    : existing?.preco_centavos ?? 0;
+    : existing?.preco_centavos_ml ?? existing?.preco_centavos ?? 0;
+  const otherChannelActive = isChannelActiveInStore(existing?.canais, QS_CHANNEL);
+  const existingQsPrice = optionalCents(existing?.preco_centavos_qs);
+  const hasDistinctOtherPrice =
+    Boolean(existing) &&
+    otherChannelActive &&
+    ((existingQsPrice !== null && existingQsPrice !== incomingPriceCents) ||
+      (existingQsPrice === null && existing?.preco_centavos !== undefined && existing.preco_centavos !== incomingPriceCents));
+  const basePriceCents = hasDistinctOtherPrice ? existing.preco_centavos : incomingPriceCents;
+  const mlPriceCents = closed
+    ? null
+    : hasDistinctOtherPrice
+      ? incomingPriceCents
+      : optionalCents(existing?.preco_centavos_ml) !== null
+        ? incomingPriceCents
+        : null;
+  const qsPriceCents =
+    hasDistinctOtherPrice && existingQsPrice === null ? optionalCents(existing?.preco_centavos) : existingQsPrice;
   const stock = closed
     ? (existing?.estoque ?? Number(mlItem.available_quantity ?? 1))
     : mlItem.available_quantity !== undefined && mlItem.available_quantity !== null
@@ -164,16 +200,18 @@ export function applyMlItemToStoreRecord(existing, mlItem) {
     ml_categoria_id: mlItem.category_id ?? existing?.ml_categoria_id ?? null,
     saude_ml: closed ? null : clampHealth(mlItem.health, clampHealth(existing?.saude_ml)),
     vendidos: Number(mlItem.sold_quantity ?? existing?.vendidos ?? 0),
+    ...(mlPriceCents !== null || existing?.preco_centavos_ml !== undefined ? { preco_centavos_ml: mlPriceCents } : {}),
     qs_item_id: existing?.qs_item_id ?? null,
     qs_permalink: existing?.qs_permalink ?? null,
     qs_categoria_id: existing?.qs_categoria_id ?? null,
     saude_qs: existing?.saude_qs ?? null,
     vendidos_qs: Number(existing?.vendidos_qs ?? 0),
+    ...(qsPriceCents !== null || existing?.preco_centavos_qs !== undefined ? { preco_centavos_qs: qsPriceCents } : {}),
     titulo: title,
     descricao: description,
     categoria: existing?.categoria || inferCategoryFromTitle(title),
     condicao: mlItem.condition === 'used' ? 'usado' : 'novo',
-    preco_centavos: priceCents,
+    preco_centavos: basePriceCents,
     preco_sugerido_centavos: existing?.preco_sugerido_centavos ?? null,
     estoque: stock,
     fotos: pictures,
@@ -207,9 +245,27 @@ export function applyQuickStoreItemToStoreRecord(existing, qsItem) {
   const description = qsItem.description !== undefined && qsItem.description !== ''
     ? String(qsItem.description)
     : existing?.descricao ?? '';
-  const priceCents = qsItem.price !== undefined && qsItem.price !== null
+  const hasIncomingPrice = qsItem.price !== undefined && qsItem.price !== null;
+  const incomingPriceCents = hasIncomingPrice
     ? Math.round(Number(qsItem.price) * 100)
-    : existing?.preco_centavos ?? 0;
+    : existing?.preco_centavos_qs ?? existing?.preco_centavos ?? 0;
+  const otherChannelActive = isChannelActiveInStore(existing?.canais, ML_CHANNEL);
+  const existingMlPrice = optionalCents(existing?.preco_centavos_ml);
+  const hasDistinctOtherPrice =
+    Boolean(existing) &&
+    otherChannelActive &&
+    ((existingMlPrice !== null && existingMlPrice !== incomingPriceCents) ||
+      (existingMlPrice === null && existing?.preco_centavos !== undefined && existing.preco_centavos !== incomingPriceCents));
+  const basePriceCents = hasDistinctOtherPrice ? existing.preco_centavos : incomingPriceCents;
+  const qsPriceCents = closed
+    ? null
+    : hasDistinctOtherPrice
+      ? incomingPriceCents
+      : optionalCents(existing?.preco_centavos_qs) !== null
+        ? incomingPriceCents
+        : null;
+  const mlPriceCents =
+    hasDistinctOtherPrice && existingMlPrice === null ? optionalCents(existing?.preco_centavos) : existingMlPrice;
   const stock = closed
     ? (existing?.estoque ?? Number(qsItem.available_quantity ?? 1))
     : qsItem.available_quantity !== undefined && qsItem.available_quantity !== null
@@ -224,16 +280,18 @@ export function applyQuickStoreItemToStoreRecord(existing, qsItem) {
     ml_categoria_id: existing?.ml_categoria_id ?? null,
     saude_ml: existing?.saude_ml ?? null,
     vendidos: Number(existing?.vendidos ?? 0),
+    ...(mlPriceCents !== null || existing?.preco_centavos_ml !== undefined ? { preco_centavos_ml: mlPriceCents } : {}),
     qs_item_id: closed ? null : (asExternalId(qsItem.id) ?? asExternalId(existing?.qs_item_id)),
     qs_permalink: closed ? null : safeHttpsUrl(qsItem.permalink, safeHttpsUrl(existing?.qs_permalink)),
     qs_categoria_id: qsItem.category_id ?? existing?.qs_categoria_id ?? null,
     saude_qs: closed ? null : clampHealth(qsItem.health, clampHealth(existing?.saude_qs)),
     vendidos_qs: Number(qsItem.sold_quantity ?? existing?.vendidos_qs ?? 0),
+    ...(qsPriceCents !== null || existing?.preco_centavos_qs !== undefined ? { preco_centavos_qs: qsPriceCents } : {}),
     titulo: title,
     descricao: description,
     categoria: existing?.categoria || inferCategoryFromTitle(title),
     condicao: qsItem.condition === 'used' ? 'usado' : 'novo',
-    preco_centavos: priceCents,
+    preco_centavos: basePriceCents,
     preco_sugerido_centavos: existing?.preco_sugerido_centavos ?? null,
     estoque: stock,
     fotos: pictures,
@@ -347,21 +405,25 @@ export function pickPhotos(record, localPhotos, legacyRecord) {
 
 function externalDataForChannel(record, canal) {
   if (canal === ML_CHANNEL) {
+    const mlPrice = optionalCents(record.preco_centavos_ml);
     return {
-      id_externo: record.ml_item_id ?? null,
-      permalink: record.permalink ?? null,
-      categoria_id: record.ml_categoria_id ?? null,
-      saude: record.saude_ml ?? null,
-      vendidos: Number(record.vendidos ?? 0)
+      id_externo: asExternalId(record.ml_item_id),
+      permalink: safeHttpsUrl(record.permalink),
+      categoria_id: record.ml_categoria_id ? String(record.ml_categoria_id).slice(0, 40) : null,
+      saude: clampHealth(record.saude_ml),
+      vendidos: Math.max(0, Math.min(10_000_000, Math.trunc(Number(record.vendidos ?? 0) || 0))),
+      ...(mlPrice !== null ? { preco_centavos: mlPrice } : {})
     };
   }
   if (canal === QS_CHANNEL) {
+    const qsPrice = optionalCents(record.preco_centavos_qs);
     return {
-      id_externo: record.qs_item_id ?? null,
-      permalink: record.qs_permalink ?? null,
-      categoria_id: record.qs_categoria_id ?? null,
-      saude: record.saude_qs ?? null,
-      vendidos: Number(record.vendidos_qs ?? 0)
+      id_externo: asExternalId(record.qs_item_id),
+      permalink: safeHttpsUrl(record.qs_permalink),
+      categoria_id: record.qs_categoria_id ? String(record.qs_categoria_id).slice(0, 40) : null,
+      saude: clampHealth(record.saude_qs),
+      vendidos: Math.max(0, Math.min(10_000_000, Math.trunc(Number(record.vendidos_qs ?? 0) || 0))),
+      ...(qsPrice !== null ? { preco_centavos: qsPrice } : {})
     };
   }
   return NO_EXTERNAL_DATA;
@@ -370,19 +432,38 @@ function externalDataForChannel(record, canal) {
 /** Registro → Produto completo (fotos como estão, publicações em ordem fixa). */
 function toProduct(record) {
   const canais = record.canais ?? {};
+  const rawAttrs = Array.isArray(record.atributos) ? record.atributos.slice(0, 30) : [];
+  const atributos = rawAttrs.map(({ id, nome, valor }) => ({
+    id: id != null && String(id).trim() !== '' ? String(id).trim().slice(0, 60) : null,
+    nome: String(nome ?? '').slice(0, 60),
+    valor:
+      typeof valor === 'string'
+        ? valor.slice(0, 120)
+        : typeof valor === 'number' && Number.isFinite(valor)
+          ? valor
+          : typeof valor === 'boolean'
+            ? valor
+            : valor == null
+              ? null
+              : String(valor).slice(0, 120)
+  }));
+  const fotos = Array.isArray(record.fotos) ? record.fotos.slice(0, 12) : [];
+  const rawCover = Math.trunc(Number(record.capa ?? 0) || 0);
+  const maxCover = fotos.length > 0 ? Math.min(11, fotos.length - 1) : 11;
+  const capa = Math.max(0, Math.min(maxCover, rawCover));
   return {
     id: record.id,
-    titulo: String(record.titulo ?? ''),
-    descricao: String(record.descricao ?? ''),
-    categoria: record.categoria || inferCategoryFromTitle(record.titulo),
+    titulo: String(record.titulo ?? '').slice(0, 120),
+    descricao: String(record.descricao ?? '').slice(0, 4000),
+    categoria: String(record.categoria || inferCategoryFromTitle(record.titulo)).slice(0, 40),
     condicao: record.condicao === 'usado' ? 'usado' : 'novo',
-    preco_centavos: Number(record.preco_centavos ?? 0),
-    preco_sugerido_centavos: record.preco_sugerido_centavos ?? null,
-    estoque: Number(record.estoque ?? 0),
-    fotos: record.fotos ?? [],
-    capa: record.capa ?? 0,
-    atributos: (record.atributos ?? []).map(({ id, nome, valor }) => ({ id: id ?? null, nome: nome ?? '', valor: valor ?? null })),
-    analise_id: record.analise_id ?? null,
+    preco_centavos: Math.max(0, Math.min(1_000_000_000, Math.round(Number(record.preco_centavos ?? 0) || 0))),
+    preco_sugerido_centavos: optionalCents(record.preco_sugerido_centavos),
+    estoque: Math.max(0, Math.min(1_000_000, Math.trunc(Number(record.estoque ?? 0) || 0))),
+    fotos,
+    capa,
+    atributos,
+    analise_id: record.analise_id ? String(record.analise_id).slice(0, 36) : null,
     criado_em: record.criado_em,
     atualizado_em: record.atualizado_em,
     publicacoes: Object.keys(canais)
@@ -397,7 +478,16 @@ function toProduct(record) {
 
 /** Registro → corpo do PUT e da importação. Foto fora do https nunca vai: a lista fica vazia. */
 export function toApi(record) {
-  return { ...toProduct(record), fotos: allHttps(record.fotos) ? record.fotos ?? [] : [] };
+  const product = toProduct(record);
+  const rawPhotos = Array.isArray(record.fotos) ? record.fotos : [];
+  const canSendPhotos = allHttps(rawPhotos);
+  const httpsPhotos = canSendPhotos
+    ? rawPhotos.filter((foto) => typeof foto === 'string' && foto.startsWith('https://') && foto.length <= 1000).slice(0, 12)
+    : [];
+  const rawCover = Math.trunc(Number(record.capa ?? 0) || 0);
+  const maxCover = httpsPhotos.length > 0 ? Math.min(11, httpsPhotos.length - 1) : 11;
+  const capa = Math.max(0, Math.min(maxCover, rawCover));
+  return { ...product, fotos: httpsPhotos, capa };
 }
 
 /** Produto da API → registro guardado. */
@@ -405,6 +495,8 @@ export function fromApi(produto) {
   const publicacoes = produto.publicacoes ?? [];
   const ml = publicacoes.find((publicacao) => publicacao.canal === ML_CHANNEL);
   const qs = publicacoes.find((publicacao) => publicacao.canal === QS_CHANNEL);
+  const mlPrice = optionalCents(ml?.preco_centavos);
+  const qsPrice = optionalCents(qs?.preco_centavos);
   return {
     id: produto.id,
     ml_item_id: ml?.id_externo ?? null,
@@ -412,11 +504,13 @@ export function fromApi(produto) {
     ml_categoria_id: ml?.categoria_id ?? null,
     saude_ml: ml?.saude ?? null,
     vendidos: Number(ml?.vendidos ?? 0),
+    ...(mlPrice !== null ? { preco_centavos_ml: mlPrice } : {}),
     qs_item_id: qs?.id_externo ?? null,
     qs_permalink: qs?.permalink ?? null,
     qs_categoria_id: qs?.categoria_id ?? null,
     saude_qs: qs?.saude ?? null,
     vendidos_qs: Number(qs?.vendidos ?? 0),
+    ...(qsPrice !== null ? { preco_centavos_qs: qsPrice } : {}),
     titulo: produto.titulo,
     descricao: produto.descricao ?? '',
     categoria: produto.categoria,

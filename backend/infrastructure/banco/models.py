@@ -228,6 +228,7 @@ class PublicacaoModel(Base):
     categoria_id = Column(String(40), nullable=True)
     saude = Column(Float, nullable=True)
     vendidos = Column(Integer, nullable=False, default=0)
+    preco_centavos = Column(Integer, nullable=True)
     atualizado_em = Column(DateTime(timezone=True), nullable=False)
 
     __table_args__ = (

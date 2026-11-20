@@ -42,7 +42,13 @@ export default function ListingRow({
         </span>
       </a>
 
-      <p className="listing-row__price">{formatMoney(listing.priceCents)}</p>
+      <p className="listing-row__price">
+        {listing.mlPriceCents != null &&
+        listing.qsPriceCents != null &&
+        listing.mlPriceCents !== listing.qsPriceCents
+          ? `ML ${formatMoney(listing.mlPriceCents)} · QS ${formatMoney(listing.qsPriceCents)}`
+          : formatMoney(listing.priceCents)}
+      </p>
       <p className={cx('listing-row__stock', listing.stock === 0 && 'listing-row__stock--empty')}>
         {LISTINGS_PANEL.stock(listing.stock)}
       </p>

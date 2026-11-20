@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import Button from '@/presentation/components/Button/Button.jsx';
 import EmptyState from '@/presentation/components/EmptyState/EmptyState.jsx';
 import FormAlert from '@/presentation/components/FormAlert/FormAlert.jsx';
@@ -12,6 +13,7 @@ import useListingDetail from '@/application/listings/useListingDetail.js';
 import { ROUTE_HASH, ROUTES, hrefForListingEdit } from '@/application/navigation/routes.js';
 import { cx } from '@/presentation/utils/cx.js';
 import {
+  LISTING_LIMITS,
   LISTING_STATUS,
   PRIMARY_CHANNEL,
   QUICKSTORE_CHANNEL,
@@ -53,6 +55,7 @@ export default function ListingDetailPage({ params }) {
     selectedPhoto,
     setSelectedPhoto,
     syncNow,
+    updateStock,
     toggleChannelStatus,
     toggleAllChannels,
     pendingChannelRemoval,
@@ -67,6 +70,15 @@ export default function ListingDetailPage({ params }) {
     cancelRemoval,
     confirmRemoval
   } = detail;
+
+  const [stockDraft, setStockDraft] = useState('');
+  const [savingStock, setSavingStock] = useState(false);
+
+  useEffect(() => {
+    if (listing?.stock !== undefined && listing?.stock !== null) {
+      setStockDraft(String(listing.stock));
+    }
+  }, [listing?.stock]);
 
   if (status === 'loading') {
     return (
@@ -105,6 +117,31 @@ export default function ListingDetailPage({ params }) {
       : null;
 
   const canSyncAny = (listing.mlItemId && mlConnected) || (listing.qsItemId && qsConnected);
+  const mlPriceCents = listing.mlPriceCents ?? listing.priceCents;
+  const qsPriceCents = listing.qsPriceCents ?? listing.priceCents;
+  const hasDistinctChannelPrices =
+    listing.mlPriceCents != null &&
+    listing.qsPriceCents != null &&
+    listing.mlPriceCents !== listing.qsPriceCents;
+
+  const parsedStockDraft = Number(stockDraft);
+  const stockChanged =
+    stockDraft !== '' &&
+    Number.isInteger(parsedStockDraft) &&
+    parsedStockDraft >= 0 &&
+    parsedStockDraft <= LISTING_LIMITS.STOCK_MAX &&
+    parsedStockDraft !== listing.stock;
+
+  const handleStockSubmit = async (event) => {
+    event.preventDefault();
+    if (!stockChanged || busy || savingStock) return;
+    setSavingStock(true);
+    try {
+      await updateStock(parsedStockDraft);
+    } finally {
+      setSavingStock(false);
+    }
+  };
 
   const channelCards = [
     {
@@ -114,7 +151,8 @@ export default function ListingDetailPage({ params }) {
       status: mlStatus,
       badge: mlBadge,
       itemId: listing.mlItemId,
-      permalink: safePermalink
+      permalink: safePermalink,
+      priceCents: mlPriceCents
     },
     {
       slug: QUICKSTORE_CHANNEL,
@@ -123,7 +161,8 @@ export default function ListingDetailPage({ params }) {
       status: qsStatus,
       badge: qsBadge,
       itemId: listing.qsItemId,
-      permalink: safeQsPermalink
+      permalink: safeQsPermalink,
+      priceCents: qsPriceCents
     }
   ];
 
@@ -154,7 +193,7 @@ export default function ListingDetailPage({ params }) {
             </Button>
             {canSyncAny && (
               <Button
-                variant="outline"
+                variant="light"
                 size="sm"
                 icon="sync"
                 iconPosition="start"
@@ -208,8 +247,16 @@ export default function ListingDetailPage({ params }) {
       <section className="listing-detail__metrics" data-enter="1" aria-label={LISTING_DETAIL.eyebrow}>
         <Panel tone="paper" className="listing-detail__metric-card">
           <span className="listing-detail__metric-label">{LISTING_DETAIL.metrics.price}</span>
-          <strong className="heading listing-detail__metric-value">{formatMoney(listing.priceCents)}</strong>
-          {listing.suggestedPriceCents ? (
+          <strong className="heading listing-detail__metric-value">
+            {hasDistinctChannelPrices
+              ? `${formatMoney(Math.min(mlPriceCents, qsPriceCents))} – ${formatMoney(Math.max(mlPriceCents, qsPriceCents))}`
+              : formatMoney(listing.priceCents)}
+          </strong>
+          {hasDistinctChannelPrices ? (
+            <span className="listing-detail__metric-foot">
+              {LISTING_DETAIL.metrics.channelPrices(formatMoney(mlPriceCents), formatMoney(qsPriceCents))}
+            </span>
+          ) : listing.suggestedPriceCents ? (
             <span className="listing-detail__metric-foot">
               {LISTING_DETAIL.metrics.suggested(formatMoney(listing.suggestedPriceCents))}
             </span>
@@ -218,13 +265,59 @@ export default function ListingDetailPage({ params }) {
           )}
         </Panel>
 
-        <Panel tone="paper" className="listing-detail__metric-card">
+        <Panel tone="paper" className="listing-detail__metric-card listing-detail__metric-card--stock">
           <span className="listing-detail__metric-label">{LISTING_DETAIL.metrics.stock}</span>
           <strong className="heading listing-detail__metric-value">
             {LISTING_DETAIL.metrics.units(listing.stock)}
           </strong>
+          <form className="listing-detail__stock-form" onSubmit={handleStockSubmit}>
+            <div className="listing-detail__stock-controls">
+              <button
+                type="button"
+                className="listing-detail__stock-step"
+                aria-label="Diminuir estoque"
+                disabled={busy || savingStock || (Number(stockDraft) || 0) <= 0}
+                onClick={() => setStockDraft(String(Math.max(0, (Number(stockDraft) || 0) - 1)))}
+              >
+                −
+              </button>
+              <input
+                type="number"
+                min={0}
+                max={LISTING_LIMITS.STOCK_MAX}
+                step={1}
+                aria-label={LISTING_DETAIL.metrics.stockInputLabel}
+                className="listing-detail__stock-input"
+                value={stockDraft}
+                disabled={busy || savingStock}
+                onChange={(e) => setStockDraft(e.target.value)}
+              />
+              <button
+                type="button"
+                className="listing-detail__stock-step"
+                aria-label="Aumentar estoque"
+                disabled={busy || savingStock || (Number(stockDraft) || 0) >= LISTING_LIMITS.STOCK_MAX}
+                onClick={() =>
+                  setStockDraft(String(Math.min(LISTING_LIMITS.STOCK_MAX, (Number(stockDraft) || 0) + 1)))
+                }
+              >
+                +
+              </button>
+              <Button
+                type="submit"
+                size="sm"
+                variant={stockChanged ? 'primary' : 'outline'}
+                loading={savingStock}
+                loadingText={LISTING_DETAIL.metrics.stockSaving}
+                disabled={!stockChanged || busy || savingStock}
+              >
+                {LISTING_DETAIL.metrics.stockSave}
+              </Button>
+            </div>
+          </form>
           <span className="listing-detail__metric-foot">
             {LISTING_DETAIL.metrics.sold}: {LISTING_DETAIL.metrics.soldUnits(listing.soldQuantity ?? 0)}
+            {canSyncAny ? ` · ${LISTING_DETAIL.metrics.stockSyncHint}` : ''}
           </span>
         </Panel>
 
@@ -335,6 +428,7 @@ export default function ListingDetailPage({ params }) {
                             {channel.connected
                               ? LISTING_DETAIL.channels.connected
                               : LISTING_DETAIL.channels.disconnected}
+                            {` · ${formatMoney(channel.priceCents)}`}
                           </span>
                         </div>
                       </div>
@@ -343,7 +437,7 @@ export default function ListingDetailPage({ params }) {
                           {channel.badge.label}
                         </StatusPill>
                         {channel.itemId && (
-                          <StatusPill tone="cream" size="sm">
+                          <StatusPill tone="neutral" size="sm">
                             {LISTING_DETAIL.channels.itemCode(channel.itemId)}
                           </StatusPill>
                         )}
