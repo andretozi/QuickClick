@@ -30,10 +30,19 @@ def _publicacao_do_canal(produto: Produto | None, canal: str) -> Publicacao | No
 
 
 def _dados_do_produto_mudaram(anterior: Produto, novo: Produto) -> bool:
+    pub_antiga = _publicacao_do_canal(anterior, QUICKSTORE)
+    pub_nova = _publicacao_do_canal(novo, QUICKSTORE)
+    preco_qs_antigo = (
+        pub_antiga.preco_centavos if pub_antiga and pub_antiga.preco_centavos is not None else anterior.preco_centavos
+    )
+    preco_qs_novo = (
+        pub_nova.preco_centavos if pub_nova and pub_nova.preco_centavos is not None else novo.preco_centavos
+    )
     return (
         anterior.titulo != novo.titulo
         or anterior.descricao != novo.descricao
         or anterior.preco_centavos != novo.preco_centavos
+        or preco_qs_antigo != preco_qs_novo
         or anterior.estoque != novo.estoque
         or anterior.condicao != novo.condicao
         or anterior.fotos != novo.fotos
@@ -49,10 +58,11 @@ def _payload_para_publicador(produto: Produto, pub: Publicacao) -> dict[str, Any
             valor = item.get("valor")
             if chave and valor is not None and str(valor).strip() != "":
                 atributos.append({"chave": chave, "valor": str(valor).strip()})
+    preco_canal = pub.preco_centavos if pub.preco_centavos is not None else produto.preco_centavos
     return {
         "titulo": produto.titulo,
         "descricao": produto.descricao,
-        "preco_centavos": max(100, int(produto.preco_centavos or 0)),
+        "preco_centavos": max(100, int(preco_canal or 0)),
         "estoque": int(produto.estoque or 0),
         "condicao": produto.condicao,
         "atributos": atributos,

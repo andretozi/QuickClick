@@ -46,7 +46,7 @@ export default function ListingsPanel({ dashboard }) {
             </Button>
             {anyConnected && (
               <Button
-                variant="outline"
+                variant="light"
                 icon="sync"
                 iconPosition="start"
                 iconSize={16}

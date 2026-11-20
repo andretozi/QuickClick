@@ -14,6 +14,7 @@ import {
   reconcileListingWithQuickStore,
   updateListing
 } from '@/infrastructure/storage/listingsRepository.js';
+import { clampHealth, safeHttpsUrl } from '@/infrastructure/storage/listingRecord.js';
 import {
   fetchConnectedMarketplaces,
   fetchMarketplaceProducts
@@ -158,7 +159,13 @@ export default function useListingEditor({ listingId, channelScope: rawChannelSc
           setConnection(mlConn);
           setQsConnection(qsConn);
           setOriginal(listing);
-          setDraft({ ...EMPTY_DRAFT, ...toDraft(listing) });
+          const baseDraft = { ...EMPTY_DRAFT, ...toDraft(listing) };
+          if (channelScope === PRIMARY_CHANNEL) {
+            baseDraft.priceInput = centsToInput(listing.mlPriceCents ?? listing.priceCents);
+          } else if (channelScope === QUICKSTORE_CHANNEL) {
+            baseDraft.priceInput = centsToInput(listing.qsPriceCents ?? listing.priceCents);
+          }
+          setDraft(baseDraft);
           setVisited(EDIT_STEPS.length - 1);
         } else {
           setConnection(mlConn);
@@ -471,19 +478,47 @@ export default function useListingEditor({ listingId, channelScope: rawChannelSc
       }
     }
 
+    const data = toListingData(draft, range.status === 'ready' ? range : null);
+    if (data.stock === 0) {
+      const creatingNewMl = (!editing || !original?.mlItemId) && willPublishMl;
+      const creatingNewQs = (!editing || !original?.qsItemId) && willPublishQs;
+      const reactivatingMl =
+        editing &&
+        (!channelScope || channelScope === PRIMARY_CHANNEL) &&
+        Boolean(original?.mlItemId) &&
+        channelStatus(original, PRIMARY_CHANNEL) !== LISTING_STATUS.PUBLISHED &&
+        draft.publishMl &&
+        canPublishMl;
+      const reactivatingQs =
+        editing &&
+        (!channelScope || channelScope === QUICKSTORE_CHANNEL) &&
+        Boolean(original?.qsItemId) &&
+        channelStatus(original, QUICKSTORE_CHANNEL) !== LISTING_STATUS.PUBLISHED &&
+        draft.publishQs &&
+        canPublishQs;
+
+      if (creatingNewMl || creatingNewQs || reactivatingMl || reactivatingQs) {
+        const detailsIdx = steps.indexOf('details');
+        if (detailsIdx >= 0) setStepIndex(detailsIdx);
+        showErrors({ stock: 'Informe pelo menos 1 unidade em estoque para publicar ou reativar o anúncio.' });
+        return;
+      }
+    }
+
     setPublishing(true);
     finishing.current = true;
-    const data = toListingData(draft, range.status === 'ready' ? range : null);
     try {
       if (editing) {
         const shouldRunMl = !channelScope || channelScope === PRIMARY_CHANNEL;
         const shouldRunQs = !channelScope || channelScope === QUICKSTORE_CHANNEL;
+        const effectivePublishMl = data.stock === 0 ? false : draft.publishMl;
+        const effectivePublishQs = data.stock === 0 ? false : draft.publishQs;
 
         const previousMlStatus = channelStatus(original, PRIMARY_CHANNEL);
         const nextMlStatus = shouldRunMl
           ? statusAfterSave({
               previous: previousMlStatus,
-              publish: draft.publishMl,
+              publish: effectivePublishMl,
               canPublish: canPublishMl
             })
           : previousMlStatus;
@@ -493,43 +528,46 @@ export default function useListingEditor({ listingId, channelScope: rawChannelSc
           if (original.mlItemId) {
             try {
               const mlUpdated = await updateOnMl(original.mlItemId, data);
-              if (!draft.publishMl && previousMlStatus === LISTING_STATUS.PUBLISHED) {
+              if (!effectivePublishMl && previousMlStatus === LISTING_STATUS.PUBLISHED) {
                 await updateMercadoLivreStatus(original.mlItemId, LISTING_STATUS.PAUSED);
                 finalMlStatus = LISTING_STATUS.PAUSED;
-              } else if (draft.publishMl && previousMlStatus !== LISTING_STATUS.PUBLISHED) {
+              } else if (effectivePublishMl && previousMlStatus !== LISTING_STATUS.PUBLISHED) {
                 await updateMercadoLivreStatus(original.mlItemId, LISTING_STATUS.PUBLISHED);
                 finalMlStatus = LISTING_STATUS.PUBLISHED;
               } else {
                 finalMlStatus = previousMlStatus;
               }
+              const mlHttpsPhotos = (Array.isArray(mlUpdated.pictures) ? mlUpdated.pictures : [])
+                .filter((p) => typeof p === 'string' && p.startsWith('https://'))
+                .slice(0, 12);
               mlPatch = {
                 mlItemId: mlUpdated.id ?? original.mlItemId,
-                permalink: mlUpdated.permalink ?? original.permalink,
+                permalink: safeHttpsUrl(mlUpdated.permalink ?? original?.permalink),
                 mlCategoryId: mlUpdated.category_id ?? original.mlCategoryId,
-                health: mlUpdated.health ?? original.health,
+                health: clampHealth(mlUpdated.health ?? original?.health ?? original?.saudeMl),
                 mlSoldQuantity: mlUpdated.sold_quantity ?? original.mlSoldQuantity ?? original.soldQuantity,
-                photos: Array.isArray(mlUpdated.pictures) && mlUpdated.pictures.length ? mlUpdated.pictures : data.photos,
+                photos: mlHttpsPhotos.length ? mlHttpsPhotos : data.photos.slice(0, 12),
                 coverIndex: 0
               };
             } catch (error) {
-              if (draft.publishMl && error?.code === 'anuncio_nao_encontrado') {
+              if (effectivePublishMl && error?.code === 'anuncio_nao_encontrado') {
                 const published = await publishOnMl(data);
                 finalMlStatus = LISTING_STATUS.PUBLISHED;
                 mlPatch = {
                   mlItemId: published.id,
-                  permalink: published.permalink,
+                  permalink: safeHttpsUrl(published.permalink),
                   mlCategoryId: published.categoryId ?? data.mlCategoryId
                 };
               } else {
                 throw error;
               }
             }
-          } else if (draft.publishMl) {
+          } else if (effectivePublishMl) {
             const published = await publishOnMl(data);
             finalMlStatus = LISTING_STATUS.PUBLISHED;
             mlPatch = {
               mlItemId: published.id,
-              permalink: published.permalink,
+              permalink: safeHttpsUrl(published.permalink),
               mlCategoryId: published.categoryId ?? data.mlCategoryId
             };
           }
@@ -539,7 +577,7 @@ export default function useListingEditor({ listingId, channelScope: rawChannelSc
         const nextQsStatus = shouldRunQs
           ? statusAfterSave({
               previous: previousQsStatus,
-              publish: draft.publishQs,
+              publish: effectivePublishQs,
               canPublish: canPublishQs
             })
           : previousQsStatus;
@@ -549,45 +587,45 @@ export default function useListingEditor({ listingId, channelScope: rawChannelSc
           if (original.qsItemId) {
             try {
               const qsUpdated = await updateOnQs(original.qsItemId, data);
-              if (!draft.publishQs && previousQsStatus === LISTING_STATUS.PUBLISHED) {
+              if (!effectivePublishQs && previousQsStatus === LISTING_STATUS.PUBLISHED) {
                 await updateQuickStoreStatus(original.qsItemId, LISTING_STATUS.PAUSED);
                 finalQsStatus = LISTING_STATUS.PAUSED;
-              } else if (draft.publishQs && previousQsStatus !== LISTING_STATUS.PUBLISHED) {
+              } else if (effectivePublishQs && previousQsStatus !== LISTING_STATUS.PUBLISHED) {
                 await updateQuickStoreStatus(original.qsItemId, LISTING_STATUS.PUBLISHED);
                 finalQsStatus = LISTING_STATUS.PUBLISHED;
               } else {
                 finalQsStatus = previousQsStatus;
               }
-              const qsHttpsPhotos = (Array.isArray(qsUpdated.pictures) ? qsUpdated.pictures : []).filter((p) =>
-                String(p).startsWith('https://')
-              );
+              const qsHttpsPhotos = (Array.isArray(qsUpdated.pictures) ? qsUpdated.pictures : [])
+                .filter((p) => typeof p === 'string' && p.startsWith('https://'))
+                .slice(0, 12);
               qsPatch = {
                 qsItemId: qsUpdated.id ?? original.qsItemId,
-                qsPermalink: qsUpdated.permalink ?? original.qsPermalink,
+                qsPermalink: safeHttpsUrl(qsUpdated.permalink ?? original?.qsPermalink),
                 qsCategoryId: qsUpdated.category_id ?? original.qsCategoryId ?? data.qsCategoryId,
-                qsHealth: qsUpdated.health ?? original.qsHealth,
+                qsHealth: clampHealth(qsUpdated.health ?? original?.qsHealth),
                 qsSoldQuantity: qsUpdated.sold_quantity ?? original.qsSoldQuantity ?? 0,
                 ...(qsHttpsPhotos.length && !mlPatch.photos ? { photos: qsHttpsPhotos, coverIndex: 0 } : {})
               };
             } catch (error) {
-              if (draft.publishQs && error?.code === 'anuncio_nao_encontrado') {
+              if (effectivePublishQs && error?.code === 'anuncio_nao_encontrado') {
                 const publishedQs = await publishOnQs(data);
                 finalQsStatus = LISTING_STATUS.PUBLISHED;
                 qsPatch = {
                   qsItemId: publishedQs.id,
-                  qsPermalink: publishedQs.permalink,
+                  qsPermalink: safeHttpsUrl(publishedQs.permalink),
                   qsCategoryId: publishedQs.categoryId ?? data.qsCategoryId ?? data.mlCategoryId
                 };
               } else {
                 throw error;
               }
             }
-          } else if (draft.publishQs) {
+          } else if (effectivePublishQs) {
             const publishedQs = await publishOnQs(data);
             finalQsStatus = LISTING_STATUS.PUBLISHED;
             qsPatch = {
               qsItemId: publishedQs.id,
-              qsPermalink: publishedQs.permalink,
+              qsPermalink: safeHttpsUrl(publishedQs.permalink),
               qsCategoryId: publishedQs.categoryId ?? data.qsCategoryId ?? data.mlCategoryId
             };
           }
@@ -596,15 +634,44 @@ export default function useListingEditor({ listingId, channelScope: rawChannelSc
         const updatedChannels = {
           ...original.channels,
           [PRIMARY_CHANNEL]: finalMlStatus,
-          ...(original.channels?.[QUICKSTORE_CHANNEL] !== undefined || qsPatch.qsItemId || (shouldRunQs && draft.publishQs)
+          ...(original.channels?.[QUICKSTORE_CHANNEL] !== undefined || qsPatch.qsItemId || (shouldRunQs && effectivePublishQs)
             ? { [QUICKSTORE_CHANNEL]: finalQsStatus }
             : {})
         };
+
+        let priceFields = {
+          priceCents: data.priceCents,
+          mlPriceCents: data.priceCents,
+          qsPriceCents: data.priceCents
+        };
+        if (channelScope === PRIMARY_CHANNEL) {
+          const qsActive =
+            Boolean(original.qsItemId) ||
+            channelStatus(original, QUICKSTORE_CHANNEL) !== LISTING_STATUS.UNPUBLISHED;
+          const preservedQsPrice = original.qsPriceCents ?? (qsActive ? original.priceCents : null);
+          priceFields = {
+            priceCents: data.priceCents,
+            mlPriceCents: data.priceCents,
+            ...(preservedQsPrice !== null ? { qsPriceCents: preservedQsPrice } : {})
+          };
+        } else if (channelScope === QUICKSTORE_CHANNEL) {
+          const mlActive =
+            Boolean(original.mlItemId) ||
+            channelStatus(original, PRIMARY_CHANNEL) !== LISTING_STATUS.UNPUBLISHED;
+          const preservedMlPrice = original.mlPriceCents ?? (mlActive ? original.priceCents : null);
+          priceFields = {
+            priceCents: mlActive ? (original.mlPriceCents ?? original.priceCents) : data.priceCents,
+            ...(preservedMlPrice !== null ? { mlPriceCents: preservedMlPrice } : {}),
+            qsPriceCents: data.priceCents
+          };
+        }
+
         const updated = await updateListing(
           accountId,
           listingId,
           {
             ...data,
+            ...priceFields,
             ...mlPatch,
             ...qsPatch,
             suggestedPriceCents: data.suggestedPriceCents ?? original.suggestedPriceCents,
@@ -637,10 +704,10 @@ export default function useListingEditor({ listingId, channelScope: rawChannelSc
         created = await createListing(accountId, {
           ...data,
           mlItemId: publishedMl?.id ?? null,
-          permalink: publishedMl?.permalink ?? null,
+          permalink: safeHttpsUrl(publishedMl?.permalink),
           mlCategoryId: publishedMl?.categoryId ?? data.mlCategoryId ?? null,
           qsItemId: publishedQs?.id ?? null,
-          qsPermalink: publishedQs?.permalink ?? null,
+          qsPermalink: safeHttpsUrl(publishedQs?.permalink),
           qsCategoryId: publishedQs?.categoryId ?? data.qsCategoryId ?? data.mlCategoryId ?? null,
           channels: {
             [PRIMARY_CHANNEL]: publishedMl ? LISTING_STATUS.PUBLISHED : LISTING_STATUS.UNPUBLISHED,

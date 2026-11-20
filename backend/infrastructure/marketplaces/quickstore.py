@@ -39,7 +39,24 @@ def _extrair_descricao(valor: Any) -> str:
     return str(valor).strip()
 
 
-def _resumo_do_item(body: dict[str, Any], descricao: str = "") -> dict[str, Any]:
+def _normalizar_permalink_item(permalink_bruto: Any, item_id: str | None, base_url: str | None = None) -> str | None:
+    texto = str(permalink_bruto or "").strip()
+    if texto.startswith("https://") and len(texto) <= 500:
+        return texto
+    base = str(base_url or "").strip().rstrip("/")
+    if texto.startswith("/") and base.startswith("https://"):
+        resolvido = f"{base}{texto}"
+        if len(resolvido) <= 500:
+            return resolvido
+    codigo = str(item_id or "").strip()
+    if codigo and base.startswith("https://"):
+        fallback = f"{base}/produto.html?id={quote(codigo, safe='')}"
+        if len(fallback) <= 500:
+            return fallback
+    return texto or None
+
+
+def _resumo_do_item(body: dict[str, Any], descricao: str = "", base_url: str | None = None) -> dict[str, Any]:
     fotos: list[str] = []
     for p in body.get("pictures") or []:
         if isinstance(p, dict):
@@ -63,8 +80,14 @@ def _resumo_do_item(body: dict[str, Any], descricao: str = "") -> dict[str, Any]
         or _extrair_descricao(body.get("description"))
         or _extrair_descricao(body.get("plain_text"))
     )
+    item_id = str(body.get("id")) if body.get("id") is not None else None
+    permalink = (
+        _normalizar_permalink_item(body.get("permalink"), item_id, base_url)
+        if base_url is not None
+        else body.get("permalink")
+    )
     return {
-        "id": str(body.get("id")) if body.get("id") is not None else None,
+        "id": item_id,
         "title": body.get("title") or body.get("family_name") or "",
         "family_name": body.get("family_name"),
         "description": descricao_final,
@@ -74,7 +97,7 @@ def _resumo_do_item(body: dict[str, Any], descricao: str = "") -> dict[str, Any]
         "available_quantity": body.get("available_quantity", 0),
         "sold_quantity": body.get("sold_quantity", 0),
         "category_id": body.get("category_id"),
-        "permalink": body.get("permalink"),
+        "permalink": permalink,
         "thumbnail": thumbnail,
         "pictures": fotos or ([thumbnail] if thumbnail else []),
         "attributes": atributos,
@@ -328,7 +351,7 @@ class GatewayQuickStore:
                 descricao = _extrair_descricao(item.get("description")) or _extrair_descricao(item.get("plain_text"))
                 if not descricao and item_id and item.get("status") != "closed":
                     descricao = self._ler_descricao(access_token, item_id)
-                produtos.append(_resumo_do_item(item, descricao))
+                produtos.append(_resumo_do_item(item, descricao, self._base_url))
             return produtos
 
         todos_ids = [str(item_id) for item_id in resultados[:50] if item_id]
@@ -360,7 +383,7 @@ class GatewayQuickStore:
                     descricao = _extrair_descricao(body.get("description")) or _extrair_descricao(body.get("plain_text"))
                     if not descricao:
                         descricao = self._ler_descricao(access_token, str(body.get("id") or ""))
-                    produtos.append(_resumo_do_item(body, descricao))
+                    produtos.append(_resumo_do_item(body, descricao, self._base_url))
                 continue
 
             for item_id in lote:
@@ -369,6 +392,9 @@ class GatewayQuickStore:
                 except ErroDaQuickStore:
                     continue
         return produtos
+
+    def _normalizar_permalink(self, permalink_bruto: Any, item_id: str | None) -> str | None:
+        return _normalizar_permalink_item(permalink_bruto, item_id, self._base_url)
 
     def obter_anuncio(self, access_token: str, item_id: str) -> dict[str, Any]:
         """GET /items/{id} + GET /items/{id}/description para sincronizar ou exibir detalhes."""
@@ -382,11 +408,11 @@ class GatewayQuickStore:
         descricao = _extrair_descricao(corpo.get("description")) or _extrair_descricao(corpo.get("plain_text"))
         if not descricao:
             descricao = self._ler_descricao(access_token, item_id)
-        return _resumo_do_item(corpo, descricao)
+        return _resumo_do_item(corpo, descricao, self._base_url)
 
     def publicar_anuncio(self, access_token: str, dados_produto: dict[str, Any]) -> dict[str, Any]:
         """POST /items para publicar um novo anúncio na QuickStore."""
-        return self._executar_requisicao(
+        criado = self._executar_requisicao(
             "POST",
             f"{self._base_url}/items",
             access_token=access_token,
@@ -394,6 +420,10 @@ class GatewayQuickStore:
             json=dados_produto,
             mensagem_erro="Erro ao publicar anúncio na QuickStore",
         )
+        if isinstance(criado, dict):
+            item_id = str(criado.get("id")) if criado.get("id") is not None else None
+            return {**criado, "permalink": self._normalizar_permalink(criado.get("permalink"), item_id)}
+        return criado
 
     def atualizar_anuncio(self, access_token: str, item_id: str, dados_produto: dict[str, Any]) -> dict[str, Any]:
         """PUT /items/{item_id} para atualizar preço, estoque ou status na QuickStore."""

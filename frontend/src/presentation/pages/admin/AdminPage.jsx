@@ -82,7 +82,7 @@ export default function AdminPage() {
         lead={ADMIN_PAGE.lead}
         actions={
           <Button
-            variant="outline"
+            variant="light"
             size="sm"
             icon="sync"
             iconPosition="start"

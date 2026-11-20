@@ -26,7 +26,8 @@ CAMPOS_DO_PRODUTO = (
 
 def _para_publicacao(linha: PublicacaoModel) -> Publicacao:
     return Publicacao(canal=linha.canal, status=linha.status, id_externo=linha.id_externo, permalink=linha.permalink,
-                      categoria_id=linha.categoria_id, saude=linha.saude, vendidos=linha.vendidos)
+                      categoria_id=linha.categoria_id, saude=linha.saude, vendidos=linha.vendidos,
+                      preco_centavos=linha.preco_centavos)
 
 
 def _para_produto(linha: ProdutoModel, publicacoes: list[PublicacaoModel]) -> Produto:
@@ -138,6 +139,7 @@ class RepositorioDeProdutosSQL:
         session.add_all(
             PublicacaoModel(vendedor_id=vendedor_id, produto_id=produto.id, canal=p.canal, status=p.status,
                             id_externo=p.id_externo, permalink=p.permalink, categoria_id=p.categoria_id,
-                            saude=p.saude, vendidos=p.vendidos, atualizado_em=atualizado_em)
+                            saude=p.saude, vendidos=p.vendidos, preco_centavos=p.preco_centavos,
+                            atualizado_em=atualizado_em)
             for p in produto.publicacoes
         )

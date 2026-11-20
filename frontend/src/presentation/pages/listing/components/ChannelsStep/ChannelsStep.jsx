@@ -81,7 +81,7 @@ export default function ChannelsStep({ editor }) {
                   {canPublishMl ? texts.connected(connection.nickname) : texts.available}
                 </StatusPill>
                 {editing && editor.linkedIds?.mlItemId && (
-                  <StatusPill tone="cream" size="sm">
+                  <StatusPill tone="neutral" size="sm">
                     {texts.linkedCode(editor.linkedIds.mlItemId)}
                   </StatusPill>
                 )}
@@ -117,7 +117,7 @@ export default function ChannelsStep({ editor }) {
                   {canPublishQs ? texts.connected(qsConnection?.nickname) : texts.available}
                 </StatusPill>
                 {editing && editor.linkedIds?.qsItemId && (
-                  <StatusPill tone="cream" size="sm">
+                  <StatusPill tone="neutral" size="sm">
                     {texts.linkedCode(editor.linkedIds.qsItemId)}
                   </StatusPill>
                 )}

@@ -115,7 +115,8 @@ def anuncio_de_dict(dados: dict[str, Any], *, exigir_mlstatic: bool = True) -> A
         raise ValueError("O anúncio precisa de um título.")
     try:
         preco = int(dados.get("preco_centavos"))
-        estoque = int(dados.get("estoque") or 1)
+        estoque_bruto = dados.get("estoque")
+        estoque = 1 if estoque_bruto is None or estoque_bruto == "" else int(estoque_bruto)
     except (TypeError, ValueError) as erro:
         raise ValueError("Preço ou estoque inválido.") from erro
     if preco < PRECO_MINIMO_CENTAVOS:
@@ -396,14 +397,21 @@ class PublicarNoMercadoLivre:
                 dados.titulo,
             )
 
+        zerando_ml_ativo = (
+            self._canal != QUICKSTORE
+            and dados.estoque == 0
+            and str(atual.get("status") or "").strip().lower() == "active"
+        )
         mudancas: dict[str, Any] = {
             "price": dados.preco_centavos / 100,
             "available_quantity": (
                 dados.estoque
-                if self._canal == QUICKSTORE
+                if self._canal == QUICKSTORE or zerando_ml_ativo
                 else (max(1, dados.estoque) if atual.get("status") == "active" else dados.estoque)
             ),
         }
+        if zerando_ml_ativo:
+            mudancas["status"] = "paused"
         if imagens:
             mudancas["pictures"] = imagens
         if ligados:
@@ -428,7 +436,12 @@ class PublicarNoMercadoLivre:
                     sem_titulo = {k: v for k, v in mudancas.items() if k != "title"}
                     self._publicador.atualizar_anuncio(token, codigo, {**sem_titulo, "family_name": dados.titulo})
                 else:
-                    essencial = {"price": mudancas["price"], "available_quantity": mudancas["available_quantity"]}
+                    essencial: dict[str, Any] = {
+                        "price": mudancas["price"],
+                        "available_quantity": 1 if zerando_ml_ativo else mudancas["available_quantity"],
+                    }
+                    if zerando_ml_ativo:
+                        essencial["status"] = "paused"
                     if imagens:
                         essencial["pictures"] = imagens
                     if self._canal == QUICKSTORE:

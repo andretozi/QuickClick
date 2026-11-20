@@ -139,3 +139,16 @@ const qsClosed = matchQuickStoreItems(qsLinked, [
 assert.equal(qsClosed[0].canais.quickstore, 'nao_publicado');
 assert.equal(qsClosed[0].qs_item_id, null);
 
+// preços individuais por plataforma: ML e QuickStore podem ter valores distintos sem sobrescrever um ao outro
+const dualChannel = matchQuickStoreItems([published], [
+  { id: 'QS888', title: 'Caneca azul', status: 'active', price: 64.9, available_quantity: 3, pictures: [ML_PHOTO] }
+]);
+assert.equal(dualChannel[0].preco_centavos, 4990);
+assert.equal(dualChannel[0].preco_centavos_ml, 4990);
+assert.equal(dualChannel[0].preco_centavos_qs, 6490);
+const dualApi = toApi(dualChannel[0]);
+const dualBack = fromApi(dualApi);
+const dualListing = toListing(dualBack);
+assert.equal(dualListing.mlPriceCents, 4990);
+assert.equal(dualListing.qsPriceCents, 6490);
+

@@ -336,6 +336,7 @@ class PublicacaoDoProduto(BaseModel):
     categoria_id: str | None = Field(default=None, max_length=40)
     saude: float | None = Field(default=None, ge=0, le=100, allow_inf_nan=False)
     vendidos: int = Field(default=0, ge=0, le=10_000_000)
+    preco_centavos: int | None = Field(default=None, ge=0, le=MAX_CENTAVOS)
 
     @field_validator("canal")
     @classmethod
