@@ -391,10 +391,31 @@ class GatewayMercadoLivre:
         tipo: str | None = None,
     ) -> list[dict[str, Any]]:
         """POST /catalog/charts/search para localizar guias de tamanho (SIZE_GRID_ID / SIZE_GRID_ROW_ID)."""
+        atributos_normalizados: list[dict[str, Any]] = []
+        for attr in atributos or []:
+            if not isinstance(attr, dict):
+                continue
+            attr_id = str(attr.get("id") or "").strip()
+            if not attr_id:
+                continue
+            values = attr.get("values")
+            if isinstance(values, list) and values:
+                atributos_normalizados.append({"id": attr_id, "values": values})
+                continue
+            valor: dict[str, str] = {}
+            val_id = str(attr.get("value_id") or "").strip()
+            val_name = str(attr.get("value_name") or "").strip()
+            if val_id:
+                valor["id"] = val_id
+            if val_name:
+                valor["name"] = val_name
+            if valor:
+                atributos_normalizados.append({"id": attr_id, "values": [valor]})
+
         payload: dict[str, Any] = {
             "domain_id": domain_id,
             "site_id": site_id,
-            "attributes": atributos,
+            "attributes": atributos_normalizados,
         }
         if tipo:
             payload["type"] = tipo
