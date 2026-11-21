@@ -56,6 +56,7 @@ export default function useDashboard() {
   const [hour] = useState(currentHour);
   const mounted = useMountedRef();
   const busyLockRef = useRef(null);
+  const syncingRef = useRef(false);
 
   const markChannelDisconnected = useCallback((slug) => {
     setData((current) => ({
@@ -66,22 +67,28 @@ export default function useDashboard() {
 
   const syncAllConnected = useCallback(
     async (connectionsList) => {
-      if (!accountId) return null;
+      if (!accountId || syncingRef.current || busyLockRef.current) return null;
+      syncingRef.current = true;
       let latest = null;
-      for (const adapter of Object.values(CHANNEL_ADAPTERS)) {
-        const isConnected = connectionsList.some((connection) => connection.slug === adapter.slug);
-        if (!isConnected) continue;
-        try {
-          const synced = await adapter.syncAll(accountId);
-          if (!mounted.current) return null;
-          latest = synced;
-        } catch (error) {
-          if (mounted.current && error?.code === adapter.disconnectedCode) {
-            markChannelDisconnected(adapter.slug);
+      try {
+        for (const adapter of Object.values(CHANNEL_ADAPTERS)) {
+          if (busyLockRef.current) return null;
+          const isConnected = connectionsList.some((connection) => connection.slug === adapter.slug);
+          if (!isConnected) continue;
+          try {
+            const synced = await adapter.syncAll(accountId);
+            if (!mounted.current || busyLockRef.current) return null;
+            latest = synced;
+          } catch (error) {
+            if (mounted.current && error?.code === adapter.disconnectedCode) {
+              markChannelDisconnected(adapter.slug);
+            }
           }
         }
+        return busyLockRef.current ? null : latest;
+      } finally {
+        syncingRef.current = false;
       }
-      return latest;
     },
     [accountId, markChannelDisconnected, mounted]
   );
@@ -131,9 +138,10 @@ export default function useDashboard() {
     if (!accountId || data.offline) return undefined;
     const onFocus = async () => {
       if (document.visibilityState && document.visibilityState !== 'visible') return;
+      if (busyLockRef.current || syncingRef.current) return;
       try {
         const synced = await syncAllConnected(data.connections);
-        if (mounted.current && synced) {
+        if (mounted.current && synced && !busyLockRef.current) {
           setData((current) => ({ ...current, listings: synced }));
         }
       } catch {
@@ -183,7 +191,8 @@ export default function useDashboard() {
   );
 
   const syncNow = useCallback(async () => {
-    if (!accountId || (!mercadoLivreConnected && !quickStoreConnected) || syncing) return;
+    if (!accountId || (!mercadoLivreConnected && !quickStoreConnected) || syncing || syncingRef.current || busyLockRef.current) return;
+    syncingRef.current = true;
     setSyncing(true);
     try {
       let synced = null;
@@ -198,6 +207,7 @@ export default function useDashboard() {
     } catch (error) {
       if (mounted.current) failed(error);
     } finally {
+      syncingRef.current = false;
       if (mounted.current) setSyncing(false);
     }
   }, [accountId, data.connections, failed, mercadoLivreConnected, quickStoreConnected, mounted, syncing]);
@@ -205,42 +215,50 @@ export default function useDashboard() {
   const applyChannelTransition = useCallback(
     async (currentListing, channel, targetStatus) => {
       const adapter = getChannelAdapter(channel);
-      const itemId = adapter.getItemId(currentListing);
+      let workingListing = currentListing;
+      let itemId = adapter.getItemId(workingListing);
+
+      const savePublishedPatch = async (listingRef, published, fallbackStatus) => {
+        const patch = adapter.toPublishedPatch(listingRef, published, fallbackStatus);
+        try {
+          return await updateListing(accountId, listingRef.id, patch, { syncQuickStore: false });
+        } catch (error) {
+          if (error?.status === 409 || error?.code === 'anuncio_desatualizado') {
+            return updateListing(accountId, listingRef.id, patch, { syncQuickStore: false });
+          }
+          throw error;
+        }
+      };
+
+      if (!itemId && targetStatus === LISTING_STATUS.PUBLISHED) {
+        workingListing = await adapter.reconcileIfNeeded(accountId, workingListing).catch(() => workingListing);
+        itemId = adapter.getItemId(workingListing);
+      }
 
       if (itemId) {
         try {
-          return await adapter.setStatus(accountId, currentListing.id, itemId, targetStatus);
+          return await adapter.setStatus(accountId, workingListing.id, itemId, targetStatus);
         } catch (error) {
           if (targetStatus === LISTING_STATUS.PUBLISHED && error?.code === 'anuncio_nao_encontrado') {
-            const { payload, photoBlobs } = adapter.buildPayload(currentListing);
+            const { payload, photoBlobs } = adapter.buildPayload(workingListing);
             const published = await adapter.publish(payload, photoBlobs);
-            return updateListing(
-              accountId,
-              currentListing.id,
-              adapter.toPublishedPatch(currentListing, published, LISTING_STATUS.PUBLISHED),
-              { syncQuickStore: false }
-            );
+            return savePublishedPatch(workingListing, published, LISTING_STATUS.PUBLISHED);
           }
           throw error;
         }
       }
 
       if (targetStatus === LISTING_STATUS.PUBLISHED) {
-        const { payload, photoBlobs } = adapter.buildPayload(currentListing);
+        const { payload, photoBlobs } = adapter.buildPayload(workingListing);
         const published = await adapter.publish(payload, photoBlobs);
-        return updateListing(
-          accountId,
-          currentListing.id,
-          adapter.toPublishedPatch(currentListing, published, targetStatus),
-          { syncQuickStore: false }
-        );
+        return savePublishedPatch(workingListing, published, targetStatus);
       }
 
       return updateListing(
         accountId,
-        currentListing.id,
+        workingListing.id,
         {
-          channels: { ...currentListing.channels, [channel]: targetStatus }
+          channels: { ...workingListing.channels, [channel]: targetStatus }
         },
         { syncQuickStore: false }
       );

@@ -10,8 +10,13 @@ import {
   updateMercadoLivreStatus
 } from '@/infrastructure/marketplaces/mercadoLivreService.js';
 import { applyMlItemToStoreRecord, matchMlItems } from '@/infrastructure/storage/mercadoLivreRecord.js';
-import { clampHealth, safeHttpsUrl } from '@/infrastructure/storage/listingRecord.js';
-import { mergeChannelItem, syncListingsWithChannel } from '@/infrastructure/storage/listingsRepository.js';
+import { asExternalId, clampHealth, isClosedExternalStatus, mlStatusToStore, safeHttpsUrl } from '@/infrastructure/storage/listingRecord.js';
+import {
+  listListings,
+  mergeChannelItem,
+  reconcileListingWithChannel,
+  syncListingsWithChannel
+} from '@/infrastructure/storage/listingsRepository.js';
 import { dataUrlToBlob } from '@/infrastructure/media/imageResizer.js';
 import { LISTING_STATUS, PRIMARY_CHANNEL, QUICKSTORE_CHANNEL, channelStatus } from '@/domain/listings/listingRules.js';
 
@@ -56,11 +61,43 @@ export const mercadoLivreChannel = {
 
   async syncAll(accountId) {
     const products = await fetchMercadoLivreProducts();
-    return syncListingsWithChannel(accountId, products, matchMlItems);
+    const list = Array.isArray(products) ? products : [];
+    const seenIds = new Set(list.map((item) => asExternalId(item?.id)).filter(Boolean));
+    const currentListings = await listListings(accountId).catch(() => []);
+    const missingIds = [
+      ...new Set(
+        currentListings
+          .map((item) => asExternalId(item?.mlItemId))
+          .filter((id) => id && !seenIds.has(id))
+      )
+    ];
+
+    const enrichedProducts = [...list];
+    const protectedIds = new Set();
+
+    for (const missingId of missingIds) {
+      try {
+        const fresh = await fetchMercadoLivreItem(missingId);
+        if (fresh && !isClosedExternalStatus(fresh.status)) {
+          enrichedProducts.push(fresh);
+        }
+      } catch (error) {
+        if (error?.code === this.disconnectedCode) throw error;
+        if (error?.code !== 'anuncio_nao_encontrado' && error?.status !== 404) {
+          protectedIds.add(missingId);
+        }
+      }
+    }
+
+    return syncListingsWithChannel(accountId, enrichedProducts, (recs, prods) =>
+      matchMlItems(recs, prods, { protectedIds })
+    );
   },
 
   async reconcileIfNeeded(accountId, listing) {
-    return listing;
+    if (!listing || this.getItemId(listing)) return listing;
+    const products = await fetchMercadoLivreProducts();
+    return reconcileListingWithChannel(accountId, listing.id, products, matchMlItems);
   },
 
   async syncOne(accountId, listing) {
@@ -109,11 +146,18 @@ export const mercadoLivreChannel = {
   },
 
   toPublishedPatch(listing, published, targetStatus = LISTING_STATUS.PUBLISHED) {
+    const storeStatus = published?.status ? mlStatusToStore(published.status) : null;
+    const resolvedStatus =
+      storeStatus === 'pausado'
+        ? LISTING_STATUS.PAUSED
+        : storeStatus === 'publicado'
+          ? LISTING_STATUS.PUBLISHED
+          : targetStatus;
     return {
       mlItemId: published.id,
       permalink: safeHttpsUrl(published.permalink),
       mlCategoryId: published.categoryId ?? listing?.mlCategoryId ?? null,
-      channels: { ...(listing?.channels ?? {}), [PRIMARY_CHANNEL]: targetStatus }
+      channels: { ...(listing?.channels ?? {}), [PRIMARY_CHANNEL]: resolvedStatus }
     };
   },
 
