@@ -8,11 +8,7 @@ import {
   fetchConnectedMarketplaces,
   fetchMarketplaceProducts
 } from '@/infrastructure/marketplaces/marketplacesService.js';
-import {
-  syncListingsWithMercadoLivre,
-  syncListingsWithQuickStore
-} from '@/infrastructure/storage/listingsRepository.js';
-import { PRIMARY_CHANNEL, QUICKSTORE_CHANNEL } from '@/domain/listings/listingRules.js';
+import { CHANNEL_ADAPTERS } from '@/application/listings/channels/channelRegistry.js';
 import { canConnectMore } from '@/domain/plans/planRules.js';
 import { DISCONNECT_DIALOG, MARKETPLACE_CARD, MARKETPLACE_CATALOG } from '@/domain/content/marketplacesContent.js';
 
@@ -146,11 +142,11 @@ export default function useMarketplaces() {
         setSync((current) => (current ? { ...current, progress } : current));
       }, SYNC_TICK_MS);
       try {
-        const products = await fetchMarketplaceProducts(slug);
-        if (slug === PRIMARY_CHANNEL) {
-          await syncListingsWithMercadoLivre(accountId, products);
-        } else if (slug === QUICKSTORE_CHANNEL) {
-          await syncListingsWithQuickStore(accountId, products);
+        const adapter = CHANNEL_ADAPTERS[slug];
+        if (adapter) {
+          await adapter.syncAll(accountId);
+        } else {
+          await fetchMarketplaceProducts(slug);
         }
         const elapsed = Date.now() - started;
         if (elapsed < 600) await wait(600 - elapsed);
