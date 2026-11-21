@@ -1,7 +1,7 @@
 """Tabela midia_fotos para servir fotos públicas de anúncios via https://."""
 
 import sqlalchemy as sa
-from alembic import op
+from alembic import context, op
 
 revision = "0008_midia_fotos"
 down_revision = "0007_preco_por_publicacao"
@@ -10,9 +10,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    bind = op.get_bind()
-    insp = sa.inspect(bind)
-    if "midia_fotos" not in insp.get_table_names():
+    if context.is_offline_mode() or "midia_fotos" not in sa.inspect(op.get_bind()).get_table_names():
         op.create_table(
             "midia_fotos",
             sa.Column("id", sa.String(length=36), nullable=False),
