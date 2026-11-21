@@ -19,6 +19,7 @@ export async function publishToQuickStore(listing, photoBlobs = []) {
     permalink: data.permalink ?? null,
     status: data.status ?? null,
     categoryId: data.categoria_id ?? null,
+    photos: Array.isArray(data.fotos) ? data.fotos : [],
     notices: (data.avisos ?? []).map((a) => ({ code: a.codigo, message: a.mensagem }))
   };
 }

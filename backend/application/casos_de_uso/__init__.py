@@ -18,6 +18,7 @@ from backend.application.casos_de_uso.registrar_usuario import RegistrarUsuario
 from backend.application.casos_de_uso.trocar_plano import TrocarPlano
 from backend.application.casos_de_uso.webhook_quickstore import ProcessarWebhookQuickStore
 from backend.application.ia.servico import ServicoDeAnalises
+from backend.application.portas import RepositorioDeMidia
 
 
 @dataclass(frozen=True)
@@ -40,4 +41,6 @@ class CasosDeUso:
     webhook_quickstore: ProcessarWebhookQuickStore | None = None
     trocar_plano: TrocarPlano | None = None
     produtos: GerenciarProdutos | None = None
+    midia_fotos: RepositorioDeMidia | None = None
+
 

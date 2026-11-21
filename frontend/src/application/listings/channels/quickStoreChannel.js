@@ -77,28 +77,58 @@ export const quickStoreChannel = {
   },
 
   async publish(payload, photoBlobs = []) {
-    return publishToQuickStore(payload, photoBlobs);
+    try {
+      return await publishToQuickStore(payload, photoBlobs);
+    } catch (error) {
+      if (error && typeof error === 'object' && !error.channel) error.channel = this.slug;
+      throw error;
+    }
   },
 
   async update(itemId, payload, photoBlobs = []) {
-    return updateQuickStoreItem(itemId, payload, photoBlobs);
+    try {
+      return await updateQuickStoreItem(itemId, payload, photoBlobs);
+    } catch (error) {
+      if (error && typeof error === 'object' && !error.channel) error.channel = this.slug;
+      throw error;
+    }
   },
 
   async setStatus(accountId, listingId, itemId, targetStatus) {
-    const fresh = await updateQuickStoreStatus(itemId, targetStatus);
-    if (!accountId || !listingId) return fresh;
-    return mergeChannelItem(accountId, listingId, fresh, applyQuickStoreItemToStoreRecord);
+    try {
+      const fresh = await updateQuickStoreStatus(itemId, targetStatus);
+      if (!accountId || !listingId) return fresh;
+      return await mergeChannelItem(accountId, listingId, fresh, applyQuickStoreItemToStoreRecord);
+    } catch (error) {
+      if (error && typeof error === 'object' && !error.channel) error.channel = this.slug;
+      throw error;
+    }
   },
 
   async remove(itemId) {
-    return deleteQuickStoreItem(itemId);
+    try {
+      return await deleteQuickStoreItem(itemId);
+    } catch (error) {
+      if (error && typeof error === 'object' && !error.channel) error.channel = this.slug;
+      throw error;
+    }
   },
 
   toPublishedPatch(listing, published, targetStatus = LISTING_STATUS.PUBLISHED) {
+    const existingHttps = (Array.isArray(listing?.photos) ? listing.photos : [])
+      .map((url) => safeHttpsUrl(url))
+      .filter(Boolean);
+    const publishedHttps = (Array.isArray(published?.photos) ? published.photos : [])
+      .map((url) => safeHttpsUrl(url))
+      .filter(Boolean)
+      .slice(0, 12);
     return {
       qsItemId: published.id,
       qsPermalink: safeHttpsUrl(published.permalink),
       qsCategoryId: published.categoryId ?? listing?.qsCategoryId ?? listing?.mlCategoryId ?? null,
+      ...(existingHttps.length === 0 && publishedHttps.length > 0
+        ? { photos: publishedHttps, coverIndex: 0 }
+        : {}),
       channels: { ...(listing?.channels ?? {}), [QUICKSTORE_CHANNEL]: targetStatus }
     };
   },

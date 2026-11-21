@@ -71,21 +71,41 @@ export const mercadoLivreChannel = {
   },
 
   async publish(payload, photoBlobs = []) {
-    return publishToMercadoLivre(payload, photoBlobs);
+    try {
+      return await publishToMercadoLivre(payload, photoBlobs);
+    } catch (error) {
+      if (error && typeof error === 'object' && !error.channel) error.channel = this.slug;
+      throw error;
+    }
   },
 
   async update(itemId, payload, photoBlobs = []) {
-    return updateMercadoLivreItem(itemId, payload, photoBlobs);
+    try {
+      return await updateMercadoLivreItem(itemId, payload, photoBlobs);
+    } catch (error) {
+      if (error && typeof error === 'object' && !error.channel) error.channel = this.slug;
+      throw error;
+    }
   },
 
   async setStatus(accountId, listingId, itemId, targetStatus) {
-    const fresh = await updateMercadoLivreStatus(itemId, targetStatus);
-    if (!accountId || !listingId) return fresh;
-    return mergeChannelItem(accountId, listingId, fresh, applyMlItemToStoreRecord);
+    try {
+      const fresh = await updateMercadoLivreStatus(itemId, targetStatus);
+      if (!accountId || !listingId) return fresh;
+      return await mergeChannelItem(accountId, listingId, fresh, applyMlItemToStoreRecord);
+    } catch (error) {
+      if (error && typeof error === 'object' && !error.channel) error.channel = this.slug;
+      throw error;
+    }
   },
 
   async remove(itemId) {
-    return deleteMercadoLivreItem(itemId);
+    try {
+      return await deleteMercadoLivreItem(itemId);
+    } catch (error) {
+      if (error && typeof error === 'object' && !error.channel) error.channel = this.slug;
+      throw error;
+    }
   },
 
   toPublishedPatch(listing, published, targetStatus = LISTING_STATUS.PUBLISHED) {
