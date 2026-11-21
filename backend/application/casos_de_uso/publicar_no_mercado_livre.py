@@ -50,6 +50,7 @@ from backend.domain.ia.atributos_ml import (
     MARCA_GENERICA_ML,
     AtributoLigado,
     AtributoML,
+    _valor_id,
     completar_para_publicacao,
     ligar_confirmados,
 )
@@ -78,6 +79,19 @@ _MIDIA_LOCAL_RE = re.compile(r"/api/quickstore/midia/([0-9a-f]{32})\.jpg$", re.I
 _SUFIXO_PAIS_TAMANHO = re.compile(r"\b(?:br|us|eu|uk|arg|col|mx|cm)\b", re.IGNORECASE)
 _IDS_COMBINACAO_PADRAO = frozenset({"COLOR", "SIZE"})
 _IDS_ATRIB_VARIACAO_PADRAO = frozenset({"SIZE_GRID_ROW_ID", "MAIN_COLOR", "GTIN", "EMPTY_GTIN_REASON"})
+_DOMINIOS_CALCADOS_ML = frozenset({
+    "SANDALS_AND_CLOGS",
+    "SNEAKERS",
+    "BOOTS_AND_BOOTIES",
+    "LOAFERS_AND_OXFORDS",
+    "FOOTBALL_SHOES",
+    "SLIPPERS",
+    "FLATS",
+    "HIGH_HEELS",
+    "ESPADRILLES",
+    "MOCCASINS",
+})
+_IDS_GENERO_INFANTIL_ML = frozenset({"339667", "339668", "19159491"})
 
 
 def _validar_item_id(item_id: str) -> str:
@@ -218,6 +232,154 @@ def _atributo_para_busca_guia(
     return {"id": ligado.id, "values": [valor]}
 
 
+def _extrair_colunas_especificacao_guia(spec: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
+    """Extrai os atributos/colunas da especificação de grade (technical_specs?section=grids)."""
+    colunas: dict[str, dict[str, Any]] = {}
+
+    def _visitar(lista: Any) -> None:
+        if not isinstance(lista, list):
+            return
+        for item in lista:
+            if not isinstance(item, dict):
+                continue
+            attrs = item.get("attributes")
+            if isinstance(attrs, list):
+                for attr in attrs:
+                    if isinstance(attr, dict) and attr.get("id"):
+                        colunas[str(attr["id"]).strip().upper()] = attr
+            _visitar(item.get("components"))
+
+    if isinstance(spec, dict):
+        entrada = spec.get("input") or spec
+        if isinstance(entrada, dict):
+            _visitar(entrada.get("groups"))
+            _visitar(entrada.get("components"))
+    return colunas
+
+
+def _eh_genero_infantil_ml(usados: dict[str, AtributoLigado]) -> bool:
+    genero = usados.get("GENDER")
+    if genero is None:
+        return False
+    if genero.valor_id and genero.valor_id in _IDS_GENERO_INFANTIL_ML:
+        return True
+    norm = _normalizar_tamanho(genero.valor)
+    return any(termo in norm for termo in ("menin", "infantil", "bebe", "crianca"))
+
+
+def _extrair_numero_tamanho_br(tamanho_alvo: str, *, infantil: bool = False) -> int | None:
+    if not tamanho_alvo:
+        return None
+    limpo = _SUFIXO_PAIS_TAMANHO.sub("", _normalizar_tamanho(tamanho_alvo))
+    numeros = [int(n) for n in re.findall(r"\b(\d{2})\b", limpo)]
+    if not numeros:
+        return None
+    minimo, maximo = (15, 36) if infantil else (30, 51)
+    for num in reversed(numeros):
+        if minimo <= num <= maximo:
+            return num
+    for num in reversed(numeros):
+        if 15 <= num <= 51:
+            return num
+    return None
+
+
+def _comprimento_pe_cm(numero_br: int) -> str:
+    """Converte tamanho BR em comprimento aproximado do pé em cm (dentro da faixa oficial 5.0–40.0 cm do ML)."""
+    cm = round(max(10.0, min(35.0, 11.0 + (numero_br - 16) * 0.65)), 1)
+    return f"{cm:.1f} cm"
+
+
+def _linha_calcado_mlb(numero_br: int) -> list[dict[str, Any]]:
+    return [
+        {"id": "BR_SIZE", "values": [{"name": f"{numero_br} BR"}]},
+        {"id": "FOOT_LENGTH", "values": [{"name": _comprimento_pe_cm(numero_br)}]},
+    ]
+
+
+def _montar_payload_guia_especifica(
+    *,
+    site_id: str,
+    domain_id: str,
+    atributos_base: list[dict[str, Any]],
+    tamanho_alvo: str,
+    usados: dict[str, AtributoLigado],
+    por_id: dict[str, AtributoML],
+    colunas_spec: dict[str, dict[str, Any]],
+) -> dict[str, Any] | None:
+    eh_calcado = (
+        "BR_SIZE" in colunas_spec
+        or "FOOT_LENGTH" in colunas_spec
+        or "FOOTWEAR_TYPE" in por_id
+        or domain_id.upper() in _DOMINIOS_CALCADOS_ML
+    )
+    genero_nome = ""
+    if atributos_base:
+        vals = atributos_base[0].get("values") or []
+        if vals and isinstance(vals[0], dict):
+            genero_nome = str(vals[0].get("name") or "").strip()
+    nome_guia = re.sub(r"\s+", " ", f"Guia {domain_id[:24]} {genero_nome[:18]}").strip()[:60] or "Guia Padrao"
+
+    if eh_calcado:
+        infantil = _eh_genero_infantil_ml(usados)
+        numero_alvo = _extrair_numero_tamanho_br(tamanho_alvo, infantil=infantil)
+        if numero_alvo is not None and numero_alvo < 32 and not infantil:
+            infantil = True
+        faixa_base = list(range(20, 35)) if infantil else list(range(34, 45))
+        if numero_alvo is not None and numero_alvo not in faixa_base:
+            faixa_base = sorted({*faixa_base, numero_alvo})
+        rows = [{"attributes": _linha_calcado_mlb(n)} for n in faixa_base]
+        return {
+            "names": {site_id: nome_guia},
+            "domain_id": domain_id,
+            "site_id": site_id,
+            "type": "SPECIFIC",
+            "main_attribute": {"attributes": [{"site_id": site_id, "id": "BR_SIZE"}]},
+            "attributes": atributos_base,
+            "rows": rows,
+        }
+
+    if "SIZE" in colunas_spec or "SIZE" in por_id:
+        alvo_limpo = (tamanho_alvo or "").strip() or "M"
+        tamanhos = ["P", "M", "G", "GG"]
+        if all(_casamento_tamanho(alvo_limpo, t) == 0 for t in tamanhos):
+            tamanhos.append(alvo_limpo)
+        filtrable_spec = colunas_spec.get("FILTRABLE_SIZE") or {}
+        filtrable_vals = [
+            v for v in (filtrable_spec.get("values") or []) if isinstance(v, dict) and (v.get("id") or v.get("name"))
+        ]
+        rows_vestuario: list[dict[str, Any]] = []
+        for tam in tamanhos:
+            attrs_linha: list[dict[str, Any]] = [{"id": "SIZE", "values": [{"name": tam}]}]
+            if filtrable_vals:
+                escolhido = next(
+                    (v for v in filtrable_vals if _casamento_tamanho(tam, str(v.get("name") or "")) > 0),
+                    filtrable_vals[0],
+                )
+                val_f: dict[str, str] = {}
+                if escolhido.get("id"):
+                    val_f["id"] = str(escolhido["id"])
+                if escolhido.get("name"):
+                    val_f["name"] = str(escolhido["name"])
+                if val_f:
+                    attrs_linha.append({"id": "FILTRABLE_SIZE", "values": [val_f]})
+            for col_id in colunas_spec:
+                if col_id.endswith("_FROM") and col_id not in ("FOOT_LENGTH_FROM",):
+                    attrs_linha.append({"id": col_id, "values": [{"name": "90 cm"}]})
+            rows_vestuario.append({"attributes": attrs_linha})
+        return {
+            "names": {site_id: nome_guia},
+            "domain_id": domain_id,
+            "site_id": site_id,
+            "type": "SPECIFIC",
+            "main_attribute": {"attributes": [{"site_id": site_id, "id": "SIZE"}]},
+            "attributes": atributos_base,
+            "rows": rows_vestuario,
+        }
+
+    return None
+
+
 def _substituir_ou_adicionar_atributo(ligados: list[AtributoLigado], novo: AtributoLigado) -> list[AtributoLigado]:
     saida = list(ligados)
     for idx, item in enumerate(saida):
@@ -310,6 +472,128 @@ class PublicarNoMercadoLivre:
             resolvidas.append({"source": url})
         return resolvidas
 
+    def _criar_ou_estender_guia_especifica(
+        self,
+        *,
+        token: str,
+        catalog_domain: str,
+        site_id: str,
+        domain_id: str,
+        atributos_base: list[dict[str, Any]],
+        tamanho_alvo: str,
+        usados: dict[str, AtributoLigado],
+        por_id: dict[str, AtributoML],
+        guia_especifica_sem_linha: dict[str, Any] | None,
+    ) -> tuple[str, str, str | None, str | None, int] | None:
+        """Adiciona uma linha à guia SPECIFIC do vendedor ou cria uma nova guia SPECIFIC no ML."""
+        obter_guia = getattr(self._publicador, "obter_guia_de_tamanho", None)
+        adicionar_linha = getattr(self._publicador, "adicionar_linha_guia_de_tamanho", None)
+        criar_guia = getattr(self._publicador, "criar_guia_de_tamanho", None)
+        obter_spec = getattr(self._publicador, "obter_especificacao_guia", None)
+
+        colunas_spec: dict[str, dict[str, Any]] = {}
+        if callable(obter_spec):
+            try:
+                spec = obter_spec(token, catalog_domain, atributos_base)
+                colunas_spec = _extrair_colunas_especificacao_guia(spec)
+            except FalhaNoMarketplace as erro:
+                if erro.status in (401, 403):
+                    raise
+
+        eh_calcado = (
+            "BR_SIZE" in colunas_spec
+            or "FOOT_LENGTH" in colunas_spec
+            or "FOOTWEAR_TYPE" in por_id
+            or domain_id.upper() in _DOMINIOS_CALCADOS_ML
+        )
+
+        if guia_especifica_sem_linha is not None and tamanho_alvo and callable(adicionar_linha):
+            chart_id_existente = str(guia_especifica_sem_linha.get("id") or "").strip()
+            numero_br = _extrair_numero_tamanho_br(tamanho_alvo, infantil=_eh_genero_infantil_ml(usados))
+            if chart_id_existente and eh_calcado and numero_br is not None:
+                try:
+                    resp_linha = adicionar_linha(token, chart_id_existente, _linha_calcado_mlb(numero_br))
+                    rows_novas = (resp_linha or {}).get("rows") or []
+                    if not rows_novas and isinstance(resp_linha, dict) and resp_linha.get("id"):
+                        rows_novas = [resp_linha]
+                    if not rows_novas and callable(obter_guia):
+                        detalhe = obter_guia(token, chart_id_existente)
+                        rows_novas = (detalhe or {}).get("rows") or []
+                    if isinstance(rows_novas, list) and rows_novas:
+                        escolhida = _escolher_linha_guia(rows_novas, tamanho_alvo)
+                        if escolhida is not None:
+                            row_id, row_size_name, row_size_id, nota = escolhida
+                            return (chart_id_existente, row_id, row_size_name, row_size_id, nota)
+                except FalhaNoMarketplace as erro:
+                    if erro.status in (401, 403):
+                        raise
+                    detalhe_erro = "; ".join(_causas(erro.corpo, erro.mensagem)) or erro.mensagem
+                    log.warning(
+                        "Mercado Livre: falha ao adicionar linha '%s' na guia %s (%s): %s",
+                        tamanho_alvo,
+                        chart_id_existente,
+                        erro.status,
+                        detalhe_erro,
+                    )
+
+        if not callable(criar_guia):
+            return None
+
+        payload = _montar_payload_guia_especifica(
+            site_id=site_id,
+            domain_id=domain_id,
+            atributos_base=atributos_base,
+            tamanho_alvo=tamanho_alvo,
+            usados=usados,
+            por_id=por_id,
+            colunas_spec=colunas_spec,
+        )
+        if payload is None:
+            return None
+
+        try:
+            criada = criar_guia(token, payload)
+        except FalhaNoMarketplace as erro:
+            if erro.status in (401, 403):
+                raise
+            detalhe_erro = "; ".join(_causas(erro.corpo, erro.mensagem)) or erro.mensagem
+            log.warning(
+                "Mercado Livre: falha ao criar guia de tamanhos SPECIFIC para %s-%s (%s): %s | corpo=%s",
+                site_id,
+                domain_id,
+                erro.status,
+                detalhe_erro,
+                erro.corpo,
+            )
+            return None
+
+        chart_id = str((criada or {}).get("id") or "").strip()
+        if not chart_id:
+            return None
+        rows = (criada or {}).get("rows") or []
+        if not rows and callable(obter_guia):
+            try:
+                detalhe = obter_guia(token, chart_id)
+                rows = (detalhe or {}).get("rows") or []
+            except FalhaNoMarketplace as erro:
+                if erro.status in (401, 403):
+                    raise
+                rows = []
+        if not isinstance(rows, list) or not rows:
+            return None
+        escolhida = _escolher_linha_guia(rows, tamanho_alvo) or _escolher_linha_guia(rows, "")
+        if escolhida is None:
+            return None
+        row_id, row_size_name, row_size_id, nota = escolhida
+        log.info(
+            "Mercado Livre: guia de tamanhos SPECIFIC %s criada automaticamente para %s-%s (linha %s).",
+            chart_id,
+            site_id,
+            domain_id,
+            row_id,
+        )
+        return (chart_id, row_id, row_size_name, row_size_id, nota)
+
     def _resolver_guia_de_tamanho(
         self,
         token: str,
@@ -375,11 +659,11 @@ class PublicarNoMercadoLivre:
         if atributos_com_marca != atributos_base:
             consultas.append(("BRAND", atributos_com_marca, seller_id))
         consultas.append(("STANDARD", atributos_base, seller_id))
-        consultas.append((None, atributos_base, seller_id))
 
         tamanho_alvo = usados["SIZE"].valor if "SIZE" in usados else ""
         melhor_global: tuple[str, str, str | None, str | None, int] | None = None
         encontrou_guia = False
+        guia_especifica_sem_linha: dict[str, Any] | None = None
 
         vistos: set[tuple[str | None, str, str | None]] = set()
         for tipo, attrs, sid in consultas:
@@ -401,6 +685,15 @@ class PublicarNoMercadoLivre:
                 )
                 continue
 
+            if not charts:
+                log.info(
+                    "Mercado Livre: busca de guia de tamanhos (%s) retornou 0 guias para %s-%s.",
+                    tipo or "geral",
+                    site_id,
+                    domain_id,
+                )
+                continue
+
             for chart in charts:
                 chart_id = str(chart.get("id") or "").strip()
                 if not chart_id:
@@ -419,6 +712,8 @@ class PublicarNoMercadoLivre:
                     continue
                 escolhida = _escolher_linha_guia(rows, tamanho_alvo)
                 if escolhida is None:
+                    if tipo == "SPECIFIC" and guia_especifica_sem_linha is None:
+                        guia_especifica_sem_linha = chart
                     continue
                 row_id, row_size_name, row_size_id, nota = escolhida
                 if nota == 2:
@@ -436,17 +731,31 @@ class PublicarNoMercadoLivre:
                     domain_id,
                     tamanho_alvo,
                 )
-            return ligados
+            melhor_global = self._criar_ou_estender_guia_especifica(
+                token=token,
+                catalog_domain=catalog_domain,
+                site_id=site_id,
+                domain_id=domain_id,
+                atributos_base=atributos_base,
+                tamanho_alvo=tamanho_alvo,
+                usados=usados,
+                por_id=por_id,
+                guia_especifica_sem_linha=guia_especifica_sem_linha,
+            )
+            if melhor_global is None:
+                return ligados
 
         chart_id, row_id, row_size_name, row_size_id, _ = melhor_global
         atualizados = _substituir_ou_adicionar_atributo(ligados, AtributoLigado("SIZE_GRID_ID", chart_id))
         if "SIZE_GRID_ROW_ID" in por_id:
             atualizados = _substituir_ou_adicionar_atributo(atualizados, AtributoLigado("SIZE_GRID_ROW_ID", row_id))
-        if row_size_name and "SIZE" in por_id and (row_size_id is not None or "SIZE" not in usados):
+        if row_size_name and "SIZE" in por_id:
+            valor_id_size = row_size_id or _valor_id(por_id["SIZE"], row_size_name)
             atualizados = _substituir_ou_adicionar_atributo(
                 atualizados,
-                AtributoLigado("SIZE", row_size_name, row_size_id),
+                AtributoLigado("SIZE", row_size_name, valor_id_size),
             )
+        log.info("Mercado Livre: guia de tamanhos %s (linha %s) vinculada para %s.", chart_id, row_id, domain_id)
         return atualizados
 
     def _ml_da_analise(self, vendedor_id: int, analise_id: str | None) -> dict[str, Any]:

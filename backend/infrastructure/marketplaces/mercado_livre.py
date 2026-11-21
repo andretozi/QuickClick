@@ -444,6 +444,53 @@ class GatewayMercadoLivre:
         )
         return dados if isinstance(dados, dict) else {}
 
+    def obter_especificacao_guia(
+        self,
+        access_token: str,
+        catalog_domain: str,
+        atributos: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """POST /domains/{catalog_domain}/technical_specs?section=grids para obter colunas exigidas na guia."""
+        dados = self._executar_requisicao(
+            "POST",
+            f"{URL_API_BASE}/domains/{quote(str(catalog_domain), safe='')}/technical_specs",
+            access_token=access_token,
+            params={"section": "grids"},
+            headers={"Content-Type": "application/json"},
+            json={"attributes": atributos},
+            mensagem_erro="Falha ao obter especificação da guia de tamanhos no Mercado Livre",
+        )
+        return dados if isinstance(dados, dict) else {}
+
+    def criar_guia_de_tamanho(self, access_token: str, payload: dict[str, Any]) -> dict[str, Any]:
+        """POST /catalog/charts para criar uma guia de tamanhos personalizada (SPECIFIC) do vendedor."""
+        dados = self._executar_requisicao(
+            "POST",
+            f"{URL_API_BASE}/catalog/charts",
+            access_token=access_token,
+            headers={"Content-Type": "application/json"},
+            json=payload,
+            mensagem_erro="Falha ao criar guia de tamanhos no Mercado Livre",
+        )
+        return dados if isinstance(dados, dict) else {}
+
+    def adicionar_linha_guia_de_tamanho(
+        self,
+        access_token: str,
+        chart_id: str,
+        attributes: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """POST /catalog/charts/{id}/rows para adicionar uma linha a uma guia SPECIFIC existente."""
+        dados = self._executar_requisicao(
+            "POST",
+            f"{URL_API_BASE}/catalog/charts/{quote(str(chart_id), safe='')}/rows",
+            access_token=access_token,
+            headers={"Content-Type": "application/json"},
+            json={"attributes": attributes},
+            mensagem_erro="Falha ao adicionar linha na guia de tamanhos no Mercado Livre",
+        )
+        return dados if isinstance(dados, dict) else {}
+
     def buscar_itens(self, termos: str, categoria_id: str | None, condicao: str | None,
                      access_token: str, limite: int = 50) -> dict[str, Any]:
         """GET /sites/MLB/search (itens ativos parecidos). Para muitos apps responde 403: quem chama trata."""
