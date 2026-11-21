@@ -151,14 +151,22 @@ def _causas(corpo: Any, fallback_mensagem: str = "") -> list[str]:
     if not isinstance(corpo, dict):
         resumo = _resumir_fallback_erro(fallback_mensagem)
         return [resumo] if resumo else []
-    causas = [
+    causas_brutas = [c for c in (corpo.get("cause") or []) if isinstance(c, dict)]
+    erros_causa = [
         str(c.get("message") or c.get("code") or "").strip()
-        for c in (corpo.get("cause") or [])
-        if isinstance(c, dict)
+        for c in causas_brutas
+        if str(c.get("type") or "").strip().lower() != "warning"
     ]
-    causas = [c for c in causas if c]
-    if causas:
-        return causas
+    erros_causa = [c for c in erros_causa if c]
+    if erros_causa:
+        return erros_causa
+    avisos_causa = [
+        str(c.get("message") or c.get("code") or "").strip()
+        for c in causas_brutas
+    ]
+    avisos_causa = [c for c in avisos_causa if c]
+    if avisos_causa:
+        return avisos_causa
     if corpo.get("message"):
         return [str(corpo["message"]).strip()]
     detail = corpo.get("detail")

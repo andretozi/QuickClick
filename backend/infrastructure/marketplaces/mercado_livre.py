@@ -370,6 +370,59 @@ class GatewayMercadoLivre:
             mensagem_erro="Falha ao ler os atributos da categoria no Mercado Livre",
         ) or []
 
+    def obter_categoria(self, categoria_id: str, access_token: str) -> dict[str, Any]:
+        """GET /categories/{id} (settings, catalog_domain, etc.)."""
+        dados = self._executar_requisicao(
+            "GET",
+            f"{URL_API_BASE}/categories/{quote(categoria_id, safe='')}",
+            access_token=access_token,
+            mensagem_erro="Falha ao ler detalhes da categoria no Mercado Livre",
+        )
+        return dados if isinstance(dados, dict) else {}
+
+    def buscar_guias_de_tamanho(
+        self,
+        access_token: str,
+        domain_id: str,
+        site_id: str,
+        atributos: list[dict[str, Any]],
+        *,
+        seller_id: str | None = None,
+        tipo: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """POST /catalog/charts/search para localizar guias de tamanho (SIZE_GRID_ID / SIZE_GRID_ROW_ID)."""
+        payload: dict[str, Any] = {
+            "domain_id": domain_id,
+            "site_id": site_id,
+            "attributes": atributos,
+        }
+        if tipo:
+            payload["type"] = tipo
+        if seller_id and str(seller_id).strip().isdigit():
+            payload["seller_id"] = int(str(seller_id).strip())
+        dados = self._executar_requisicao(
+            "POST",
+            f"{URL_API_BASE}/catalog/charts/search",
+            access_token=access_token,
+            headers={"Content-Type": "application/json"},
+            json=payload,
+            mensagem_erro="Falha ao buscar guias de tamanho no Mercado Livre",
+        )
+        if isinstance(dados, dict):
+            charts = dados.get("charts")
+            return [c for c in charts if isinstance(c, dict)] if isinstance(charts, list) else []
+        return []
+
+    def obter_guia_de_tamanho(self, access_token: str, chart_id: str) -> dict[str, Any]:
+        """GET /catalog/charts/{id} para obter as linhas de uma guia de tamanho."""
+        dados = self._executar_requisicao(
+            "GET",
+            f"{URL_API_BASE}/catalog/charts/{quote(str(chart_id), safe='')}",
+            access_token=access_token,
+            mensagem_erro="Falha ao ler a guia de tamanho no Mercado Livre",
+        )
+        return dados if isinstance(dados, dict) else {}
+
     def buscar_itens(self, termos: str, categoria_id: str | None, condicao: str | None,
                      access_token: str, limite: int = 50) -> dict[str, Any]:
         """GET /sites/MLB/search (itens ativos parecidos). Para muitos apps responde 403: quem chama trata."""

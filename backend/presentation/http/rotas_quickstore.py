@@ -47,22 +47,36 @@ def criar_rotas_quickstore(
     rotas = APIRouter(tags=["quickstore"])
     limitador = limitador or LimitadorDeTentativas()
 
-    @rotas.get(
-        "/quickstore/midia/{foto_id}.jpg",
-        summary="Serve foto pública de anúncio para a QuickStore",
-    )
-    def obter_midia_quickstore(foto_id: str) -> Response:
+    def _resposta_midia_quickstore(foto_id: str, *, apenas_cabecalho: bool = False) -> Response:
         if not _FORMATO_FOTO_ID.match(str(foto_id or "")) or casos.midia_fotos is None:
             raise HTTPException(status_code=404, detail="Foto não encontrada.")
         item = casos.midia_fotos.obter(foto_id)
         if item is None:
             raise HTTPException(status_code=404, detail="Foto não encontrada.")
         conteudo, content_type = item
+        headers = {
+            "Cache-Control": "public, max-age=31536000, immutable",
+            "Content-Length": str(len(conteudo)),
+        }
         return Response(
-            content=conteudo,
+            content=b"" if apenas_cabecalho else conteudo,
             media_type=content_type or "image/jpeg",
-            headers={"Cache-Control": "public, max-age=31536000, immutable"},
+            headers=headers,
         )
+
+    @rotas.get(
+        "/quickstore/midia/{foto_id}.jpg",
+        summary="Serve foto pública de anúncio para a QuickStore",
+    )
+    def obter_midia_quickstore(foto_id: str) -> Response:
+        return _resposta_midia_quickstore(foto_id)
+
+    @rotas.head(
+        "/quickstore/midia/{foto_id}.jpg",
+        include_in_schema=False,
+    )
+    def cabecalho_midia_quickstore(foto_id: str) -> Response:
+        return _resposta_midia_quickstore(foto_id, apenas_cabecalho=True)
 
     @rotas.post(
         "/anuncios/publicar/quickstore",

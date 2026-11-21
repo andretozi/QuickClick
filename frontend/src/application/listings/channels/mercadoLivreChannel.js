@@ -47,7 +47,7 @@ export const mercadoLivreChannel = {
         condition: overrides.condition ?? listing.condition,
         attributes: overrides.attributes ?? listing.attributes,
         analysisId: overrides.analysisId ?? listing.analysisId ?? null,
-        mlCategoryId: overrides.mlCategoryId ?? listing.mlCategoryId ?? listing.qsCategoryId ?? null,
+        mlCategoryId: overrides.mlCategoryId ?? listing.mlCategoryId ?? null,
         keptPhotos
       },
       photoBlobs

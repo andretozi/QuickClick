@@ -632,6 +632,34 @@ class TestFontePrecosML(unittest.TestCase):
         sem_campos._cache.dados["MLB2"] = []
         self.assertEqual(sem_campos.esquema("MLB2", "t").campos, ())  # categoria sem campos não é falha
 
+    def test_preserva_tags_de_leitura_e_variacao_no_cache(self):
+        class GatewayTags(GatewayMLFalso):
+            def atributos_da_categoria(self, categoria_id, token):
+                return [
+                    {
+                        "id": "FILTRABLE_SIZE",
+                        "name": "Tamanho filtrável",
+                        "tags": {"read_only": True, "hidden": True, "variation_attribute": True},
+                        "values": [{"id": "40", "name": "40"}],
+                        "value_type": "string",
+                    },
+                    {
+                        "id": "COLOR",
+                        "name": "Cor",
+                        "tags": {"allow_variations": True},
+                        "values": [{"id": "52049", "name": "Preto"}],
+                        "value_type": "string",
+                    },
+                ]
+
+        cache = CacheEmMemoria()
+        fonte = FontePrecosMercadoLivre(GatewayTags(), cache, relogio=lambda: AGORA)
+        atributos = {a.id: a for a in fonte.atributos_da_categoria("MLB273770", "t")}
+        self.assertTrue(atributos["FILTRABLE_SIZE"].somente_leitura)
+        self.assertTrue(atributos["FILTRABLE_SIZE"].oculto)
+        self.assertTrue(atributos["COLOR"].permite_variacao)
+        self.assertEqual([c.id for c in fonte.esquema("MLB273770", "t").campos], ["COLOR"])
+
 
 if __name__ == "__main__":
     unittest.main()

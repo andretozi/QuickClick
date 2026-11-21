@@ -35,12 +35,24 @@ def _agora() -> datetime:
     return datetime.now(UTC)
 
 
+_TAGS_ATRIBUTO_RELEVANTES = (
+    "required",
+    "catalog_required",
+    "read_only",
+    "non_modifiable",
+    "hidden",
+    "allow_variations",
+    "variation_attribute",
+    "grid_template_required",
+)
+
+
 def _resumo_do_atributo(bruto: dict[str, Any]) -> dict[str, Any]:
     """O que interessa guardar no cache (o atributo completo do ML é bem maior)."""
     resumo: dict[str, Any] = {
         "id": bruto.get("id"),
         "name": bruto.get("name"),
-        "tags": {k: v for k, v in (bruto.get("tags") or {}).items() if k in ("required", "catalog_required")},
+        "tags": {k: v for k, v in (bruto.get("tags") or {}).items() if k in _TAGS_ATRIBUTO_RELEVANTES and v},
         "values": [{"id": v.get("id"), "name": v.get("name")} for v in (bruto.get("values") or [])[:200]
                    if isinstance(v, dict)],
     }
