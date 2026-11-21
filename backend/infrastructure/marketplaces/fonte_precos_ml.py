@@ -52,7 +52,7 @@ def _resumo_do_atributo(bruto: dict[str, Any]) -> dict[str, Any]:
 
 
 class FontePrecosMercadoLivre:
-    def __init__(self, gateway: GatewayMercadoLivre | Any, cache: CacheDeCategoriasML,
+    def __init__(self, gateway: GatewayMercadoLivre, cache: CacheDeCategoriasML,
                  relogio: Callable[[], datetime] = _agora):
         self._gateway = gateway
         self._cache = cache

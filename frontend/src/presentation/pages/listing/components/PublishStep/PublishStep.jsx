@@ -10,16 +10,18 @@ export default function PublishStep({ editor }) {
   const stepOf = (name) => steps.indexOf(name);
   // a capa vem primeiro (e ocupa o dobro)
   const photos = [draft.photos[draft.coverIndex], ...draft.photos.filter((_, i) => i !== draft.coverIndex)].filter(Boolean);
+  const publishMl = Boolean(willPublishMl);
+  const publishQs = Boolean(willPublishQs);
   let channelsValue = channelsNone;
   if (channelScope === PRIMARY_CHANNEL) {
-    channelsValue = willPublishMl ? channelsMl : channelsNone;
+    channelsValue = publishMl ? channelsMl : channelsNone;
   } else if (channelScope === QUICKSTORE_CHANNEL) {
-    channelsValue = willPublishQs ? channelsQs : channelsNone;
-  } else if (willPublishMl && willPublishQs) {
+    channelsValue = publishQs ? channelsQs : channelsNone;
+  } else if (publishMl && publishQs) {
     channelsValue = channelsBoth;
-  } else if (willPublishMl) {
+  } else if (publishMl) {
     channelsValue = channelsMl;
-  } else if (willPublishQs) {
+  } else if (publishQs) {
     channelsValue = channelsQs;
   }
 

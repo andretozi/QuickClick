@@ -10,13 +10,22 @@ import './ListingPreview.css';
  * - photo, title, price (texto pronto), condition (texto), stock (texto)
  * - texts: { label, shipping, buy }
  */
-export default function ListingPreview({ photo, title, price, condition, stock, texts, className }) {
+export default function ListingPreview({
+  channel = 'mercado-livre',
+  photo,
+  title,
+  price,
+  condition,
+  stock,
+  texts,
+  className
+}) {
   return (
-    <figure className={cx('listing-preview', className)}>
+    <figure className={cx('listing-preview', channel === 'quickstore' && 'listing-preview--quickstore', className)}>
       <figcaption className="listing-preview__caption">{texts.label}</figcaption>
       <div className="listing-preview__device" aria-hidden="true">
         <div className="listing-preview__bar">
-          <MarketplaceLogo slug="mercado-livre" size="sm" decorative />
+          <MarketplaceLogo slug={channel} size="sm" decorative />
           <span className="listing-preview__search" />
         </div>
         <div className="listing-preview__body">

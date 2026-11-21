@@ -3,30 +3,15 @@ import useMountedRef from '@/application/ui/useMountedRef.js';
 import useSession from '@/application/session/useSession.js';
 import { dismissWelcome } from '@/application/session/sessionStore.js';
 import { showToast, TOAST_TONES } from '@/application/feedback/toastStore.js';
+import { CHANNEL_ADAPTERS, getChannelAdapter } from '@/application/listings/channels/channelRegistry.js';
 import {
   duplicateListing,
   listListings,
   listLocalListings,
-  mergeMercadoLivreItem,
-  mergeQuickStoreItem,
   removeListing,
-  syncListingsWithMercadoLivre,
-  syncListingsWithQuickStore,
   updateListing
 } from '@/infrastructure/storage/listingsRepository.js';
-import {
-  fetchConnectedMarketplaces,
-  fetchMarketplaceProducts
-} from '@/infrastructure/marketplaces/marketplacesService.js';
-import {
-  deleteMercadoLivreItem,
-  deleteQuickStoreItem,
-  publishToMercadoLivre,
-  publishToQuickStore,
-  updateMercadoLivreStatus,
-  updateQuickStoreStatus
-} from '@/infrastructure/ai/iaService.js';
-import { dataUrlToBlob } from '@/infrastructure/media/imageResizer.js';
+import { fetchConnectedMarketplaces } from '@/infrastructure/marketplaces/marketplacesService.js';
 import { currentHour } from '@/infrastructure/browser/events.js';
 import {
   LISTING_STATUS,
@@ -46,43 +31,16 @@ export const DASHBOARD_TABS = { LISTINGS: 'listings', INSIGHTS: 'insights' };
 
 const DEFAULT_FILTERS = { query: '', status: 'all', sort: 'recent' };
 
-const CHANNEL_NAMES = {
-  [PRIMARY_CHANNEL]: 'Mercado Livre',
-  [QUICKSTORE_CHANNEL]: 'QuickStore'
-};
-
-const formatChannelNames = (slugs) => slugs.map((slug) => CHANNEL_NAMES[slug] ?? slug).join(' e ');
+const formatChannelNames = (slugs) => slugs.map((slug) => getChannelAdapter(slug).name ?? slug).join(' e ');
 
 /** Rede fora ou servidor com erro (5xx): o painel mostra a cópia salva no navegador. */
 const isConnectionError = (error) => error?.status === 0 || error?.status >= 500 || error?.code === 'sem_conexao';
-
-function buildPublishInputs(listing) {
-  const orderedPhotos = listing.photos ?? [];
-  const keptPhotos = orderedPhotos.filter((p) => String(p).startsWith('https://'));
-  const photoBlobs = orderedPhotos
-    .filter((p) => String(p).startsWith('data:'))
-    .map((p) => dataUrlToBlob(p));
-  return {
-    payload: {
-      id: listing.id,
-      title: listing.title,
-      description: listing.description,
-      priceCents: listing.priceCents,
-      stock: Math.max(1, Number(listing.stock) || 1),
-      condition: listing.condition,
-      attributes: listing.attributes,
-      mlCategoryId: listing.mlCategoryId ?? listing.qsCategoryId,
-      keptPhotos
-    },
-    photoBlobs
-  };
-}
 
 /**
  * Aplicação · Caso de uso "painel do vendedor".
  *
  * Carrega os anúncios e as conexões da conta logada, sincroniza os dados reais
- * com o Mercado Livre e a QuickStore, calcula os números do topo, filtra e ordena a lista e cuida
+ * com os canais conectados, calcula os números do topo, filtra e ordena a lista e cuida
  * das ações de cada anúncio (pausar, reativar, publicar em cada canal, duplicar e excluir com confirmação).
  */
 export default function useDashboard() {
@@ -109,28 +67,17 @@ export default function useDashboard() {
   const syncAllConnected = useCallback(
     async (connectionsList) => {
       if (!accountId) return null;
-      const mlConnected = connectionsList.some((connection) => connection.slug === PRIMARY_CHANNEL);
-      const qsConnected = connectionsList.some((connection) => connection.slug === QUICKSTORE_CHANNEL);
       let latest = null;
-      if (mlConnected) {
+      for (const adapter of Object.values(CHANNEL_ADAPTERS)) {
+        const isConnected = connectionsList.some((connection) => connection.slug === adapter.slug);
+        if (!isConnected) continue;
         try {
-          const mlProducts = await fetchMarketplaceProducts(PRIMARY_CHANNEL);
+          const synced = await adapter.syncAll(accountId);
           if (!mounted.current) return null;
-          latest = await syncListingsWithMercadoLivre(accountId, mlProducts);
+          latest = synced;
         } catch (error) {
-          if (mounted.current && error?.code === 'mercado_livre_desconectado') {
-            markChannelDisconnected(PRIMARY_CHANNEL);
-          }
-        }
-      }
-      if (qsConnected) {
-        try {
-          const qsProducts = await fetchMarketplaceProducts(QUICKSTORE_CHANNEL);
-          if (!mounted.current) return null;
-          latest = await syncListingsWithQuickStore(accountId, qsProducts);
-        } catch (error) {
-          if (mounted.current && error?.code === 'quickstore_desconectada') {
-            markChannelDisconnected(QUICKSTORE_CHANNEL);
+          if (mounted.current && error?.code === adapter.disconnectedCode) {
+            markChannelDisconnected(adapter.slug);
           }
         }
       }
@@ -158,9 +105,7 @@ export default function useDashboard() {
       // Sem o servidor, o sync não roda: gravaria por cima de uma cópia que pode estar desatualizada.
       if (offline) return;
 
-      const hasConnected = connections.some(
-        (connection) => connection.slug === PRIMARY_CHANNEL || connection.slug === QUICKSTORE_CHANNEL
-      );
+      const hasConnected = connections.some((connection) => Boolean(CHANNEL_ADAPTERS[connection.slug]));
       if (hasConnected) {
         setSyncing(true);
         try {
@@ -181,7 +126,7 @@ export default function useDashboard() {
     load();
   }, [load]);
 
-  // Sincroniza automaticamente quando a aba do navegador volta a ficar ativa (ex.: após mexer na QuickStore)
+  // Sincroniza automaticamente quando a aba do navegador volta a ficar ativa (ex.: após mexer em outro canal)
   useEffect(() => {
     if (!accountId || data.offline) return undefined;
     const onFocus = async () => {
@@ -222,10 +167,16 @@ export default function useDashboard() {
   }, []);
 
   const failed = useCallback(
-    (error) => {
-      if (error?.code === 'mercado_livre_desconectado') markChannelDisconnected(PRIMARY_CHANNEL);
-      if (error?.code === 'quickstore_desconectada') markChannelDisconnected(QUICKSTORE_CHANNEL);
-      const message = error?.code ? aiErrorText(error.code, error.userMessage) : LISTINGS_PANEL.toasts.error;
+    (error, explicitChannel = null) => {
+      for (const adapter of Object.values(CHANNEL_ADAPTERS)) {
+        if (error?.code === adapter.disconnectedCode) markChannelDisconnected(adapter.slug);
+      }
+      const message = error?.code
+        ? aiErrorText(error.code, error.userMessage, {
+            channel: error.channel ?? explicitChannel,
+            details: error.details
+          })
+        : LISTINGS_PANEL.toasts.error;
       showToast({ tone: TOAST_TONES.ERROR, ...message });
     },
     [markChannelDisconnected]
@@ -236,13 +187,10 @@ export default function useDashboard() {
     setSyncing(true);
     try {
       let synced = null;
-      if (mercadoLivreConnected) {
-        const mlProducts = await fetchMarketplaceProducts(PRIMARY_CHANNEL);
-        synced = await syncListingsWithMercadoLivre(accountId, mlProducts);
-      }
-      if (quickStoreConnected) {
-        const qsProducts = await fetchMarketplaceProducts(QUICKSTORE_CHANNEL);
-        synced = await syncListingsWithQuickStore(accountId, qsProducts);
+      for (const adapter of Object.values(CHANNEL_ADAPTERS)) {
+        const isConnected = data.connections.some((connection) => connection.slug === adapter.slug);
+        if (!isConnected) continue;
+        synced = await adapter.syncAll(accountId);
       }
       if (!mounted.current) return;
       if (synced) setData((current) => ({ ...current, listings: synced }));
@@ -252,44 +200,24 @@ export default function useDashboard() {
     } finally {
       if (mounted.current) setSyncing(false);
     }
-  }, [accountId, failed, mercadoLivreConnected, quickStoreConnected, mounted, syncing]);
+  }, [accountId, data.connections, failed, mercadoLivreConnected, quickStoreConnected, mounted, syncing]);
 
   const applyChannelTransition = useCallback(
     async (currentListing, channel, targetStatus) => {
-      const isQs = channel === QUICKSTORE_CHANNEL;
-      const itemId = isQs ? currentListing.qsItemId : currentListing.mlItemId;
-      const shouldCreateFresh = !itemId;
+      const adapter = getChannelAdapter(channel);
+      const itemId = adapter.getItemId(currentListing);
 
-      if (!shouldCreateFresh) {
+      if (itemId) {
         try {
-          if (isQs) {
-            const qsItem = await updateQuickStoreStatus(itemId, targetStatus);
-            return mergeQuickStoreItem(accountId, currentListing.id, qsItem);
-          }
-          const mlItem = await updateMercadoLivreStatus(itemId, targetStatus);
-          return mergeMercadoLivreItem(accountId, currentListing.id, mlItem);
+          return await adapter.setStatus(accountId, currentListing.id, itemId, targetStatus);
         } catch (error) {
           if (targetStatus === LISTING_STATUS.PUBLISHED && error?.code === 'anuncio_nao_encontrado') {
-            const { payload, photoBlobs } = buildPublishInputs(currentListing);
-            const published = isQs
-              ? await publishToQuickStore(payload, photoBlobs)
-              : await publishToMercadoLivre(payload, photoBlobs);
+            const { payload, photoBlobs } = adapter.buildPayload(currentListing);
+            const published = await adapter.publish(payload, photoBlobs);
             return updateListing(
               accountId,
               currentListing.id,
-              isQs
-                ? {
-                    qsItemId: published.id,
-                    qsPermalink: published.permalink,
-                    qsCategoryId: published.categoryId ?? currentListing.qsCategoryId ?? currentListing.mlCategoryId,
-                    channels: { ...currentListing.channels, [QUICKSTORE_CHANNEL]: LISTING_STATUS.PUBLISHED }
-                  }
-                : {
-                    mlItemId: published.id,
-                    permalink: published.permalink,
-                    mlCategoryId: published.categoryId ?? currentListing.mlCategoryId,
-                    channels: { ...currentListing.channels, [PRIMARY_CHANNEL]: LISTING_STATUS.PUBLISHED }
-                  },
+              adapter.toPublishedPatch(currentListing, published, LISTING_STATUS.PUBLISHED),
               { syncQuickStore: false }
             );
           }
@@ -298,26 +226,12 @@ export default function useDashboard() {
       }
 
       if (targetStatus === LISTING_STATUS.PUBLISHED) {
-        const { payload, photoBlobs } = buildPublishInputs(currentListing);
-        const published = isQs
-          ? await publishToQuickStore(payload, photoBlobs)
-          : await publishToMercadoLivre(payload, photoBlobs);
+        const { payload, photoBlobs } = adapter.buildPayload(currentListing);
+        const published = await adapter.publish(payload, photoBlobs);
         return updateListing(
           accountId,
           currentListing.id,
-          isQs
-            ? {
-                qsItemId: published.id,
-                qsPermalink: published.permalink,
-                qsCategoryId: published.categoryId ?? currentListing.qsCategoryId ?? currentListing.mlCategoryId,
-                channels: { ...currentListing.channels, [QUICKSTORE_CHANNEL]: targetStatus }
-              }
-            : {
-                mlItemId: published.id,
-                permalink: published.permalink,
-                mlCategoryId: published.categoryId ?? currentListing.mlCategoryId,
-                channels: { ...currentListing.channels, [PRIMARY_CHANNEL]: targetStatus }
-              },
+          adapter.toPublishedPatch(currentListing, published, targetStatus),
           { syncQuickStore: false }
         );
       }
@@ -334,16 +248,16 @@ export default function useDashboard() {
     [accountId]
   );
 
-  /** Publica, pausa ou reativa um produto em um canal específico ('mercado-livre' ou 'quickstore'). */
+  /** Publica, pausa ou reativa um produto em um canal específico. */
   const toggleChannelStatus = useCallback(
     async (listing, channel = PRIMARY_CHANNEL) => {
       if (busyLockRef.current) return;
-      const isQs = channel === QUICKSTORE_CHANNEL;
-      const connected = isQs ? quickStoreConnected : mercadoLivreConnected;
+      const adapter = getChannelAdapter(channel);
+      const connected = data.connections.some((connection) => connection.slug === adapter.slug);
       if (!connected) {
         showToast({
           tone: TOAST_TONES.ERROR,
-          ...aiErrorText(isQs ? 'quickstore_desconectada' : 'mercado_livre_desconectado')
+          ...aiErrorText(adapter.disconnectedCode)
         });
         return;
       }
@@ -356,7 +270,10 @@ export default function useDashboard() {
             ? { status: LISTING_STATUS.PUBLISHED, toast: LISTINGS_PANEL.toasts.resumed }
             : {
                 status: LISTING_STATUS.PUBLISHED,
-                toast: isQs ? LISTINGS_PANEL.toasts.publishedQs : LISTINGS_PANEL.toasts.publishedMl
+                toast:
+                  adapter.slug === QUICKSTORE_CHANNEL
+                    ? LISTINGS_PANEL.toasts.publishedQs
+                    : LISTINGS_PANEL.toasts.publishedMl
               };
 
       busyLockRef.current = listing.id;
@@ -367,13 +284,13 @@ export default function useDashboard() {
         replaceListing(updated);
         showToast({ tone: TOAST_TONES.SUCCESS, ...next.toast });
       } catch (error) {
-        if (mounted.current) failed(error);
+        if (mounted.current) failed(error, channel);
       } finally {
         busyLockRef.current = null;
         if (mounted.current) setBusyId(null);
       }
     },
-    [applyChannelTransition, failed, mercadoLivreConnected, quickStoreConnected, replaceListing, mounted]
+    [applyChannelTransition, data.connections, failed, replaceListing, mounted]
   );
 
   /** Ação geral do painel principal: atua em todos os e-commerces relevantes e sinaliza vínculos ausentes. */
@@ -394,7 +311,7 @@ export default function useDashboard() {
           const slug = disconnectedTargets[0];
           showToast({
             tone: TOAST_TONES.ERROR,
-            ...aiErrorText(slug === QUICKSTORE_CHANNEL ? 'quickstore_desconectada' : 'mercado_livre_desconectado')
+            ...aiErrorText(getChannelAdapter(slug).disconnectedCode)
           });
         } else {
           showToast({
@@ -440,7 +357,7 @@ export default function useDashboard() {
           showToast({ tone: TOAST_TONES.SUCCESS, ...toast });
         }
       } catch (error) {
-        if (mounted.current) failed(error);
+        if (mounted.current) failed(error, connectedTargets.length === 1 ? connectedTargets[0] : null);
       } finally {
         busyLockRef.current = null;
         if (mounted.current) setBusyId(null);
@@ -476,13 +393,13 @@ export default function useDashboard() {
   const confirmChannelRemoval = useCallback(
     async (channel) => {
       if (!pendingRemoval || removing) return;
-      const isQs = channel === QUICKSTORE_CHANNEL;
-      const itemId = isQs ? pendingRemoval.qsItemId : pendingRemoval.mlItemId;
-      const connected = isQs ? quickStoreConnected : mercadoLivreConnected;
+      const adapter = getChannelAdapter(channel);
+      const itemId = adapter.getItemId(pendingRemoval);
+      const connected = data.connections.some((connection) => connection.slug === adapter.slug);
       if (itemId && !connected) {
         showToast({
           tone: TOAST_TONES.ERROR,
-          ...aiErrorText(isQs ? 'quickstore_desconectada' : 'mercado_livre_desconectado')
+          ...aiErrorText(adapter.disconnectedCode)
         });
         return;
       }
@@ -490,63 +407,41 @@ export default function useDashboard() {
       try {
         if (itemId) {
           try {
-            if (isQs) await deleteQuickStoreItem(itemId);
-            else await deleteMercadoLivreItem(itemId);
+            await adapter.remove(itemId);
           } catch (error) {
             if (error?.code !== 'anuncio_nao_encontrado') throw error;
           }
         }
-        const updated = await updateListing(
-          accountId,
-          pendingRemoval.id,
-          isQs
-            ? {
-                qsItemId: null,
-                qsPermalink: null,
-                qsHealth: null,
-                channels: { ...pendingRemoval.channels, [QUICKSTORE_CHANNEL]: LISTING_STATUS.UNPUBLISHED }
-              }
-            : {
-                mlItemId: null,
-                permalink: null,
-                health: null,
-                channels: { ...pendingRemoval.channels, [PRIMARY_CHANNEL]: LISTING_STATUS.UNPUBLISHED }
-              },
-          { syncQuickStore: false }
-        );
+        const updated = await updateListing(accountId, pendingRemoval.id, adapter.toClearedPatch(pendingRemoval), {
+          syncQuickStore: false
+        });
         if (!mounted.current) return;
         replaceListing(updated);
         setPendingRemoval(null);
-        const channelName = CHANNEL_NAMES[channel] ?? channel;
         showToast({
           tone: TOAST_TONES.SUCCESS,
           ...(LISTINGS_PANEL.toasts.removedChannel
-            ? LISTINGS_PANEL.toasts.removedChannel(channelName)
+            ? LISTINGS_PANEL.toasts.removedChannel(adapter.name)
             : LISTINGS_PANEL.toasts.removed)
         });
       } catch (error) {
-        if (mounted.current) failed(error);
+        if (mounted.current) failed(error, channel);
       } finally {
         if (mounted.current) setRemoving(false);
       }
     },
-    [accountId, failed, mercadoLivreConnected, mounted, pendingRemoval, quickStoreConnected, removing, replaceListing]
+    [accountId, data.connections, failed, mounted, pendingRemoval, removing, replaceListing]
   );
 
   const confirmRemoval = useCallback(async () => {
     if (!pendingRemoval) return;
     setRemoving(true);
     try {
-      if (pendingRemoval.mlItemId) {
+      for (const adapter of Object.values(CHANNEL_ADAPTERS)) {
+        const itemId = adapter.getItemId(pendingRemoval);
+        if (!itemId) continue;
         try {
-          await deleteMercadoLivreItem(pendingRemoval.mlItemId);
-        } catch (error) {
-          if (error?.code !== 'anuncio_nao_encontrado') throw error;
-        }
-      }
-      if (pendingRemoval.qsItemId) {
-        try {
-          await deleteQuickStoreItem(pendingRemoval.qsItemId);
+          await adapter.remove(itemId);
         } catch (error) {
           if (error?.code !== 'anuncio_nao_encontrado') throw error;
         }

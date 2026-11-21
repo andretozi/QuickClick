@@ -14,12 +14,14 @@ const API_BASE = '/api';
 
 /** Falha numa chamada à API. `code` vem do back (ex.: "limite_do_plano") ou é "sem_conexao". */
 export class ApiError extends Error {
-  constructor({ status, code, userMessage = '' }) {
+  constructor({ status, code, userMessage = '', channel = null, details = [] }) {
     super(`${status} ${code}`);
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
     this.userMessage = userMessage; // texto do back, já pronto para a tela (pode vir vazio)
+    this.channel = channel;
+    this.details = Array.isArray(details) ? details : [];
   }
 }
 
@@ -71,7 +73,9 @@ export async function requestJson(path, { method = 'GET', body, headers = {} } =
       status: response.status,
       // Sem o formato da API (ex.: o back fora do ar no "npm run dev") é falta de conexão
       code: erro?.codigo ?? (response.status >= 500 ? 'sem_conexao' : 'erro_desconhecido'),
-      userMessage: erro?.mensagem ?? ''
+      userMessage: erro?.mensagem ?? '',
+      channel: erro?.canal ?? null,
+      details: Array.isArray(erro?.detalhes) ? erro.detalhes : []
     });
   }
   return data;

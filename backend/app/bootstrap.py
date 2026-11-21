@@ -28,8 +28,10 @@ from backend.application.casos_de_uso import (
     ObterUsuarioAtual,
     ObterVendedorAtual,
     ProcessarWebhookQuickStore,
+    PublicarNaQuickStore,
     PublicarNoMercadoLivre,
     RegistrarUsuario,
+    SincronizadorQuickStore,
     TrocarPlano,
 )
 from backend.application.ia.contas import ContasPelosCasosDeUso
@@ -67,6 +69,7 @@ from backend.infrastructure.ia.fabrica import criar_provedores
 from backend.infrastructure.ia.preparador_pillow import PillowPreparador
 from backend.infrastructure.ia.sem_tratamento import SemTratamento, SemVerificacaoDeFidelidade
 from backend.infrastructure.marketplaces.fonte_precos_ml import FontePrecosMercadoLivre
+from backend.infrastructure.marketplaces.fonte_quickstore import FonteQuickStore
 from backend.infrastructure.marketplaces.registro import criar_gateways
 from backend.infrastructure.seguranca.cripto_tokens import CifradorDeTokens
 from backend.infrastructure.seguranca.google_oauth import VerificadorGoogleOAuth
@@ -125,7 +128,7 @@ def criar_app(
     cache_categorias = CacheDeCategoriasMLSQL(session_factory)
     if fonte_ml is None:
         fonte_ml = FontePrecosMercadoLivre(gateways["mercado-livre"], cache_categorias, relogio=relogio)
-    fonte_quickstore = FontePrecosMercadoLivre(gateways["quickstore"], cache_categorias, relogio=relogio)
+    fonte_quickstore = FonteQuickStore(gateways["quickstore"], cache_categorias, relogio=relogio)
     executor_padrao = executor is None
     executor = executor or ThreadPoolExecutor(max_workers=TRABALHADORES_DA_ANALISE, thread_name_prefix="analise")
     analises = RepositorioDeAnalisesSQL(session_factory)
@@ -156,13 +159,12 @@ def criar_app(
 
     emails_admin = extrair_emails_admin(leitor.texto("ADMIN_EMAILS"))
 
-    publicar_na_quickstore = PublicarNoMercadoLivre(
+    publicar_na_quickstore = PublicarNaQuickStore(
         conectar,
         gateways["quickstore"],
         fonte_quickstore,
         analises,
         preparador,
-        canal="quickstore",
         produtos=repositorio_produtos,
     )
 
@@ -190,7 +192,11 @@ def criar_app(
             publicadores={"mercado-livre": gateways["mercado-livre"], "quickstore": gateways["quickstore"]},
             relogio=relogio,
         ),
-        produtos=GerenciarProdutos(repositorio_produtos, relogio, publicar_na_quickstore=publicar_na_quickstore),
+        produtos=GerenciarProdutos(
+            repositorio_produtos,
+            relogio,
+            sincronizadores=(SincronizadorQuickStore(publicar_na_quickstore),),
+        ),
     )
 
     documentacao_ativa = leitor.booleano("DOCUMENTACAO_API_ATIVA", False)

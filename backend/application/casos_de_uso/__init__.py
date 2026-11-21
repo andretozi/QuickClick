@@ -12,6 +12,7 @@ from backend.application.casos_de_uso.moderar_contas import ModerarContas
 from backend.application.casos_de_uso.obter_usuario_atual import ObterUsuarioAtual
 from backend.application.casos_de_uso.obter_vendedor_atual import ObterVendedorAtual
 from backend.application.casos_de_uso.produtos import GerenciarProdutos
+from backend.application.casos_de_uso.publicar_na_quickstore import PublicarNaQuickStore, SincronizadorQuickStore
 from backend.application.casos_de_uso.publicar_no_mercado_livre import PublicarNoMercadoLivre
 from backend.application.casos_de_uso.registrar_usuario import RegistrarUsuario
 from backend.application.casos_de_uso.trocar_plano import TrocarPlano
@@ -35,7 +36,8 @@ class CasosDeUso:
     moderar_contas: ModerarContas | None = None
     analises_ia: ServicoDeAnalises | None = None
     publicar_no_mercado_livre: PublicarNoMercadoLivre | None = None
-    publicar_na_quickstore: PublicarNoMercadoLivre | None = None
+    publicar_na_quickstore: PublicarNaQuickStore | None = None
     webhook_quickstore: ProcessarWebhookQuickStore | None = None
     trocar_plano: TrocarPlano | None = None
     produtos: GerenciarProdutos | None = None
+

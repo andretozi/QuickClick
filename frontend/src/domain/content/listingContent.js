@@ -65,6 +65,9 @@ export const LISTING_WIZARD = {
     back: 'Voltar',
     next: 'Continuar',
     publish: 'Publicar anúncio',
+    publishMl: 'Publicar no Mercado Livre',
+    publishQs: 'Publicar na QuickStore',
+    publishBoth: 'Publicar no Mercado Livre e QuickStore',
     publishing: 'Publicando…',
     saveNew: 'Salvar anúncio',
     save: 'Salvar alterações',
@@ -270,6 +273,8 @@ export const LISTING_WIZARD = {
     toggleLabel: 'Publicar no Mercado Livre',
     toggleLabelQs: 'Publicar na QuickStore',
     preview: 'Prévia no Mercado Livre',
+    previewQs: 'Prévia na QuickStore',
+    previewFor: (name) => `Prévia em ${name}`,
     previewFree: 'Frete calculado no anúncio',
     previewStock: (units) => (units === 1 ? 'Último disponível!' : `${units} disponíveis`),
     previewNew: 'Novo',
@@ -557,6 +562,47 @@ export const AI_ERRORS = {
   sem_conexao: { title: 'Sem conexão com a Quick Click.', text: 'Confira a internet e tente de novo.' }
 };
 
-export function aiErrorText(code, message) {
+export function aiErrorText(code, message, options = {}) {
+  const channel = options?.channel ?? null;
+  const details = Array.isArray(options?.details) ? options.details.filter(Boolean) : [];
+  const firstDetail = details.length > 0 ? String(details[0]).trim() : '';
+
+  if (code === 'publicacao_recusada') {
+    const isQs = channel === 'quickstore' || /quickstore/i.test(String(message ?? ''));
+    const isMl = channel === 'mercado-livre' || /mercado livre/i.test(String(message ?? ''));
+    const title = isQs
+      ? 'A QuickStore recusou a operação.'
+      : isMl
+        ? 'O Mercado Livre recusou a operação.'
+        : message
+          ? 'O canal recusou a operação.'
+          : AI_ERRORS.publicacao_recusada.title;
+    const baseText = AI_ERRORS.publicacao_recusada.text;
+    const text = firstDetail ? `${baseText} (${firstDetail})` : message || baseText;
+    return { title, text };
+  }
+
+  if (code === 'anuncio_nao_encontrado') {
+    const isQs = channel === 'quickstore' || /quickstore/i.test(String(message ?? ''));
+    if (isQs) {
+      return {
+        title: 'Anúncio não encontrado na QuickStore.',
+        text: 'Ele pode já ter sido removido por lá.'
+      };
+    }
+    return AI_ERRORS.anuncio_nao_encontrado;
+  }
+
+  if (code === 'descricao_nao_gravada') {
+    const isQs = channel === 'quickstore' || /quickstore/i.test(String(message ?? ''));
+    if (isQs) {
+      return {
+        title: 'O anúncio foi salvo, mas a descrição não entrou.',
+        text: 'Confira na QuickStore.'
+      };
+    }
+    return AI_ERRORS.descricao_nao_gravada;
+  }
+
   return AI_ERRORS[code] ?? { title: 'Algo deu errado.', text: message || 'Tente de novo em instantes.' };
 }

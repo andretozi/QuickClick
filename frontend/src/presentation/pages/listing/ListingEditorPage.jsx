@@ -226,7 +226,13 @@ export default function ListingEditorPage({ params, query }) {
                     disabled={publishing}
                     className="listing-editor__publish"
                   >
-                    {editor.willPublish ? nav.publish : nav.saveNew}
+                    {editor.willPublishMl && editor.willPublishQs
+                      ? (nav.publishBoth ?? nav.publish)
+                      : editor.willPublishMl
+                        ? (nav.publishMl ?? nav.publish)
+                        : editor.willPublishQs
+                          ? (nav.publishQs ?? nav.publish)
+                          : nav.saveNew}
                   </Button>
                 )}
               </div>
