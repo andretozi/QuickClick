@@ -18,7 +18,12 @@ from backend.application.casos_de_uso.publicar_comum import (
 )
 from backend.application.ia.modelos import ArquivoDeFoto, FotoPreparada
 from backend.application.ia.portas import FontePrecosMarketplace, PreparadorDeFotos, RepositorioDeAnalises
-from backend.application.portas import FalhaNoMarketplace, PublicadorDeCanal, RepositorioDeProdutos
+from backend.application.portas import (
+    FalhaNoMarketplace,
+    PublicadorDeCanal,
+    RepositorioDeMidia,
+    RepositorioDeProdutos,
+)
 from backend.domain.erros import (
     AnuncioNaoEncontrado,
     FotoInvalida,
@@ -33,6 +38,11 @@ log = logging.getLogger("quickclick.marketplaces")
 QUICKSTORE = "quickstore"
 CATEGORIA_PADRAO_QUICKSTORE = "MLB23332"
 _FORMATO_ITEM_ID_QUICKSTORE = re.compile(r"^[A-Za-z0-9_-]{1,60}$")
+
+
+def _erro_indica_url_ou_foto(erro: FalhaNoMarketplace) -> bool:
+    texto = " ".join(_causas(erro.corpo, erro.mensagem)).lower()
+    return any(termo in texto for termo in ("url", "http://", "https://", "picture", "foto", "imagem", "image"))
 
 
 def _validar_item_id_quickstore(item_id: str) -> str:
@@ -111,6 +121,8 @@ class PublicarNaQuickStore:
         preparador: PreparadorDeFotos,
         *,
         produtos: RepositorioDeProdutos | None = None,
+        midia: RepositorioDeMidia | None = None,
+        url_base_publica: str = "",
     ):
         self._conectar = conectar
         self._publicador = publicador
@@ -118,8 +130,16 @@ class PublicarNaQuickStore:
         self._analises = analises
         self._preparador = preparador
         self._produtos = produtos
+        self._midia = midia
+        self._url_base_publica = str(url_base_publica or "").strip().rstrip("/")
 
-    def _subir_imagens(self, token: str, preparadas: list[FotoPreparada]) -> list[dict[str, str]]:
+    def _subir_imagens(self, vendedor_id: int, token: str, preparadas: list[FotoPreparada]) -> list[dict[str, str]]:
+        if self._midia is not None and self._url_base_publica.startswith(("https://", "http://")):
+            imagens: list[dict[str, str]] = []
+            for foto in preparadas:
+                foto_id = self._midia.salvar(vendedor_id, foto.leitura_jpeg)
+                imagens.append({"source": f"{self._url_base_publica}/api/quickstore/midia/{foto_id}.jpg"})
+            return imagens
         return subir_imagens_no_canal(
             self._publicador,
             self._preparador,
@@ -190,7 +210,7 @@ class PublicarNaQuickStore:
         )
 
         try:
-            imagens_novas = self._subir_imagens(token, preparadas)
+            imagens_novas = self._subir_imagens(vendedor_id, token, preparadas)
             imagens = ([{"source": url} for url in dados.fotos_mantidas] + imagens_novas)[:6]
             item = {
                 "title": dados.titulo,
@@ -209,7 +229,11 @@ class PublicarNaQuickStore:
             except FalhaNoMarketplace as erro:
                 if erro.status in (401, 403):
                     raise
-                if erro.status in (400, 422) and categoria_id != CATEGORIA_PADRAO_QUICKSTORE:
+                if (
+                    erro.status in (400, 422)
+                    and categoria_id != CATEGORIA_PADRAO_QUICKSTORE
+                    and not _erro_indica_url_ou_foto(erro)
+                ):
                     log.info(
                         "QuickStore recusou categoria %s (%s); tentando reenvio com categoria padrão %s.",
                         categoria_id,
@@ -262,6 +286,11 @@ class PublicarNaQuickStore:
             "permalink": criado.get("permalink"),
             "status": criado.get("status"),
             "categoria_id": categoria_id,
+            "fotos": [
+                img["source"]
+                for img in imagens
+                if isinstance(img, dict) and str(img.get("source") or "").startswith("https://")
+            ],
             "avisos": avisos,
         }
 
@@ -293,7 +322,7 @@ class PublicarNaQuickStore:
         preparadas = self._preparador.preparar(fotos) if fotos else []
 
         try:
-            novas = self._subir_imagens(token, preparadas)
+            novas = self._subir_imagens(vendedor_id, token, preparadas)
         except FalhaNoMarketplace as erro:
             if erro.status in (401, 403):
                 raise QuickStoreDesconectada() from erro

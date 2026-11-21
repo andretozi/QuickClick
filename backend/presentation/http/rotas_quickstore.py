@@ -10,10 +10,11 @@ Apresentação · Rotas HTTP dedicadas à QuickStore (anúncios, callback OAuth 
     POST   /api/quickstore/webhook                    receptor de Webhooks (orders_v2 / items) da QuickStore
 """
 
+import re
 from collections.abc import Callable
 from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 from starlette.concurrency import run_in_threadpool
 
@@ -34,6 +35,7 @@ MAX_BYTES_WEBHOOK = 32_768
 LIMITE_WEBHOOK_IP = 120
 LIMITE_FALHAS_WEBHOOK_IP = 15
 JANELA_WEBHOOK_S = 60.0
+_FORMATO_FOTO_ID = re.compile(r"^[0-9a-f]{32}$")
 
 
 def criar_rotas_quickstore(
@@ -44,6 +46,23 @@ def criar_rotas_quickstore(
 ) -> APIRouter:
     rotas = APIRouter(tags=["quickstore"])
     limitador = limitador or LimitadorDeTentativas()
+
+    @rotas.get(
+        "/quickstore/midia/{foto_id}.jpg",
+        summary="Serve foto pública de anúncio para a QuickStore",
+    )
+    def obter_midia_quickstore(foto_id: str) -> Response:
+        if not _FORMATO_FOTO_ID.match(str(foto_id or "")) or casos.midia_fotos is None:
+            raise HTTPException(status_code=404, detail="Foto não encontrada.")
+        item = casos.midia_fotos.obter(foto_id)
+        if item is None:
+            raise HTTPException(status_code=404, detail="Foto não encontrada.")
+        conteudo, content_type = item
+        return Response(
+            content=conteudo,
+            media_type=content_type or "image/jpeg",
+            headers={"Cache-Control": "public, max-age=31536000, immutable"},
+        )
 
     @rotas.post(
         "/anuncios/publicar/quickstore",
@@ -177,3 +196,4 @@ def criar_rotas_quickstore(
         )
 
     return rotas
+

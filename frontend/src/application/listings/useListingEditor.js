@@ -569,11 +569,20 @@ export default function useListingEditor({ listingId, channelScope: rawChannelSc
             } catch (error) {
               if (effectivePublishQs && error?.code === 'anuncio_nao_encontrado') {
                 const publishedQs = await publishOnChannel(QUICKSTORE_CHANNEL, data);
+                const qsPhotos = (Array.isArray(publishedQs?.photos) ? publishedQs.photos : [])
+                  .map((url) => safeHttpsUrl(url))
+                  .filter(Boolean)
+                  .slice(0, 12);
+                const hasMlHttps = Boolean(
+                  mlPatch.photos?.length ||
+                    (Array.isArray(data.photos) && data.photos.some((p) => Boolean(safeHttpsUrl(p))))
+                );
                 finalQsStatus = LISTING_STATUS.PUBLISHED;
                 qsPatch = {
                   qsItemId: publishedQs.id,
                   qsPermalink: safeHttpsUrl(publishedQs.permalink),
-                  qsCategoryId: publishedQs.categoryId ?? data.qsCategoryId ?? data.mlCategoryId
+                  qsCategoryId: publishedQs.categoryId ?? data.qsCategoryId ?? data.mlCategoryId,
+                  ...(!hasMlHttps && qsPhotos.length ? { photos: qsPhotos, coverIndex: 0 } : {})
                 };
               } else {
                 throw error;
@@ -581,11 +590,20 @@ export default function useListingEditor({ listingId, channelScope: rawChannelSc
             }
           } else if (effectivePublishQs) {
             const publishedQs = await publishOnChannel(QUICKSTORE_CHANNEL, data);
+            const qsPhotos = (Array.isArray(publishedQs?.photos) ? publishedQs.photos : [])
+              .map((url) => safeHttpsUrl(url))
+              .filter(Boolean)
+              .slice(0, 12);
+            const hasMlHttps = Boolean(
+              mlPatch.photos?.length ||
+                (Array.isArray(data.photos) && data.photos.some((p) => Boolean(safeHttpsUrl(p))))
+            );
             finalQsStatus = LISTING_STATUS.PUBLISHED;
             qsPatch = {
               qsItemId: publishedQs.id,
               qsPermalink: safeHttpsUrl(publishedQs.permalink),
-              qsCategoryId: publishedQs.categoryId ?? data.qsCategoryId ?? data.mlCategoryId
+              qsCategoryId: publishedQs.categoryId ?? data.qsCategoryId ?? data.mlCategoryId,
+              ...(!hasMlHttps && qsPhotos.length ? { photos: qsPhotos, coverIndex: 0 } : {})
             };
           }
         }
@@ -637,12 +655,22 @@ export default function useListingEditor({ listingId, channelScope: rawChannelSc
         willPublishQs ? publishOnChannel(QUICKSTORE_CHANNEL, data) : Promise.resolve(null)
       ]);
       const anyPublished = Boolean(publishedMl || publishedQs);
+      const existingHttpsPhotos = (Array.isArray(data.photos) ? data.photos : [])
+        .map((url) => safeHttpsUrl(url))
+        .filter(Boolean);
+      const qsHttpsPhotos = (Array.isArray(publishedQs?.photos) ? publishedQs.photos : [])
+        .map((url) => safeHttpsUrl(url))
+        .filter(Boolean)
+        .slice(0, 12);
       // O rascunho sai antes: as fotos não ocupam o espaço duas vezes na hora de gravar.
       await clearDraft(accountId);
       let created;
       try {
         created = await createListing(accountId, {
           ...data,
+          ...(existingHttpsPhotos.length === 0 && qsHttpsPhotos.length > 0
+            ? { photos: qsHttpsPhotos, coverIndex: 0 }
+            : {}),
           mlItemId: publishedMl?.id ?? null,
           permalink: safeHttpsUrl(publishedMl?.permalink),
           mlCategoryId: publishedMl?.categoryId ?? data.mlCategoryId ?? null,

@@ -11,6 +11,7 @@ import logging
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
+from urllib.parse import urlparse
 
 from fastapi import FastAPI
 from sqlalchemy.orm import Session
@@ -51,6 +52,7 @@ from backend.infrastructure.banco.repositorio_ia import (
     RegistroDeUsoSQL,
     RepositorioDeAnalisesSQL,
 )
+from backend.infrastructure.banco.repositorio_midia import RepositorioDeMidiaSQL
 from backend.infrastructure.banco.repositorio_moderacao import RepositorioModeracaoSQL
 from backend.infrastructure.banco.repositorio_produtos import RepositorioDeProdutosSQL
 from backend.infrastructure.banco.repositorio_usuarios import RepositorioUsuariosSQL
@@ -117,6 +119,7 @@ def criar_app(
     usuarios = RepositorioUsuariosSQL(session_factory)
     moderacao = RepositorioModeracaoSQL(session_factory)
     repositorio_produtos = RepositorioDeProdutosSQL(session_factory)
+    midia_fotos = RepositorioDeMidiaSQL(session_factory, relogio=relogio)
 
     hasher = HasherPBKDF2()
     token_service = ServicoJWT(segredo_jwt(leitor))
@@ -159,6 +162,12 @@ def criar_app(
 
     emails_admin = extrair_emails_admin(leitor.texto("ADMIN_EMAILS"))
 
+    redirect_uri = leitor.texto("QUICKSTORE_REDIRECT_URI") or leitor.texto("MERCADO_LIVRE_REDIRECT_URI")
+    parsed_uri = urlparse(str(redirect_uri or "").strip())
+    url_base_publica = (
+        f"{parsed_uri.scheme}://{parsed_uri.netloc}" if parsed_uri.scheme in ("https", "http") and parsed_uri.netloc else ""
+    )
+
     publicar_na_quickstore = PublicarNaQuickStore(
         conectar,
         gateways["quickstore"],
@@ -166,6 +175,8 @@ def criar_app(
         analises,
         preparador,
         produtos=repositorio_produtos,
+        midia=midia_fotos,
+        url_base_publica=url_base_publica,
     )
 
     casos = CasosDeUso(
@@ -197,6 +208,7 @@ def criar_app(
             relogio,
             sincronizadores=(SincronizadorQuickStore(publicar_na_quickstore),),
         ),
+        midia_fotos=midia_fotos,
     )
 
     documentacao_ativa = leitor.booleano("DOCUMENTACAO_API_ATIVA", False)

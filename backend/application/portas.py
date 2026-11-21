@@ -245,3 +245,12 @@ class GatewayWebhookQuickStore(Protocol):
     def obter_anuncio(self, access_token: str, item_id: str) -> dict[str, Any]: ...
 
 
+class RepositorioDeMidia(Protocol):
+    """Armazenamento persistente de fotos de anúncios servidas via URL pública https://."""
+
+    def salvar(self, vendedor_id: int | None, conteudo: bytes, content_type: str = "image/jpeg") -> str: ...
+
+    def obter(self, foto_id: str) -> tuple[bytes, str] | None: ...
+
+
+

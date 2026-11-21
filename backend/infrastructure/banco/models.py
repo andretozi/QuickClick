@@ -15,6 +15,7 @@ from sqlalchemy import (
     ForeignKeyConstraint,
     Index,
     Integer,
+    LargeBinary,
     Numeric,
     String,
     Text,
@@ -236,3 +237,18 @@ class PublicacaoModel(Base):
                              ondelete="CASCADE"),
         Index("ux_publicacoes_externo", "vendedor_id", "canal", "id_externo", unique=True),
     )
+
+
+class MidiaFotoModel(Base):
+    """Foto JPEG sanitizada de anúncio servida via URL pública https:// para canais como a QuickStore."""
+
+    __tablename__ = "midia_fotos"
+
+    id = Column(String(36), primary_key=True)
+    vendedor_id = Column(Integer, ForeignKey("vendedores.id", ondelete="CASCADE"), nullable=True)
+    content_type = Column(String(40), nullable=False)
+    conteudo = Column(LargeBinary, nullable=False)
+    criado_em = Column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (Index("ix_midia_fotos_criado", "criado_em"),)
+
