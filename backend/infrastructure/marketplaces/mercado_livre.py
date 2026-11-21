@@ -262,24 +262,24 @@ class GatewayMercadoLivre:
         if not item_ids:
             return []
 
-        lote = item_ids[:20]
-        respostas = self._executar_requisicao(
-            "GET",
-            f"{URL_API_BASE}/items",
-            access_token=access_token,
-            params={"ids": ",".join(lote)},
-            mensagem_erro="Falha ao buscar detalhes dos anúncios no Mercado Livre",
-        )
-
         produtos = []
-        for item_bloco in respostas:
-            if item_bloco.get("code") == 200:
-                body = item_bloco.get("body", {})
-                sub_status = body.get("sub_status") or []
-                if isinstance(sub_status, list) and "deleted" in sub_status:
-                    continue
-                descricao = self._ler_descricao(access_token, str(body.get("id") or ""))
-                produtos.append(_resumo_do_item(body, descricao))
+        for inicio in range(0, len(item_ids), 20):
+            lote = item_ids[inicio : inicio + 20]
+            respostas = self._executar_requisicao(
+                "GET",
+                f"{URL_API_BASE}/items",
+                access_token=access_token,
+                params={"ids": ",".join(lote)},
+                mensagem_erro="Falha ao buscar detalhes dos anúncios no Mercado Livre",
+            )
+            for item_bloco in respostas:
+                if item_bloco.get("code") == 200:
+                    body = item_bloco.get("body", {})
+                    sub_status = body.get("sub_status") or []
+                    if isinstance(sub_status, list) and "deleted" in sub_status:
+                        continue
+                    descricao = self._ler_descricao(access_token, str(body.get("id") or ""))
+                    produtos.append(_resumo_do_item(body, descricao))
         return produtos
 
     def obter_anuncio(self, access_token: str, item_id: str) -> dict[str, Any]:

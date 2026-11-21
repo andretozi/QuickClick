@@ -15,6 +15,7 @@ from backend.application.casos_de_uso.publicar_comum import (
     executar_excluir,
     subir_imagens_no_canal,
     verificar_duplicidade_no_canal,
+    vincular_publicacao_no_produto,
 )
 from backend.application.ia.modelos import ArquivoDeFoto, FotoPreparada
 from backend.application.ia.portas import FontePrecosMarketplace, PreparadorDeFotos, RepositorioDeAnalises
@@ -281,6 +282,16 @@ class PublicarNaQuickStore:
                         "mensagem": "O anúncio foi criado, mas a descrição não entrou. Confira na QuickStore.",
                     }
                 )
+        vincular_publicacao_no_produto(
+            self._produtos,
+            vendedor_id,
+            dados.produto_id,
+            canal=QUICKSTORE,
+            id_externo=item_id,
+            status_externo=criado.get("status"),
+            permalink=criado.get("permalink"),
+            categoria_id=categoria_id,
+        )
         return {
             "id": item_id,
             "permalink": criado.get("permalink"),

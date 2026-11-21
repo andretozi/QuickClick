@@ -17,6 +17,15 @@ import {
 export const ML_CHANNEL = 'mercado-livre';
 const QS_CHANNEL = 'quickstore';
 
+const mlCandidateTitles = (mlItem) => {
+  const candidates = new Set();
+  for (const raw of [mlItem?.title, mlItem?.family_name]) {
+    const norm = normalizeTitle(raw);
+    if (norm) candidates.add(norm);
+  }
+  return candidates;
+};
+
 export function applyMlItemToStoreRecord(existing, mlItem) {
   const now = nowIso();
   const closed = isClosedExternalStatus(mlItem.status);
@@ -30,7 +39,14 @@ export function applyMlItemToStoreRecord(existing, mlItem) {
     Array.isArray(mlItem.attributes) && mlItem.attributes.length
       ? mlItem.attributes.map((a) => ({ id: a.id ?? null, nome: a.name ?? a.id ?? '', valor: a.value ?? '' }))
       : (existing?.atributos ?? []);
-  const title = String(mlItem.title || existing?.titulo || '').trim();
+  const existingTitle = String(existing?.titulo || '').trim();
+  const preserveSharedTitle =
+    Boolean(existingTitle) &&
+    Boolean(mlItem?.family_name) &&
+    normalizeTitle(mlItem.family_name) === normalizeTitle(existingTitle);
+  const title = preserveSharedTitle
+    ? existingTitle
+    : String(mlItem.title || mlItem.family_name || existingTitle).trim();
   const description =
     mlItem.description !== undefined && mlItem.description !== ''
       ? String(mlItem.description)
@@ -101,24 +117,46 @@ export function applyMlItemToStoreRecord(existing, mlItem) {
 
 /**
  * Casa os itens do Mercado Livre com os registros: pelo ml_item_id e, sem ele, pelo título
- * normalizado. Os já casados ficam marcados por id (não por posição, que anda quando um item novo
- * entra no topo): dois itens de mesmo título nunca caem no mesmo anúncio.
+ * normalizado (ou family_name em User Products). Os já casados ficam marcados por id (não por
+ * posição, que anda quando um item novo entra no topo): dois itens de mesmo título nunca caem no mesmo anúncio.
  */
-export function matchMlItems(records, mlProducts) {
+export function matchMlItems(records, mlProducts, options = {}) {
   const next = [...records];
   const matched = new Set();
   const list = mlProducts ?? [];
+  const protectedIds = options?.protectedIds ?? null;
   const seenIds = new Set(list.map((item) => asExternalId(item?.id)).filter(Boolean));
   for (const mlItem of list) {
     const extId = asExternalId(mlItem?.id);
     if (!extId) continue;
     let index = next.findIndex((item) => asExternalId(item.ml_item_id) === extId);
     if (index < 0) {
-      const targetTitle = normalizeTitle(mlItem.title);
-      index = next.findIndex(
-        (item) =>
-          !matched.has(item.id) && !asExternalId(item.ml_item_id) && normalizeTitle(item.titulo) === targetTitle
-      );
+      const candidateTitles = mlCandidateTitles(mlItem);
+      if (candidateTitles.size > 0) {
+        index = next.findIndex(
+          (item) =>
+            !matched.has(item.id) &&
+            !asExternalId(item.ml_item_id) &&
+            candidateTitles.has(normalizeTitle(item.titulo))
+        );
+      }
+      if (index < 0) {
+        const mlTitleNorm = normalizeTitle(mlItem.title);
+        if (mlTitleNorm) {
+          const prefixCandidates = [];
+          for (let i = 0; i < next.length; i += 1) {
+            const item = next[i];
+            if (matched.has(item.id) || asExternalId(item.ml_item_id)) continue;
+            const recTitleNorm = normalizeTitle(item.titulo);
+            if (recTitleNorm.length >= 10 && mlTitleNorm.startsWith(`${recTitleNorm} `)) {
+              prefixCandidates.push(i);
+            }
+          }
+          if (prefixCandidates.length === 1) {
+            index = prefixCandidates[0];
+          }
+        }
+      }
     }
     if (index < 0 && isClosedExternalStatus(mlItem.status)) continue;
     const updated = applyMlItemToStoreRecord(index >= 0 ? next[index] : null, mlItem);
@@ -129,7 +167,7 @@ export function matchMlItems(records, mlProducts) {
   const canClearMissing = list.length < 50;
   return next.map((record) => {
     const recId = asExternalId(record.ml_item_id);
-    if (!recId || seenIds.has(recId) || !canClearMissing) return record;
+    if (!recId || seenIds.has(recId) || !canClearMissing || protectedIds?.has(recId)) return record;
     return {
       ...record,
       ml_item_id: null,

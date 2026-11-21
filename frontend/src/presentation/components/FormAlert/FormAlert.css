@@ -1,6 +1,6 @@
 /* ==================================================================
    Bloco: form-alert
-   Tom: --error
+   Tons: --error, --info
    ================================================================== */
 .form-alert {
   --alert-rgb: var(--rgb-coral-deep);
@@ -13,6 +13,16 @@
   background: rgb(var(--alert-rgb) / 0.09);
   box-shadow: inset 0 0 0 1px rgb(var(--alert-rgb) / 0.22);
   color: var(--color-ink);
+}
+
+.form-alert--info {
+  --alert-rgb: var(--rgb-honey);
+  --alert-fg: var(--color-honey-dark);
+}
+
+.form-alert__body {
+  flex: 1;
+  min-width: 0;
 }
 
 .form-alert__icon {
@@ -40,4 +50,40 @@
   font-size: 13.5px;
   font-weight: 600;
   line-height: 1.5;
+}
+
+/* Adaptação de contraste quando o FormAlert aparece sobre superfícies escuras */
+:is(
+  .app-shell__main > .form-alert,
+  .listing-editor > .form-alert,
+  .dashboard > .form-alert,
+  .panel--glass .form-alert,
+  .section--dark .form-alert
+) {
+  --alert-rgb: var(--rgb-coral);
+  --alert-fg: var(--color-coral-glow);
+  color: var(--color-cream);
+  background: rgb(var(--alert-rgb) / 0.14);
+  box-shadow: inset 0 0 0 1px rgb(var(--alert-rgb) / 0.34);
+}
+
+:is(
+  .app-shell__main > .form-alert--info,
+  .listing-editor > .form-alert--info,
+  .dashboard > .form-alert--info,
+  .panel--glass .form-alert--info,
+  .section--dark .form-alert--info
+) {
+  --alert-rgb: var(--rgb-honey);
+  --alert-fg: var(--color-honey);
+}
+
+:is(
+  .app-shell__main > .form-alert,
+  .listing-editor > .form-alert,
+  .dashboard > .form-alert,
+  .panel--glass .form-alert,
+  .section--dark .form-alert
+) .form-alert__text {
+  color: rgb(var(--rgb-cream) / 0.86);
 }

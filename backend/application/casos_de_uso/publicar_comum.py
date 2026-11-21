@@ -5,7 +5,8 @@ Aplicação · Estruturas e utilitários agnósticos de canal para publicação 
 import ipaddress
 import logging
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlparse
 
@@ -15,6 +16,7 @@ from backend.application.portas import FalhaNoMarketplace, PublicadorDeCanal, Re
 from backend.domain.erros import PublicacaoRecusada
 from backend.domain.ia.escrita import cortar_titulo
 from backend.domain.ia.leitura import normalizar_chave
+from backend.domain.produto import Publicacao
 
 log = logging.getLogger("quickclick.marketplaces")
 
@@ -244,6 +246,76 @@ def verificar_duplicidade_no_canal(
                 ],
                 canal=canal,
             )
+
+
+def vincular_publicacao_no_produto(
+    produtos: RepositorioDeProdutos | None,
+    vendedor_id: int,
+    produto_id: str | None,
+    *,
+    canal: str,
+    id_externo: str,
+    status_externo: str | None = None,
+    permalink: str | None = None,
+    categoria_id: str | None = None,
+) -> None:
+    id_limpo = str(id_externo or "").strip()
+    if not produto_id or produtos is None or not id_limpo:
+        return
+    obter = getattr(produtos, "obter", None)
+    salvar = getattr(produtos, "salvar", None)
+    if not callable(obter) or not callable(salvar):
+        return
+    try:
+        produto = obter(vendedor_id, produto_id)
+        if produto is None:
+            return
+        st_bruto = str(status_externo or "").strip().lower()
+        if st_bruto in ("paused", "under_review", "pausado"):
+            status_interno = "pausado"
+        elif st_bruto in ("closed", "inactive", "nao_publicado"):
+            status_interno = "nao_publicado"
+        else:
+            status_interno = "publicado"
+        link_str = str(permalink or "").strip()
+        link_valido = link_str if link_str.startswith("https://") and len(link_str) <= 500 else None
+        cat_str = str(categoria_id or "").strip() or None
+
+        novas_pubs: list[Publicacao] = []
+        encontrou = False
+        for pub in produto.publicacoes:
+            if pub.canal == canal:
+                encontrou = True
+                novas_pubs.append(
+                    Publicacao(
+                        canal=canal,
+                        status=status_interno,
+                        id_externo=id_limpo,
+                        permalink=link_valido or pub.permalink,
+                        categoria_id=cat_str or pub.categoria_id,
+                        saude=pub.saude,
+                        vendidos=pub.vendidos,
+                        preco_centavos=pub.preco_centavos,
+                    )
+                )
+            else:
+                novas_pubs.append(pub)
+        if not encontrou:
+            novas_pubs.append(
+                Publicacao(
+                    canal=canal,
+                    status=status_interno,
+                    id_externo=id_limpo,
+                    permalink=link_valido,
+                    categoria_id=cat_str,
+                )
+            )
+        agora = datetime.now(UTC)
+        agora = agora.replace(microsecond=(agora.microsecond // 1000) * 1000)
+        atualizado = replace(produto, publicacoes=tuple(novas_pubs))
+        salvar(vendedor_id, atualizado, agora)
+    except Exception as erro:
+        log.warning("Não foi possível persistir vínculo de %s (%s) no produto %s: %s", canal, id_limpo, produto_id, erro)
 
 
 def subir_imagens_no_canal(
