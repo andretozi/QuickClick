@@ -192,8 +192,15 @@ def criar_app(
         moderar_contas=ModerarContas(usuarios, moderacao, contas, relogio=relogio),
         trocar_plano=TrocarPlano(vendedores, usuarios, livre=leitor.booleano("TROCA_DE_PLANO_LIVRE", False)),
         analises_ia=analises_ia,
-        publicar_no_mercado_livre=PublicarNoMercadoLivre(conectar, gateways["mercado-livre"], fonte_ml, analises,
-                                                         preparador, produtos=repositorio_produtos),
+        publicar_no_mercado_livre=PublicarNoMercadoLivre(
+            conectar,
+            gateways["mercado-livre"],
+            fonte_ml,
+            analises,
+            preparador,
+            produtos=repositorio_produtos,
+            midia=midia_fotos,
+        ),
         publicar_na_quickstore=publicar_na_quickstore,
         webhook_quickstore=ProcessarWebhookQuickStore(
             gateway_quickstore=gateways["quickstore"],

@@ -286,6 +286,286 @@ class TestPublicarNoMercadoLivre(unittest.TestCase):
         with self.assertRaises(ValueError):
             publicar.executar(1, {**ANUNCIO, "titulo": " "}, fotos(1))
 
+    def test_ignora_atributos_somente_leitura_e_mapeia_unissex_para_sem_genero(self):
+        da_categoria = [
+            AtributoML.de_api({
+                "id": "FILTRABLE_SIZE",
+                "name": "Tamanho filtrável",
+                "tags": {},  # simula cache antigo de 24h sem a tag read_only
+                "values": [{"id": "40", "name": "40"}],
+                "value_type": "string",
+            }),
+            AtributoML.de_api({
+                "id": "CUSTOM_READONLY",
+                "name": "Campo interno",
+                "tags": {"read_only": True, "hidden": True},
+                "values": [{"id": "1", "name": "Preto"}],
+                "value_type": "list",
+            }),
+            AtributoML.de_api({
+                "id": "GENDER",
+                "name": "Gênero",
+                "tags": {"required": True, "catalog_required": True},
+                "values": [
+                    {"id": "339665", "name": "Feminino"},
+                    {"id": "339666", "name": "Masculino"},
+                    {"id": "110461", "name": "Sem gênero"},
+                ],
+                "value_type": "list",
+            }),
+            AtributoML.de_api({
+                "id": "COLOR",
+                "name": "Cor",
+                "tags": {"allow_variations": True},
+                "values": [{"id": "52049", "name": "Preto"}],
+                "value_type": "string",
+            }),
+            AtributoML.de_api({
+                "id": "SIZE",
+                "name": "Tamanho",
+                "tags": {"allow_variations": True, "required": True},
+                "values": [],
+                "value_type": "string",
+            }),
+            AtributoML.de_api({
+                "id": "BRAND",
+                "name": "Marca",
+                "tags": {"required": True},
+                "values": [],
+                "value_type": "string",
+            }),
+        ]
+
+        ligados = completar_para_publicacao(
+            ligar_confirmados([("marca", "Havaianas"), ("genero", "Unissex")], da_categoria, {}),
+            da_categoria,
+            "Chinelo Havaianas Preto Tamanho 40 Unissex Borracha",
+        )
+        por_id = {l.id: l.para_api() for l in ligados}
+        self.assertNotIn("FILTRABLE_SIZE", por_id)
+        self.assertNotIn("CUSTOM_READONLY", por_id)
+        self.assertEqual(por_id["GENDER"], {"id": "GENDER", "value_id": "110461"})
+        self.assertEqual(por_id["COLOR"], {"id": "COLOR", "value_id": "52049"})
+        self.assertEqual(por_id["SIZE"], {"id": "SIZE", "value_name": "40"})
+
+        # Também funciona quando o gênero só aparece no título ("Unissex")
+        ligados_do_titulo = completar_para_publicacao(
+            ligar_confirmados([("marca", "Havaianas")], da_categoria, {}),
+            da_categoria,
+            "Chinelo Havaianas Preto Tamanho 40 Unissex Borracha",
+        )
+        por_id_titulo = {l.id: l.para_api() for l in ligados_do_titulo}
+        self.assertEqual(por_id_titulo["GENDER"], {"id": "GENDER", "value_id": "110461"})
+        self.assertNotIn("FILTRABLE_SIZE", por_id_titulo)
+
+    def test_causas_prioriza_erro_real_sobre_warning_do_mercado_livre(self):
+        erro = FalhaNoMarketplace(
+            "400",
+            400,
+            {
+                "message": "Validation error",
+                "cause": [
+                    {
+                        "type": "warning",
+                        "code": "item.attributes.ignored",
+                        "message": "Attribute [FILTRABLE_SIZE] ignored because it is not modifiable.",
+                    },
+                    {
+                        "type": "error",
+                        "code": "missing.fashion_grid.grid_id.values",
+                        "message": "Attribute [SIZE_GRID_ID] is required.",
+                    },
+                ],
+            },
+        )
+        publicar, _ = caso(PublicadorFalso(erros_ao_publicar=[erro]))
+        with self.assertRaises(PublicacaoRecusada) as recusa:
+            publicar.executar(1, ANUNCIO, fotos(1))
+        self.assertEqual(recusa.exception.detalhes, ["Attribute [SIZE_GRID_ID] is required."])
+
+        # Se a API só devolver warnings, ainda preserva a mensagem como fallback
+        so_warning = FalhaNoMarketplace(
+            "400",
+            400,
+            {"cause": [{"type": "warning", "message": "Only warning"}]},
+        )
+        publicar_aviso, _ = caso(PublicadorFalso(erros_ao_publicar=[so_warning]))
+        with self.assertRaises(PublicacaoRecusada) as recusa_aviso:
+            publicar_aviso.executar(1, ANUNCIO, fotos(1))
+        self.assertEqual(recusa_aviso.exception.detalhes, ["Only warning"])
+
+    def test_resolve_guia_de_tamanho_e_reenvia_com_variacoes_para_calcados(self):
+        atributos_calcado = [
+            AtributoML.de_api({"id": "BRAND", "name": "Marca", "tags": {"required": True}, "value_type": "string"}),
+            AtributoML.de_api({"id": "MODEL", "name": "Modelo", "tags": {"required": True}, "value_type": "string"}),
+            AtributoML.de_api({
+                "id": "GENDER",
+                "name": "Gênero",
+                "tags": {"required": True},
+                "values": [{"id": "110461", "name": "Sem gênero"}],
+                "value_type": "list",
+            }),
+            AtributoML.de_api({
+                "id": "COLOR",
+                "name": "Cor",
+                "tags": {"allow_variations": True},
+                "values": [{"id": "52049", "name": "Preto"}],
+                "value_type": "string",
+            }),
+            AtributoML.de_api({
+                "id": "SIZE",
+                "name": "Tamanho",
+                "tags": {"allow_variations": True, "required": True},
+                "value_type": "string",
+            }),
+            AtributoML.de_api({
+                "id": "FILTRABLE_SIZE",
+                "name": "Tamanho filtrável",
+                "tags": {"read_only": True, "hidden": True},
+                "values": [{"id": "40", "name": "40"}],
+                "value_type": "string",
+            }),
+            AtributoML.de_api({"id": "SIZE_GRID_ID", "name": "Guia de tamanhos", "value_type": "grid_id"}),
+            AtributoML.de_api({
+                "id": "SIZE_GRID_ROW_ID",
+                "name": "Linha da guia",
+                "tags": {"variation_attribute": True},
+                "value_type": "grid_row_id",
+            }),
+        ]
+
+        class FonteCalcado(FonteMLFalsa):
+            def atributos_da_categoria(self, categoria_id, token):
+                return atributos_calcado
+
+        class PublicadorComGuia(PublicadorFalso):
+            def __init__(self, **kwargs):
+                super().__init__(**kwargs)
+                self.consultas_guia = []
+
+            def obter_categoria(self, categoria_id, token):
+                return {"id": categoria_id, "settings": {"catalog_domain": "MLB-SANDALS_AND_CLOGS"}}
+
+            def buscar_guias_de_tamanho(self, token, domain_id, site_id, atributos, *, seller_id=None, tipo=None):
+                self.consultas_guia.append((domain_id, site_id, tipo, seller_id, atributos))
+                if tipo == "BRAND":
+                    return [
+                        {
+                            "id": "987654",
+                            "rows": [
+                                {"id": "987654:1", "attributes": [{"id": "SIZE", "values": [{"name": "37/38"}]}]},
+                                {
+                                    "id": "987654:2",
+                                    "attributes": [
+                                        {"id": "SIZE", "values": [{"id": "319001", "name": "39/40"}]},
+                                        {"id": "BR_SIZE", "values": [{"name": "40 BR"}]},
+                                    ],
+                                },
+                            ],
+                        }
+                    ]
+                return []
+
+        erro_variacoes = FalhaNoMarketplace(
+            "400",
+            400,
+            {"cause": [{"type": "error", "code": "item.variations.required", "message": "allow_variations must be in variations"}]},
+        )
+        publicador = PublicadorComGuia(erros_ao_publicar=[erro_variacoes])
+        contas = RepositorioContasEmMemoria()
+        contas.salvar(ContaVinculada(
+            1, "mercado-livre", AGORA,
+            CredenciaisOAuth("tok", "ref", AGORA + timedelta(days=3650), conta_externa_id="1001"),
+        ))
+        conectar = ConectarMarketplace(
+            RepositorioVendedoresEmMemoria(Vendedor(1, "Loja", GRATIS)),
+            contas,
+            {"mercado-livre": GatewayFalso()},
+        )
+        publicar = PublicarNoMercadoLivre(
+            conectar,
+            publicador,
+            FonteCalcado(),
+            AnalisesFalsas({}),
+            PillowPreparador(),
+        )
+
+        anuncio_chinelo = {
+            "titulo": "Chinelo Havaianas Preto Tamanho 40 Unissex Borracha",
+            "descricao": "Chinelo original.",
+            "preco_centavos": 50000,
+            "estoque": 1,
+            "condicao": "novo",
+            "ml_categoria_id": "MLB273770",
+            "atributos": [{"chave": "marca", "valor": "Havaianas"}, {"chave": "genero", "valor": "Unissex"}],
+        }
+        resultado = publicar.executar(1, anuncio_chinelo, fotos(1))
+        self.assertEqual(resultado["id"], "MLB123456")
+        self.assertEqual(len(publicador.itens), 2)
+
+        primeiro = {a["id"]: a for a in publicador.itens[0]["attributes"]}
+        self.assertNotIn("FILTRABLE_SIZE", primeiro)
+        self.assertEqual(primeiro["GENDER"], {"id": "GENDER", "value_id": "110461"})
+        self.assertEqual(primeiro["SIZE_GRID_ID"], {"id": "SIZE_GRID_ID", "value_name": "987654"})
+        self.assertEqual(primeiro["SIZE_GRID_ROW_ID"], {"id": "SIZE_GRID_ROW_ID", "value_name": "987654:2"})
+        self.assertEqual(primeiro["SIZE"], {"id": "SIZE", "value_id": "319001"})
+
+        segundo = publicador.itens[1]
+        self.assertNotIn("price", segundo)
+        self.assertNotIn("available_quantity", segundo)
+        self.assertEqual(len(segundo["variations"]), 1)
+        variacao = segundo["variations"][0]
+        self.assertEqual(variacao["price"], 500.0)
+        self.assertEqual(variacao["available_quantity"], 1)
+        self.assertEqual(variacao["picture_ids"], ["IMG1"])
+        comb_ids = {a["id"] for a in variacao["attribute_combinations"]}
+        self.assertEqual(comb_ids, {"COLOR", "SIZE"})
+        var_attr_ids = {a["id"] for a in variacao["attributes"]}
+        self.assertIn("SIZE_GRID_ROW_ID", var_attr_ids)
+        raiz_ids = {a["id"] for a in segundo["attributes"]}
+        self.assertIn("SIZE_GRID_ID", raiz_ids)
+        self.assertNotIn("COLOR", raiz_ids)
+        self.assertNotIn("SIZE", raiz_ids)
+
+    def test_sobe_foto_local_da_quickstore_direto_para_o_mercado_livre(self):
+        foto_id = "a" * 32
+        conteudo_jpeg = jpeg(foto_com_detalhes())
+
+        class MidiaEmMemoria:
+            def salvar(self, vendedor_id, conteudo, content_type="image/jpeg"):
+                return foto_id
+
+            def obter(self, fid):
+                return (conteudo_jpeg, "image/jpeg") if fid == foto_id else None
+
+        contas = RepositorioContasEmMemoria()
+        contas.salvar(ContaVinculada(
+            1, "mercado-livre", AGORA,
+            CredenciaisOAuth("tok", "ref", AGORA + timedelta(days=3650), conta_externa_id="1001"),
+        ))
+        conectar = ConectarMarketplace(
+            RepositorioVendedoresEmMemoria(Vendedor(1, "Loja", GRATIS)),
+            contas,
+            {"mercado-livre": GatewayFalso()},
+        )
+        publicador = PublicadorFalso()
+        publicar = PublicarNoMercadoLivre(
+            conectar,
+            publicador,
+            FonteMLFalsa(),
+            AnalisesFalsas({}),
+            PillowPreparador(),
+            midia=MidiaEmMemoria(),
+        )
+        anuncio_com_midia_local = {
+            **ANUNCIO,
+            "fotos_mantidas": [f"https://quickclick.azurewebsites.net/api/quickstore/midia/{foto_id}.jpg"],
+        }
+        resultado = publicar.executar(1, anuncio_com_midia_local, [])
+        self.assertEqual(resultado["id"], "MLB123456")
+        self.assertEqual(publicador.imagens, ["foto1.jpg"])
+        self.assertEqual(publicador.itens[0]["pictures"], [{"id": "IMG1"}])
+
 
 class TestRotaDePublicacao(BaseIA):
     def setUp(self):

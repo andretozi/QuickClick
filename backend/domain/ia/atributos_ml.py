@@ -38,6 +38,66 @@ IDS_QUANTIDADE_ML = ("UNITS_PER_PACK", "UNITS_PER_PACKAGE", "PACKAGE_QUANTITY")
 # Obrigatórios que completar_para_publicacao preenche sozinho (o GTIN fica coberto pelo EMPTY_GTIN_REASON)
 PREENCHIDOS_NA_PUBLICACAO_ML = frozenset({"BRAND", "MANUFACTURER", "MODEL", "SALE_FORMAT", "UNITS_PER_PACK",
                                           "IS_SET", "EMPTY_GTIN_REASON", "GTIN"})
+# Atributos gerenciados/calculados pelo próprio Mercado Livre (read_only/non_modifiable).
+# Mantemos essa lista como rede de segurança além das tags da API para proteger caches antigos de 24h.
+IDS_SOMENTE_LEITURA_ML = frozenset({
+    "FILTRABLE_SIZE",
+    "SIZE_COVERAGE",
+    "PACKAGE_HEIGHT",
+    "PACKAGE_WIDTH",
+    "PACKAGE_LENGTH",
+    "PACKAGE_WEIGHT",
+    "SELLER_PACKAGE_DATA_SOURCE",
+    "IS_HIGHLIGHT_BRAND",
+    "VALUE_ADDED_TAX",
+    "IMPORT_DUTY",
+    "HAZMAT_TRANSPORTABILITY",
+    "DESCRIPTIVE_TAGS",
+    "PRODUCT_CHEMICAL_FEATURES",
+    "FOODS_AND_DRINKS",
+    "MEDICINES",
+    "BATTERIES_FEATURES",
+    "SHIPMENT_PACKING",
+    "ADDITIONAL_INFO_REQUIRED",
+    "EXCLUDED_PLATFORMS",
+    "IS_SUITABLE_FOR_SHIPMENT",
+    "LIMITED_MARKETPLACE_VISIBILITY_REASONS",
+    "HAS_COMPATIBILITIES",
+    "CATALOG_TITLE",
+    "SEARCH_ENHANCEMENT_FIELDS",
+    "PRODUCT_FEATURES",
+    "IS_NEW_OFFER",
+    "SYI_PYMES_ID",
+    "IS_FLAMMABLE",
+})
+# Sinônimos comuns para atributos de lista fechada do ML Brasil (ex.: GENDER não aceita "Unissex", só "Sem gênero")
+ALIASES_VALORES_ML: dict[str, dict[str, str]] = {
+    "GENDER": {
+        "unissex": "sem genero",
+        "unisex": "sem genero",
+        "neutro": "sem genero",
+        "neutra": "sem genero",
+        "ambos": "sem genero",
+        "todos": "sem genero",
+        "sem genero": "sem genero",
+        "genero neutro": "sem genero",
+        "unissex infantil": "sem genero infantil",
+        "infantil unissex": "sem genero infantil",
+        "infantil": "sem genero infantil",
+        "masculino": "masculino",
+        "masculina": "masculino",
+        "homem": "masculino",
+        "homens": "masculino",
+        "feminino": "feminino",
+        "feminina": "feminino",
+        "mulher": "feminino",
+        "mulheres": "feminino",
+        "menino": "meninos",
+        "meninos": "meninos",
+        "menina": "meninas",
+        "meninas": "meninas",
+    },
+}
 UNIDADES_CANONICAS = {"ml": "mL", "l": "L", "cc": "cc", "cm": "cm", "mm": "mm", "m": "m", "g": "g", "kg": "kg"}
 
 
@@ -60,19 +120,43 @@ class AtributoML:
     valores: tuple[tuple[str, str], ...] = ()  # (id do valor, nome do valor), quando a lista é fechada
     unidade_padrao: str = ""
     tipo_valor: str = ""  # value_type do ML (string, number, number_unit, list, boolean); vazio no cache antigo
+    somente_leitura: bool = False
+    oculto: bool = False
+    permite_variacao: bool = False
+    atributo_de_variacao: bool = False
 
     @staticmethod
     def de_api(bruto: dict[str, Any]) -> "AtributoML":
         tags = bruto.get("tags") or {}
-        obrigatorio = bool(tags.get("required") or tags.get("catalog_required")) if isinstance(tags, dict) else False
+        tags_dict = tags if isinstance(tags, dict) else {}
+        attr_id = str(bruto.get("id"))
+        obrigatorio = bool(tags_dict.get("required") or tags_dict.get("catalog_required"))
+        somente_leitura = bool(
+            tags_dict.get("read_only")
+            or tags_dict.get("non_modifiable")
+            or attr_id in IDS_SOMENTE_LEITURA_ML
+        )
+        oculto = bool(tags_dict.get("hidden"))
+        permite_variacao = bool(tags_dict.get("allow_variations"))
+        atributo_de_variacao = bool(tags_dict.get("variation_attribute"))
         valores = tuple(
             (str(v.get("id")), str(v.get("name")))
             for v in bruto.get("values") or []
             if isinstance(v, dict) and v.get("id") and v.get("name")
         )
         unidade = str(bruto.get("default_unit") or "").strip()
-        return AtributoML(id=str(bruto.get("id")), nome=str(bruto.get("name") or ""), obrigatorio=obrigatorio,
-                          valores=valores, unidade_padrao=unidade, tipo_valor=str(bruto.get("value_type") or "").strip())
+        return AtributoML(
+            id=attr_id,
+            nome=str(bruto.get("name") or ""),
+            obrigatorio=obrigatorio,
+            valores=valores,
+            unidade_padrao=unidade,
+            tipo_valor=str(bruto.get("value_type") or "").strip(),
+            somente_leitura=somente_leitura,
+            oculto=oculto,
+            permite_variacao=permite_variacao,
+            atributo_de_variacao=atributo_de_variacao,
+        )
 
 
 @dataclass(frozen=True)
@@ -94,7 +178,15 @@ def _valor_id(atributo: AtributoML, valor: str) -> str | None:
     if exato is not None:
         return exato
     alvo_neutro = _neutro(valor)
-    return next((vid for vid, nome in atributo.valores if _neutro(nome) == alvo_neutro), None)
+    por_neutro = next((vid for vid, nome in atributo.valores if _neutro(nome) == alvo_neutro), None)
+    if por_neutro is not None:
+        return por_neutro
+    aliases = ALIASES_VALORES_ML.get(atributo.id)
+    if aliases:
+        canonico = aliases.get(alvo) or aliases.get(alvo_neutro)
+        if canonico:
+            return next((vid for vid, nome in atributo.valores if _normalizar(nome) == canonico), None)
+    return None
 
 
 def _formatar_valor(atributo: AtributoML, valor: str) -> str:
@@ -120,8 +212,9 @@ def _formatar_valor(atributo: AtributoML, valor: str) -> str:
 def ligar_por_regra(confirmados: list[tuple[str, str]], da_categoria: list[AtributoML]
                     ) -> tuple[list[AtributoLigado], list[tuple[str, str]]]:
     """(ligados, sobras). Um atributo do Mercado Livre recebe no máximo um valor."""
-    por_id = {a.id: a for a in da_categoria}
-    por_nome = {_normalizar(a.nome): a for a in da_categoria if a.nome}
+    editaveis = [a for a in da_categoria if not a.somente_leitura]
+    por_id = {a.id: a for a in editaveis}
+    por_nome = {_normalizar(a.nome): a for a in editaveis if a.nome}
     ligados: dict[str, AtributoLigado] = {}
     sobras = []
     for chave, valor in confirmados:
@@ -141,8 +234,9 @@ def ligar_por_regra(confirmados: list[tuple[str, str]], da_categoria: list[Atrib
 def ligar_sugestoes_da_ia(sugestoes: list[dict[str, Any]], sobras: list[tuple[str, str]],
                           da_categoria: list[AtributoML], ja_ligados: list[AtributoLigado]) -> list[AtributoLigado]:
     """Aceita da IA só ligações para IDs que existem na categoria, ainda livres, com chave das sobras."""
-    por_id = {a.id: a for a in da_categoria}
-    livres = {a.id for a in da_categoria} - {l.id for l in ja_ligados}
+    editaveis = [a for a in da_categoria if not a.somente_leitura]
+    por_id = {a.id: a for a in editaveis}
+    livres = {a.id for a in editaveis} - {l.id for l in ja_ligados}
     valores = dict(sobras)
     saida = []
     for sugestao in sugestoes if isinstance(sugestoes, list) else []:
@@ -158,7 +252,7 @@ def ligar_sugestoes_da_ia(sugestoes: list[dict[str, Any]], sobras: list[tuple[st
 
 def obrigatorios_faltando(da_categoria: list[AtributoML], ligados: list[AtributoLigado]) -> list[AtributoML]:
     preenchidos = {l.id for l in ligados}
-    return [a for a in da_categoria if a.obrigatorio and a.id not in preenchidos]
+    return [a for a in da_categoria if a.obrigatorio and not a.somente_leitura and not a.oculto and a.id not in preenchidos]
 
 
 def chave_do_atributo_ml(atributo: AtributoML) -> str:
@@ -190,7 +284,7 @@ def ligar_confirmados(confirmados: list[tuple[str, str]], da_categoria: list[Atr
                       mapa: dict[str, str]) -> list[AtributoLigado]:
     """Na confirmação: regra primeiro; o que sobrar usa o mapa guardado na leitura (sem chamar a IA de novo)."""
     ligados, sobras = ligar_por_regra(confirmados, da_categoria)
-    por_id = {a.id: a for a in da_categoria}
+    por_id = {a.id: a for a in da_categoria if not a.somente_leitura}
     usados = {l.id for l in ligados}
     for chave, valor in sobras:
         ml_id = mapa.get(chave)
@@ -225,20 +319,82 @@ def _definir_ou_substituir(saida: list[AtributoLigado], usados: dict[str, Atribu
     usados[novo.id] = novo
 
 
+def _valor_canonico_por_id(atributo: AtributoML, valor_id: str) -> str:
+    return next((nome for vid, nome in atributo.valores if vid == valor_id), "")
+
+
+def _inferir_genero_do_titulo(atributo: AtributoML, titulo: str) -> AtributoLigado | None:
+    aliases = ALIASES_VALORES_ML.get("GENDER", {})
+    norm = _normalizar(titulo)
+    if norm:
+        palavras = norm.split()
+        # Testa frases de 2 palavras antes de palavras isoladas (ex.: "unissex infantil" antes de "unissex")
+        candidatos = [f"{palavras[i]} {palavras[i + 1]}" for i in range(len(palavras) - 1)] + palavras
+        for termo in candidatos:
+            canonico = aliases.get(termo)
+            if canonico:
+                vid = next((v for v, nome in atributo.valores if _normalizar(nome) == canonico), None)
+                if vid is not None:
+                    return AtributoLigado("GENDER", _valor_canonico_por_id(atributo, vid), vid)
+    if atributo.obrigatorio:
+        vid = _valor_id(atributo, "Sem gênero")
+        if vid is not None:
+            return AtributoLigado("GENDER", _valor_canonico_por_id(atributo, vid), vid)
+    return None
+
+
+def _extrair_tamanho_do_titulo(titulo: str) -> str | None:
+    if not titulo:
+        return None
+    sem_acento = unicodedata.normalize("NFKD", titulo).encode("ascii", "ignore").decode("ascii")
+    achado = re.search(
+        r"\b(?:tamanho|tam\.?|num(?:ero)?|n[o°º]\.?)\s*([0-9]{2}(?:[/\-][0-9]{2})?|PP|P|M|G|GG|XG|XXG|EG|U)\b",
+        sem_acento,
+        flags=re.IGNORECASE,
+    )
+    if not achado:
+        return None
+    bruto = achado.group(1).strip()
+    return bruto.upper() if bruto.isalpha() else bruto
+
+
 def completar_para_publicacao(ligados: list[AtributoLigado], da_categoria: list[AtributoML],
                               titulo: str = "") -> list[AtributoLigado]:
     """Preenche na hora de publicar o que o título já diz (valores fechados e medidas) e os atributos
     estruturais do Mercado Livre (marca, fabricante, modelo, formato de venda, unidades por kit e motivo
     de GTIN vazio) que elevam a pontuação de qualidade da ficha técnica."""
-    saida = list(ligados)
     por_id = {a.id: a for a in da_categoria}
+    saida: list[AtributoLigado] = []
+    for item in ligados:
+        if item.id in IDS_SOMENTE_LEITURA_ML:
+            continue
+        atributo = por_id.get(item.id)
+        if atributo is not None and atributo.somente_leitura:
+            continue
+        if atributo is not None and item.valor_id is None and atributo.valores:
+            vid = _valor_id(atributo, item.valor)
+            if vid is not None:
+                saida.append(AtributoLigado(item.id, item.valor, vid, item.chave))
+                continue
+            if atributo.tipo_valor == "list":
+                if atributo.id == "GENDER" and atributo.obrigatorio:
+                    vid_padrao = _valor_id(atributo, "Sem gênero")
+                    if vid_padrao is not None:
+                        saida.append(
+                            AtributoLigado(item.id, _valor_canonico_por_id(atributo, vid_padrao), vid_padrao, item.chave)
+                        )
+                continue
+        saida.append(item)
+
     usados = {l.id: l for l in saida}
     palavras_titulo = set(_neutro(titulo).split())
 
     for atributo in da_categoria:
+        if atributo.somente_leitura or atributo.oculto:
+            continue
         if atributo.id in usados or not atributo.valores or not palavras_titulo:
             continue
-        if atributo.id in ("SALE_FORMAT", "IS_SET", "EMPTY_GTIN_REASON"):
+        if atributo.id in ("SALE_FORMAT", "IS_SET", "EMPTY_GTIN_REASON", "SIZE_GRID_ID", "SIZE_GRID_ROW_ID"):
             continue
         for vid, nome in atributo.valores:
             termos = _neutro(nome).split()
@@ -247,6 +403,19 @@ def completar_para_publicacao(ligados: list[AtributoLigado], da_categoria: list[
                 saida.append(ligado)
                 usados[atributo.id] = ligado
                 break
+
+    if "GENDER" in por_id and "GENDER" not in usados and not por_id["GENDER"].somente_leitura:
+        genero_inferido = _inferir_genero_do_titulo(por_id["GENDER"], titulo)
+        if genero_inferido is not None:
+            saida.append(genero_inferido)
+            usados["GENDER"] = genero_inferido
+
+    if "SIZE" in por_id and "SIZE" not in usados and not por_id["SIZE"].somente_leitura:
+        tamanho_titulo = _extrair_tamanho_do_titulo(titulo)
+        if tamanho_titulo:
+            ligado = AtributoLigado("SIZE", tamanho_titulo, _valor_id(por_id["SIZE"], tamanho_titulo))
+            saida.append(ligado)
+            usados["SIZE"] = ligado
 
     for id_cap in ("VOLUME_CAPACITY", "CAPACITY"):
         if id_cap in por_id and id_cap not in usados and titulo:
@@ -333,5 +502,6 @@ def esquema_do_ml(categoria_id: str, categoria_nome: str, atributos: list[Atribu
             valores=a.valores, unidade=a.unidade_padrao, chave=chave_do_atributo_ml(a),
         )
         for a in atributos
+        if not a.somente_leitura and not a.oculto
     )
     return EsquemaDoCanal(canal=CANAL_ML, categoria_id=categoria_id, categoria_nome=categoria_nome, campos=campos)
