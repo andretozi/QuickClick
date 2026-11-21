@@ -220,6 +220,10 @@ def ligar_por_regra(confirmados: list[tuple[str, str]], da_categoria: list[Atrib
     for chave, valor in confirmados:
         candidato = next((por_id[i] for i in SINONIMOS_ML.get(chave, ()) if i in por_id and i not in ligados), None)
         if candidato is None:
+            chave_id = chave.strip().upper()
+            if chave_id in por_id and chave_id not in ligados:
+                candidato = por_id[chave_id]
+        if candidato is None:
             candidato = por_nome.get(_normalizar(chave.replace("_", " ")))
             if candidato is not None and candidato.id in ligados:
                 candidato = None
