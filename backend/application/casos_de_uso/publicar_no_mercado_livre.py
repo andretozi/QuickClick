@@ -119,7 +119,8 @@ def _erro_tamanho_imagem_ml(corpo: Any) -> bool:
 
 def _normalizar_tamanho(texto: str) -> str:
     sem_acento = unicodedata.normalize("NFKD", str(texto or "")).encode("ascii", "ignore").decode("ascii")
-    return re.sub(r"\s+", " ", sem_acento.lower()).strip()
+    normalizado = re.sub(r"\s+", " ", sem_acento.lower()).strip()
+    return re.sub(r"\b(\d+)[.,]0+\b", r"\1", normalizado)
 
 
 def _casamento_tamanho(alvo: str, candidato: str) -> int:
@@ -131,8 +132,8 @@ def _casamento_tamanho(alvo: str, candidato: str) -> int:
     c_limpo = re.sub(r"\s+", " ", _SUFIXO_PAIS_TAMANHO.sub("", c)).strip()
     if a == c or (a_limpo and c_limpo and a_limpo == c_limpo):
         return 2
-    partes_c = [p.strip() for p in re.split(r"[/\-]", c_limpo or c) if p.strip()]
-    partes_a = [p.strip() for p in re.split(r"[/\-]", a_limpo or a) if p.strip()]
+    partes_c = [p.strip() for p in re.split(r"[/\-]|\s+a\s+", c_limpo or c) if p.strip()]
+    partes_a = [p.strip() for p in re.split(r"[/\-]|\s+a\s+", a_limpo or a) if p.strip()]
     if any(pa in partes_c for pa in partes_a):
         return 1
     return 0
@@ -154,6 +155,7 @@ def _escolher_linha_guia(
             continue
         row_size_name: str | None = None
         row_size_id: str | None = None
+        fallback_size_name: str | None = None
         melhor_nota_linha = 0
 
         for attr in row.get("attributes") or []:
@@ -164,6 +166,10 @@ def _escolher_linha_guia(
             if attr_id == "SIZE" and valores and row_size_name is None:
                 row_size_name = str(valores[0].get("name") or "").strip() or None
                 row_size_id = str(valores[0].get("id") or "").strip() or None
+            elif attr_id.endswith("_SIZE") and valores:
+                nome_val = str(valores[0].get("name") or "").strip() or None
+                if nome_val and (fallback_size_name is None or attr_id == "BR_SIZE"):
+                    fallback_size_name = nome_val
             if not tamanho_alvo:
                 continue
             if attr_id == "SIZE" or attr_id.endswith("_SIZE"):
@@ -172,7 +178,7 @@ def _escolher_linha_guia(
                     if nota > melhor_nota_linha:
                         melhor_nota_linha = nota
 
-        candidato = (row_id, row_size_name, row_size_id, melhor_nota_linha)
+        candidato = (row_id, row_size_name or fallback_size_name, row_size_id, melhor_nota_linha)
         if primeira_valida is None:
             primeira_valida = candidato
         if melhor_nota_linha == 2:
@@ -183,6 +189,33 @@ def _escolher_linha_guia(
     if melhor is not None:
         return melhor
     return primeira_valida if not tamanho_alvo else None
+
+
+def _atributo_para_busca_guia(
+    ligado: AtributoLigado,
+    atributo_cat: AtributoML | None,
+) -> dict[str, Any] | None:
+    """Serializa um atributo no contrato de POST /catalog/charts/search ({id, values: [{id, name}]})."""
+    nome_canonico: str | None = None
+    if ligado.valor_id and atributo_cat is not None:
+        for opcao in atributo_cat.valores or ():
+            if isinstance(opcao, tuple) and len(opcao) >= 2:
+                opc_id, opc_nome = str(opcao[0]), str(opcao[1])
+            else:
+                opc_id = str(getattr(opcao, "id", "") or "")
+                opc_nome = str(getattr(opcao, "nome", "") or "")
+            if opc_id == ligado.valor_id and opc_nome:
+                nome_canonico = opc_nome
+                break
+    valor: dict[str, str] = {}
+    if ligado.valor_id:
+        valor["id"] = ligado.valor_id
+    nome = (nome_canonico or ligado.valor or "").strip()
+    if nome:
+        valor["name"] = nome
+    if not valor:
+        return None
+    return {"id": ligado.id, "values": [valor]}
 
 
 def _substituir_ou_adicionar_atributo(ligados: list[AtributoLigado], novo: AtributoLigado) -> list[AtributoLigado]:
@@ -298,6 +331,16 @@ class PublicarNoMercadoLivre:
         if not callable(obter_categoria) or not callable(buscar_guias):
             return ligados
 
+        if not seller_id:
+            obter_perfil = getattr(self._publicador, "obter_perfil_usuario", None)
+            if callable(obter_perfil):
+                try:
+                    perfil = obter_perfil(token)
+                    seller_id = str((perfil or {}).get("id") or "").strip() or None
+                except FalhaNoMarketplace as erro:
+                    if erro.status in (401, 403):
+                        raise
+
         try:
             categoria = obter_categoria(categoria_id, token)
         except FalhaNoMarketplace as erro:
@@ -315,10 +358,14 @@ class PublicarNoMercadoLivre:
 
         atributos_base: list[dict[str, Any]] = []
         if "GENDER" in usados:
-            atributos_base.append(usados["GENDER"].para_api())
+            attr_genero = _atributo_para_busca_guia(usados["GENDER"], por_id.get("GENDER"))
+            if attr_genero is not None:
+                atributos_base.append(attr_genero)
         atributos_com_marca = list(atributos_base)
         if "BRAND" in usados and usados["BRAND"].valor and usados["BRAND"].valor != MARCA_GENERICA_ML:
-            atributos_com_marca.append(usados["BRAND"].para_api())
+            attr_marca = _atributo_para_busca_guia(usados["BRAND"], por_id.get("BRAND"))
+            if attr_marca is not None:
+                atributos_com_marca.append(attr_marca)
 
         consultas: list[tuple[str | None, list[dict[str, Any]], str | None]] = []
         if seller_id:
@@ -326,12 +373,13 @@ class PublicarNoMercadoLivre:
             if atributos_com_marca != atributos_base:
                 consultas.append(("SPECIFIC", atributos_base, seller_id))
         if atributos_com_marca != atributos_base:
-            consultas.append(("BRAND", atributos_com_marca, None))
-        consultas.append(("STANDARD", atributos_base, None))
+            consultas.append(("BRAND", atributos_com_marca, seller_id))
+        consultas.append(("STANDARD", atributos_base, seller_id))
         consultas.append((None, atributos_base, seller_id))
 
         tamanho_alvo = usados["SIZE"].valor if "SIZE" in usados else ""
         melhor_global: tuple[str, str, str | None, str | None, int] | None = None
+        encontrou_guia = False
 
         vistos: set[tuple[str | None, str, str | None]] = set()
         for tipo, attrs, sid in consultas:
@@ -344,13 +392,20 @@ class PublicarNoMercadoLivre:
             except FalhaNoMarketplace as erro:
                 if erro.status in (401, 403):
                     raise
-                log.info("Mercado Livre: busca de guia de tamanhos (%s) falhou (%s).", tipo or "geral", erro.status)
+                detalhe_erro = "; ".join(_causas(erro.corpo, erro.mensagem)) or erro.mensagem
+                log.info(
+                    "Mercado Livre: busca de guia de tamanhos (%s) falhou (%s): %s",
+                    tipo or "geral",
+                    erro.status,
+                    detalhe_erro,
+                )
                 continue
 
             for chart in charts:
                 chart_id = str(chart.get("id") or "").strip()
                 if not chart_id:
                     continue
+                encontrou_guia = True
                 rows = chart.get("rows") or []
                 if not rows and callable(obter_guia):
                     try:
@@ -375,13 +430,19 @@ class PublicarNoMercadoLivre:
                 break
 
         if melhor_global is None:
+            if encontrou_guia and tamanho_alvo:
+                log.info(
+                    "Mercado Livre: nenhuma linha de guia de tamanhos de %s casou com '%s'.",
+                    domain_id,
+                    tamanho_alvo,
+                )
             return ligados
 
         chart_id, row_id, row_size_name, row_size_id, _ = melhor_global
         atualizados = _substituir_ou_adicionar_atributo(ligados, AtributoLigado("SIZE_GRID_ID", chart_id))
         if "SIZE_GRID_ROW_ID" in por_id:
             atualizados = _substituir_ou_adicionar_atributo(atualizados, AtributoLigado("SIZE_GRID_ROW_ID", row_id))
-        if row_size_name and "SIZE" in por_id:
+        if row_size_name and "SIZE" in por_id and (row_size_id is not None or "SIZE" not in usados):
             atualizados = _substituir_ou_adicionar_atributo(
                 atualizados,
                 AtributoLigado("SIZE", row_size_name, row_size_id),
