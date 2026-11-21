@@ -263,8 +263,18 @@ class AnaliseNaoEncontrada(ErroDeDominio):
 class AnuncioNaoEncontrado(ErroDeDominio):
     codigo = "anuncio_nao_encontrado"
 
-    def __init__(self, mensagem: str = "Não encontramos esse anúncio na sua conta do Mercado Livre."):
+    def __init__(
+        self,
+        mensagem: str = "Não encontramos esse anúncio na sua conta do Mercado Livre.",
+        *,
+        canal: str | None = None,
+    ):
         super().__init__(mensagem)
+        self.canal = canal
+
+    @property
+    def extras(self) -> dict:
+        return {"canal": self.canal} if self.canal else {}
 
 
 class AnuncioDesatualizado(ErroDeDominio):
@@ -288,13 +298,21 @@ class PublicacaoRecusada(ErroDeDominio):
 
     codigo = "publicacao_recusada"
 
-    def __init__(self, detalhes: Sequence[str] = ()):
-        super().__init__("O Mercado Livre recusou o anúncio. Confira os dados e tente de novo.")
+    def __init__(self, detalhes: Sequence[str] = (), *, canal: str = "mercado-livre"):
+        if canal == "quickstore":
+            mensagem = "A QuickStore recusou o anúncio. Confira os dados e tente de novo."
+        else:
+            mensagem = "O Mercado Livre recusou o anúncio. Confira os dados e tente de novo."
+        super().__init__(mensagem)
         self.detalhes = list(detalhes)
+        self.canal = canal
 
     @property
     def extras(self) -> dict:
-        return {"detalhes": self.detalhes} if self.detalhes else {}
+        dados: dict = {"canal": self.canal}
+        if self.detalhes:
+            dados["detalhes"] = self.detalhes
+        return dados
 
 
 class CamposObrigatoriosFaltando(ErroDeDominio):

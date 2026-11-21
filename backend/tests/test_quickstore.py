@@ -13,7 +13,12 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from backend.app.bootstrap import criar_app
-from backend.application.casos_de_uso import ConectarMarketplace, ProcessarWebhookQuickStore, PublicarNoMercadoLivre
+from backend.application.casos_de_uso import (
+    ConectarMarketplace,
+    ProcessarWebhookQuickStore,
+    PublicarNaQuickStore,
+    SincronizadorQuickStore,
+)
 from backend.application.ia.modelos import ArquivoDeFoto
 from backend.domain.conta_vinculada import ContaVinculada, CredenciaisOAuth
 from backend.domain.erros import QuickStoreDesconectada
@@ -319,13 +324,12 @@ class TestPublicarNaQuickStore(unittest.TestCase):
         conectar = ConectarMarketplace(vendedores, contas, {"quickstore": GatewayFalso()}, agora=lambda: AGORA)
         publicador = PublicadorFalso(seller_id="1")
         fonte = FonteSemCategoriaFalsa()
-        caso = PublicarNoMercadoLivre(
+        caso = PublicarNaQuickStore(
             conectar,
             publicador,
             fonte,
             AnalisesFalsas({}),
             PillowPreparador(),
-            canal="quickstore",
         )
 
         anuncio_qs = {
@@ -345,13 +349,12 @@ class TestPublicarNaQuickStore(unittest.TestCase):
         contas = RepositorioContasEmMemoria()
         vendedores = RepositorioVendedoresEmMemoria(Vendedor(1, "Ana", PRO))
         conectar = ConectarMarketplace(vendedores, contas, {"quickstore": GatewayFalso()}, agora=lambda: AGORA)
-        caso = PublicarNoMercadoLivre(
+        caso = PublicarNaQuickStore(
             conectar,
             PublicadorFalso(),
             FonteMLFalsa(),
             AnalisesFalsas({}),
             PillowPreparador(),
-            canal="quickstore",
         )
         with self.assertRaises(QuickStoreDesconectada) as ctx:
             caso.executar(1, ANUNCIO, fotos(1))
@@ -741,7 +744,7 @@ class TestWebhookQuickStoreEIntegracaoHTTP(unittest.TestCase):
         data_url = gateway.subir_imagem("token_qs", b"\xff\xd8\xff\xe0", "image/jpeg")
         self.assertTrue(data_url.startswith("data:image/jpeg;base64,"))
 
-        # Verifica que PublicarNoMercadoLivre(canal='quickstore') aceita data_url como source e atualiza todos os campos
+        # Verifica que PublicarNaQuickStore aceita data_url como source e atualiza todos os campos
         contas = RepositorioContasEmMemoria()
         contas.salvar(
             ContaVinculada(
@@ -755,13 +758,12 @@ class TestWebhookQuickStoreEIntegracaoHTTP(unittest.TestCase):
         conectar = ConectarMarketplace(vendedores, contas, {"quickstore": GatewayFalso()}, agora=lambda: AGORA)
         publicador = PublicadorFalso(seller_id="1")
         publicador.subir_imagem = lambda token, conteudo, tipo: "data:image/jpeg;base64,ABCD"
-        caso = PublicarNoMercadoLivre(
+        caso = PublicarNaQuickStore(
             conectar,
             publicador,
             FonteSemCategoriaFalsa(),
             AnalisesFalsas({}),
             PillowPreparador(),
-            canal="quickstore",
         )
         criado = caso.executar(1, {**ANUNCIO, "analise_id": None}, fotos(1))
         self.assertEqual(publicador.itens[0]["pictures"], [{"source": "data:image/jpeg;base64,ABCD"}])
@@ -922,18 +924,17 @@ class TestWebhookQuickStoreEIntegracaoHTTP(unittest.TestCase):
             "status": "active",
         }
         conectar = ConectarMarketplace(self.vendedores, self.contas, {"quickstore": GatewayFalso()}, agora=lambda: AGORA)
-        publicar_qs = PublicarNoMercadoLivre(
+        publicar_qs = PublicarNaQuickStore(
             conectar,
             publicador_qs,
             FonteSemCategoriaFalsa(),
             AnalisesFalsas({}),
             PillowPreparador(),
-            canal="quickstore",
         )
         gerenciar = GerenciarProdutos(
             self.produtos,
             relogio=lambda: AGORA,
-            publicar_na_quickstore=publicar_qs,
+            sincronizadores=(SincronizadorQuickStore(publicar_qs),),
         )
 
         produto = Produto(

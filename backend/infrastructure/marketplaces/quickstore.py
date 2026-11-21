@@ -194,18 +194,28 @@ class GatewayQuickStore:
             resposta.raise_for_status()
             if not resposta.content:
                 return {}
-            return resposta.json()
+            try:
+                return resposta.json()
+            except ValueError as erro:
+                trecho = resposta.text.strip()[:300]
+                raise ErroDaQuickStore(
+                    f"{mensagem_erro} ({resposta.status_code}): resposta não é JSON válido ({trecho or 'vazia'})",
+                    resposta.status_code,
+                    trecho or None,
+                ) from erro
         except httpx.HTTPStatusError as erro:
             detalhe = erro.response.text
             try:
                 corpo = erro.response.json()
             except Exception:
-                corpo = None
+                corpo = detalhe.strip()[:300] or None
             raise ErroDaQuickStore(
                 f"{mensagem_erro} ({erro.response.status_code}): {detalhe[:500]}",
                 erro.response.status_code,
                 corpo,
             ) from erro
+        except ErroDaQuickStore:
+            raise
         except Exception as erro:
             raise ErroDaQuickStore(f"{mensagem_erro}: {type(erro).__name__}") from erro
 

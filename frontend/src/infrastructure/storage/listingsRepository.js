@@ -12,13 +12,9 @@ import { ApiError, requestJson } from '../http/httpClient.js';
 import { STORAGE_KEYS, USER_KEYS, newId, nowIso, readJson, removeKey, userKey, writeJson } from './localStore.js';
 import {
   allHttps,
-  applyMlItemToStoreRecord,
-  applyQuickStoreItemToStoreRecord,
   byUpdatedDesc,
   fromApi,
   mapChannels,
-  matchMlItems,
-  matchQuickStoreItems,
   pickPhotos,
   samePhotos,
   sameRecord,
@@ -195,49 +191,30 @@ async function saveMatchedRecords(accountId, records, next) {
 }
 
 /**
- * Sincroniza os anúncios com os produtos reais retornados pelo Mercado Livre.
+ * Sincroniza os anúncios com os produtos reais retornados por um canal externo, usando `matchFn`.
  * Grava (em paralelo) só os que mudaram; 409 é pulado (o próximo sync acerta) e outro erro
  * sobe depois de todos terminarem.
  */
-export async function syncListingsWithMercadoLivre(accountId, mlProducts) {
-  if (!Array.isArray(mlProducts)) return listListings(accountId);
+export async function syncListingsWithChannel(accountId, products, matchFn) {
+  if (!Array.isArray(products)) return listListings(accountId);
   const records = await loadRecords(accountId);
-  const next = matchMlItems(records, mlProducts);
+  const next = matchFn(records, products);
   return saveMatchedRecords(accountId, records, next);
 }
 
-/**
- * Sincroniza os anúncios com os produtos reais retornados pela QuickStore.
- */
-export async function syncListingsWithQuickStore(accountId, qsProducts) {
-  if (!Array.isArray(qsProducts)) return listListings(accountId);
-  const records = await loadRecords(accountId);
-  const next = matchQuickStoreItems(records, qsProducts);
-  return saveMatchedRecords(accountId, records, next);
-}
-
-/** Atualiza um anúncio específico com os dados frescos vindos do Mercado Livre. */
-export async function mergeMercadoLivreItem(accountId, id, mlItem) {
+/** Atualiza um anúncio específico com os dados frescos vindos de um canal externo, usando `applyFn`. */
+export async function mergeChannelItem(accountId, id, item, applyFn) {
   const current = await fetchRecord(accountId, id);
-  const updated = applyMlItemToStoreRecord(current, mlItem);
-  // Abrir o anúncio não grava nada se o ML não mudou (gravar levaria o anúncio para o topo do painel)
+  const updated = applyFn(current, item);
   if (sameRecord(current, updated)) return toListing(current);
   return toListing(await saveRecord(accountId, updated, current.atualizado_em, current.fotos, { syncQuickStore: false }));
 }
 
-/** Atualiza um anúncio específico com os dados frescos vindos da QuickStore. */
-export async function mergeQuickStoreItem(accountId, id, qsItem) {
-  const current = await fetchRecord(accountId, id);
-  const updated = applyQuickStoreItemToStoreRecord(current, qsItem);
-  if (sameRecord(current, updated)) return toListing(current);
-  return toListing(await saveRecord(accountId, updated, current.atualizado_em, current.fotos, { syncQuickStore: false }));
-}
-
-/** Reconcilia um anúncio local com a lista da QuickStore (por qs_item_id ou título normalizado). */
-export async function reconcileListingWithQuickStore(accountId, listingId, qsProducts) {
-  if (!Array.isArray(qsProducts) || !qsProducts.length) return getListing(accountId, listingId);
+/** Reconcilia um anúncio local com a lista de produtos de um canal externo, usando `matchFn`. */
+export async function reconcileListingWithChannel(accountId, listingId, products, matchFn) {
+  if (!Array.isArray(products) || !products.length) return getListing(accountId, listingId);
   const current = await fetchRecord(accountId, listingId);
-  const matchedList = matchQuickStoreItems([current], qsProducts);
+  const matchedList = matchFn([current], products);
   const reconciled = matchedList.find((item) => item.id === current.id) ?? current;
   if (sameRecord(current, reconciled)) return toListing(current);
   return toListing(

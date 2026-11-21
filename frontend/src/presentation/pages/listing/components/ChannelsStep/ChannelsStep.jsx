@@ -45,6 +45,14 @@ export default function ChannelsStep({ editor }) {
   const worth = others.filter((channel) => !channel.connected);
   const noneSelected = (!showMl || !canPublishMl || !draft.publishMl) && (!showQs || !canPublishQs || !draft.publishQs);
 
+  const previewQuickStore =
+    channelScope === QUICKSTORE_CHANNEL ||
+    (!editor.willPublishMl && (editor.willPublishQs || (canPublishQs && !canPublishMl)));
+  const previewChannel = previewQuickStore ? QUICKSTORE_CHANNEL : PRIMARY_CHANNEL;
+  const previewLabel = previewQuickStore
+    ? (texts.previewQs ?? (texts.previewFor ? texts.previewFor('QuickStore') : 'Prévia na QuickStore'))
+    : texts.preview;
+
   return (
     <div className="channels-step">
       <header>
@@ -91,7 +99,7 @@ export default function ChannelsStep({ editor }) {
               </h4>
               {canPublishMl ? (
                 <Toggle
-                  checked={draft.publishMl}
+                  checked={Boolean(draft.publishMl)}
                   onChange={(checked) => update({ publishMl: checked })}
                   label={texts.toggleLabel}
                   description={noneSelected ? texts.noneSelected : null}
@@ -127,7 +135,7 @@ export default function ChannelsStep({ editor }) {
               </h4>
               {canPublishQs ? (
                 <Toggle
-                  checked={draft.publishQs}
+                  checked={Boolean(draft.publishQs)}
                   onChange={(checked) => update({ publishQs: checked })}
                   label={texts.toggleLabelQs}
                   description={noneSelected ? texts.noneSelected : null}
@@ -181,13 +189,14 @@ export default function ChannelsStep({ editor }) {
         </div>
 
         <ListingPreview
+          channel={previewChannel}
           className="channels-step__preview"
           photo={coverPhoto(draft)}
           title={draft.title}
           price={priceCents !== null ? formatMoney(priceCents) : ''}
           condition={draft.condition === 'used' ? texts.previewUsed : texts.previewNew}
           stock={texts.previewStock(stock)}
-          texts={{ label: texts.preview, shipping: texts.previewFree, buy: texts.previewBuy }}
+          texts={{ label: previewLabel, shipping: texts.previewFree, buy: texts.previewBuy }}
         />
       </div>
     </div>

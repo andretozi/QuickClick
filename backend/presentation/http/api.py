@@ -17,11 +17,12 @@ from backend.domain.usuario import Usuario
 from backend.presentation.http.autenticacao import dependencia_do_admin, dependencia_do_vendedor
 from backend.presentation.http.erros import registrar_tratamento_de_erros
 from backend.presentation.http.limite_do_corpo import LimiteDoCorpo
-from backend.presentation.http.rotas import criar_rotas
+from backend.presentation.http.rotas import LimitadorDeTentativas, concluir_callback_oauth, criar_rotas
 from backend.presentation.http.rotas_admin import criar_rotas_admin
-from backend.presentation.http.rotas_anuncios import criar_rotas_anuncios
 from backend.presentation.http.rotas_ia import criar_rotas_ia
+from backend.presentation.http.rotas_mercado_livre import criar_rotas_mercado_livre
 from backend.presentation.http.rotas_produtos import MAX_BYTES_DO_PRODUTO, criar_rotas_produtos
+from backend.presentation.http.rotas_quickstore import criar_rotas_quickstore
 
 PREFIXO = "/api"
 
@@ -81,13 +82,26 @@ def criar_api(
     app.add_middleware(LimiteDoCorpo, prefixo=f"{PREFIXO}/produtos", maximo_bytes=MAX_BYTES_DO_PRODUTO)
     registrar_cabecalhos_de_seguranca(app)
     registrar_tratamento_de_erros(app)
-    app.include_router(criar_rotas(casos, identificar_vendedor, servico_token=servico_token, usuarios=usuarios), prefix=PREFIXO)
+    limitador = LimitadorDeTentativas()
+    app.include_router(
+        criar_rotas(casos, identificar_vendedor, servico_token=servico_token, limitador=limitador, usuarios=usuarios),
+        prefix=PREFIXO,
+    )
 
     vendedor_atual = Annotated[
         int, Depends(dependencia_do_vendedor(servico_token, identificar_vendedor, usuarios=usuarios))
     ]
     app.include_router(criar_rotas_ia(casos, vendedor_atual), prefix=PREFIXO)
-    app.include_router(criar_rotas_anuncios(casos, vendedor_atual), prefix=PREFIXO)
+    app.include_router(criar_rotas_mercado_livre(casos, vendedor_atual), prefix=PREFIXO)
+    app.include_router(
+        criar_rotas_quickstore(
+            casos,
+            vendedor_atual,
+            lambda **kwargs: concluir_callback_oauth(casos, servico_token, **kwargs),
+            limitador=limitador,
+        ),
+        prefix=PREFIXO,
+    )
     app.include_router(criar_rotas_produtos(casos, vendedor_atual), prefix=PREFIXO)
 
     if usuarios is not None:
@@ -95,3 +109,4 @@ def criar_api(
         app.include_router(criar_rotas_admin(casos, dep_admin), prefix=PREFIXO)
 
     return app
+

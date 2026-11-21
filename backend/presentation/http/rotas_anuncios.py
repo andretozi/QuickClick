@@ -1,25 +1,16 @@
 """
-Apresentação · Publicação e gestão do anúncio no Mercado Livre (exige JWT)
-
-    POST   /api/anuncios/publicar/mercado-livre          multipart: "anuncio" (JSON) e "fotos" (até 6)
-    GET    /api/anuncios/mercado-livre/{item_id}         lê o anúncio atualizado direto do Mercado Livre
-    PATCH  /api/anuncios/mercado-livre/{item_id}/status  pausa ou reativa o anúncio no Mercado Livre
-    PUT    /api/anuncios/mercado-livre/{item_id}         atualiza dados, fotos e descrição no Mercado Livre
-    DELETE /api/anuncios/mercado-livre/{item_id}         fecha e exclui o anúncio no Mercado Livre
+Apresentação · Utilitários HTTP compartilhados de leitura e validação de anúncio multipart/JSON
 """
 
 import json
 from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import Request
 from pydantic import ValidationError
-from starlette.concurrency import run_in_threadpool
 
-from backend.application.casos_de_uso import CasosDeUso
-from backend.domain.erros import ServicoIndisponivel
+from backend.application.ia.modelos import ArquivoDeFoto
 from backend.domain.ia.fotos import MAX_FOTOS_POR_ANALISE
-from backend.presentation.http.esquemas import RequisicaoPublicarAnuncio, RequisicaoStatusAnuncio
-from backend.presentation.http.rotas_ia import ERROS_IA
+from backend.presentation.http.esquemas import RequisicaoPublicarAnuncio
 from backend.presentation.http.uploads import campo_de_texto, ler_fotos
 
 MAX_BYTES_JSON_ANUNCIO = 100_000
@@ -37,111 +28,17 @@ def _ler_anuncio_json(bruto: str) -> dict[str, Any]:
         raise ValueError("Anúncio inválido.") from erro
 
 
-def criar_rotas_anuncios(casos: CasosDeUso, VendedorAtual) -> APIRouter:  # noqa: N803 (tipo anotado do FastAPI)
-    rotas = APIRouter(prefix="/anuncios", tags=["anuncios"])
-
-    @rotas.post("/publicar/mercado-livre", summary="Publica o anúncio no Mercado Livre (montado no back)",
-                responses=ERROS_IA)
-    async def publicar_no_mercado_livre(request: Request, vendedor_id: VendedorAtual) -> dict[str, Any]:
-        if casos.publicar_no_mercado_livre is None:
-            raise ServicoIndisponivel()
+async def ler_payload_anuncio(
+    request: Request,
+    *,
+    aceitar_json_puro: bool = False,
+) -> tuple[dict[str, Any], list[ArquivoDeFoto]]:
+    tipo_conteudo = (request.headers.get("content-type") or "").lower()
+    if not aceitar_json_puro or "multipart/form-data" in tipo_conteudo:
         fotos = await ler_fotos(request, "fotos", MAX_FOTOS_POR_ANALISE)
         bruto = await campo_de_texto(request, "anuncio") or "{}"
-        anuncio = _ler_anuncio_json(bruto)
-        return await run_in_threadpool(casos.publicar_no_mercado_livre.executar, vendedor_id, anuncio, fotos)
-
-    @rotas.get("/mercado-livre/{item_id}", summary="Obtém os dados atualizados de um anúncio no Mercado Livre",
-               responses=ERROS_IA)
-    async def obter_anuncio_mercado_livre(item_id: str, vendedor_id: VendedorAtual) -> dict[str, Any]:
-        if casos.publicar_no_mercado_livre is None:
-            raise ServicoIndisponivel()
-        return await run_in_threadpool(casos.publicar_no_mercado_livre.obter, vendedor_id, item_id)
-
-    @rotas.patch("/mercado-livre/{item_id}/status", summary="Pausa ou reativa um anúncio no Mercado Livre",
-                 responses=ERROS_IA)
-    async def alterar_status_mercado_livre(item_id: str, corpo: RequisicaoStatusAnuncio,
-                                           vendedor_id: VendedorAtual) -> dict[str, Any]:
-        if casos.publicar_no_mercado_livre is None:
-            raise ServicoIndisponivel()
-        return await run_in_threadpool(
-            casos.publicar_no_mercado_livre.alterar_status, vendedor_id, item_id, corpo.status
-        )
-
-    @rotas.put("/mercado-livre/{item_id}", summary="Atualiza um anúncio existente no Mercado Livre",
-               responses=ERROS_IA)
-    async def atualizar_anuncio_mercado_livre(item_id: str, request: Request,
-                                              vendedor_id: VendedorAtual) -> dict[str, Any]:
-        if casos.publicar_no_mercado_livre is None:
-            raise ServicoIndisponivel()
-        tipo_conteudo = (request.headers.get("content-type") or "").lower()
-        if "multipart/form-data" in tipo_conteudo:
-            fotos = await ler_fotos(request, "fotos", MAX_FOTOS_POR_ANALISE)
-            bruto = await campo_de_texto(request, "anuncio") or "{}"
-        else:
-            fotos = []
-            bruto = (await request.body()).decode("utf-8", errors="replace") or "{}"
-        anuncio = _ler_anuncio_json(bruto)
-        return await run_in_threadpool(
-            casos.publicar_no_mercado_livre.atualizar, vendedor_id, item_id, anuncio, fotos
-        )
-
-    @rotas.delete("/mercado-livre/{item_id}", summary="Fecha e exclui um anúncio no Mercado Livre",
-                  responses=ERROS_IA)
-    async def excluir_anuncio_mercado_livre(item_id: str, vendedor_id: VendedorAtual) -> dict[str, Any]:
-        if casos.publicar_no_mercado_livre is None:
-            raise ServicoIndisponivel()
-        return await run_in_threadpool(casos.publicar_no_mercado_livre.excluir, vendedor_id, item_id)
-
-    @rotas.post("/publicar/quickstore", summary="Publica o anúncio na QuickStore (montado no back)",
-                responses=ERROS_IA)
-    async def publicar_na_quickstore(request: Request, vendedor_id: VendedorAtual) -> dict[str, Any]:
-        if casos.publicar_na_quickstore is None:
-            raise ServicoIndisponivel()
-        fotos = await ler_fotos(request, "fotos", MAX_FOTOS_POR_ANALISE)
-        bruto = await campo_de_texto(request, "anuncio") or "{}"
-        anuncio = _ler_anuncio_json(bruto)
-        return await run_in_threadpool(casos.publicar_na_quickstore.executar, vendedor_id, anuncio, fotos)
-
-    @rotas.get("/quickstore/{item_id}", summary="Obtém os dados atualizados de um anúncio na QuickStore",
-               responses=ERROS_IA)
-    async def obter_anuncio_quickstore(item_id: str, vendedor_id: VendedorAtual) -> dict[str, Any]:
-        if casos.publicar_na_quickstore is None:
-            raise ServicoIndisponivel()
-        return await run_in_threadpool(casos.publicar_na_quickstore.obter, vendedor_id, item_id)
-
-    @rotas.patch("/quickstore/{item_id}/status", summary="Pausa ou reativa um anúncio na QuickStore",
-                 responses=ERROS_IA)
-    async def alterar_status_quickstore(item_id: str, corpo: RequisicaoStatusAnuncio,
-                                        vendedor_id: VendedorAtual) -> dict[str, Any]:
-        if casos.publicar_na_quickstore is None:
-            raise ServicoIndisponivel()
-        return await run_in_threadpool(
-            casos.publicar_na_quickstore.alterar_status, vendedor_id, item_id, corpo.status
-        )
-
-    @rotas.put("/quickstore/{item_id}", summary="Atualiza um anúncio existente na QuickStore",
-               responses=ERROS_IA)
-    async def atualizar_anuncio_quickstore(item_id: str, request: Request,
-                                           vendedor_id: VendedorAtual) -> dict[str, Any]:
-        if casos.publicar_na_quickstore is None:
-            raise ServicoIndisponivel()
-        tipo_conteudo = (request.headers.get("content-type") or "").lower()
-        if "multipart/form-data" in tipo_conteudo:
-            fotos = await ler_fotos(request, "fotos", MAX_FOTOS_POR_ANALISE)
-            bruto = await campo_de_texto(request, "anuncio") or "{}"
-        else:
-            fotos = []
-            bruto = (await request.body()).decode("utf-8", errors="replace") or "{}"
-        anuncio = _ler_anuncio_json(bruto)
-        return await run_in_threadpool(
-            casos.publicar_na_quickstore.atualizar, vendedor_id, item_id, anuncio, fotos
-        )
-
-    @rotas.delete("/quickstore/{item_id}", summary="Fecha e exclui um anúncio na QuickStore",
-                  responses=ERROS_IA)
-    async def excluir_anuncio_quickstore(item_id: str, vendedor_id: VendedorAtual) -> dict[str, Any]:
-        if casos.publicar_na_quickstore is None:
-            raise ServicoIndisponivel()
-        return await run_in_threadpool(casos.publicar_na_quickstore.excluir, vendedor_id, item_id)
-
-    return rotas
+    else:
+        fotos = []
+        bruto = (await request.body()).decode("utf-8", errors="replace") or "{}"
+    anuncio = _ler_anuncio_json(bruto)
+    return anuncio, fotos

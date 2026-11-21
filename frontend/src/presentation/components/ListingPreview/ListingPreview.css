@@ -124,3 +124,11 @@
   font-weight: 700;
   text-align: center;
 }
+
+.listing-preview--quickstore .listing-preview__bar {
+  background: var(--color-quickstore, var(--color-brand));
+}
+
+.listing-preview--quickstore .listing-preview__buy {
+  background: var(--color-quickstore, var(--color-brand));
+}

@@ -155,13 +155,13 @@ function toAnalysis(data) {
   };
 }
 
-function photosForm(field, blobs) {
+export function photosForm(field, blobs) {
   const form = new FormData();
   blobs.forEach((blob, index) => form.append(field, blob, `foto${index + 1}.jpg`));
   return form;
 }
 
-function toAnuncioPayload(listing) {
+export function toAnuncioPayload(listing) {
   return {
     titulo: listing.title,
     descricao: listing.description,
@@ -218,99 +218,5 @@ export async function resumeAnalysis(id, readingBlobs = null) {
   const options = { method: 'POST' };
   if (readingBlobs?.length) options.body = photosForm('fotos', readingBlobs);
   return toAnalysis(await requestJson(`/ia/analises/${encodeURIComponent(id)}/retomar`, options));
-}
-
-/**
- * Publica no Mercado Livre com o anúncio montado no back.
- * listing: { title, description, priceCents, stock, condition ('new' ou 'used'), attributes: [{ key, value }],
- *            analysisId, mlCategoryId, keptPhotos }
- */
-export async function publishToMercadoLivre(listing, photoBlobs = []) {
-  const form = photosForm('fotos', photoBlobs);
-  form.append('anuncio', JSON.stringify(toAnuncioPayload(listing)));
-  const data = await requestJson('/anuncios/publicar/mercado-livre', { method: 'POST', body: form });
-  return {
-    id: data.id,
-    permalink: data.permalink ?? null,
-    status: data.status ?? null,
-    categoryId: data.categoria_id ?? null,
-    notices: (data.avisos ?? []).map((a) => ({ code: a.codigo, message: a.mensagem }))
-  };
-}
-
-/** Obtém os dados mais recentes de um anúncio publicado no Mercado Livre. */
-export async function fetchMercadoLivreItem(itemId) {
-  return await requestJson(`/anuncios/mercado-livre/${encodeURIComponent(itemId)}`);
-}
-
-/** Pausa ('paused') ou reativa ('published') um anúncio diretamente no Mercado Livre. */
-export async function updateMercadoLivreStatus(itemId, nextStatus) {
-  const status = nextStatus === 'paused' ? 'pausado' : 'publicado';
-  return await requestJson(`/anuncios/mercado-livre/${encodeURIComponent(itemId)}/status`, {
-    method: 'PATCH',
-    body: { status }
-  });
-}
-
-/** Atualiza preço, estoque, fotos, atributos, título e descrição de um anúncio no Mercado Livre. */
-export async function updateMercadoLivreItem(itemId, listing, photoBlobs = []) {
-  const form = photosForm('fotos', photoBlobs);
-  form.append('anuncio', JSON.stringify(toAnuncioPayload(listing)));
-  return await requestJson(`/anuncios/mercado-livre/${encodeURIComponent(itemId)}`, {
-    method: 'PUT',
-    body: form
-  });
-}
-
-/** Fecha e exclui definitivamente o anúncio no Mercado Livre. */
-export async function deleteMercadoLivreItem(itemId) {
-  return await requestJson(`/anuncios/mercado-livre/${encodeURIComponent(itemId)}`, {
-    method: 'DELETE'
-  });
-}
-
-/** Publica na QuickStore com o anúncio montado no back. */
-export async function publishToQuickStore(listing, photoBlobs = []) {
-  const form = photosForm('fotos', photoBlobs);
-  form.append('anuncio', JSON.stringify(toAnuncioPayload(listing)));
-  const data = await requestJson('/anuncios/publicar/quickstore', { method: 'POST', body: form });
-  return {
-    id: data.id,
-    permalink: data.permalink ?? null,
-    status: data.status ?? null,
-    categoryId: data.categoria_id ?? null,
-    notices: (data.avisos ?? []).map((a) => ({ code: a.codigo, message: a.mensagem }))
-  };
-}
-
-/** Obtém os dados mais recentes de um anúncio publicado na QuickStore. */
-export async function fetchQuickStoreItem(itemId) {
-  return await requestJson(`/anuncios/quickstore/${encodeURIComponent(itemId)}`);
-}
-
-/** Pausa ('paused') ou reativa ('published') um anúncio diretamente na QuickStore. */
-export async function updateQuickStoreStatus(itemId, nextStatus) {
-  const status = nextStatus === 'paused' ? 'pausado' : 'publicado';
-  return await requestJson(`/anuncios/quickstore/${encodeURIComponent(itemId)}/status`, {
-    method: 'PATCH',
-    body: { status }
-  });
-}
-
-/** Atualiza preço, estoque, fotos, atributos, título e descrição de um anúncio na QuickStore. */
-export async function updateQuickStoreItem(itemId, listing, photoBlobs = []) {
-  const form = photosForm('fotos', photoBlobs);
-  form.append('anuncio', JSON.stringify(toAnuncioPayload(listing)));
-  return await requestJson(`/anuncios/quickstore/${encodeURIComponent(itemId)}`, {
-    method: 'PUT',
-    body: form
-  });
-}
-
-/** Fecha e exclui definitivamente o anúncio na QuickStore. */
-export async function deleteQuickStoreItem(itemId) {
-  return await requestJson(`/anuncios/quickstore/${encodeURIComponent(itemId)}`, {
-    method: 'DELETE'
-  });
 }
 

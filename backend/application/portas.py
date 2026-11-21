@@ -198,12 +198,13 @@ class FalhaNoMarketplace(RuntimeError):
 
     def __init__(self, mensagem: str, status: int = 0, corpo: Any = None):
         super().__init__(mensagem)
+        self.mensagem = mensagem
         self.status = status
         self.corpo = corpo
 
 
-class PublicadorMercadoLivre(Protocol):
-    """O que a publicação e a gestão de anúncios precisam do Mercado Livre (com o token do vendedor)."""
+class PublicadorDeCanal(Protocol):
+    """O que a publicação e a gestão de anúncios precisam do canal/marketplace (com o token do vendedor)."""
 
     def subir_imagem(self, access_token: str, jpeg: bytes, nome: str = "foto.jpg") -> str: ...
 
@@ -220,6 +221,17 @@ class PublicadorMercadoLivre(Protocol):
     def excluir_anuncio(self, access_token: str, item_id: str) -> dict[str, Any]: ...
 
 
+PublicadorMercadoLivre = PublicadorDeCanal
+
+
+class SincronizadorDeCanal(Protocol):
+    """Hooks invocados ao salvar ou remover produtos no banco para refletir nos canais externos."""
+
+    def sincronizar_ao_salvar(self, vendedor_id: int, anterior: Produto | None, salvo: Produto) -> None: ...
+
+    def sincronizar_ao_remover(self, vendedor_id: int, anterior: Produto) -> None: ...
+
+
 class GatewayWebhookQuickStore(Protocol):
     """Operações de webhook e consulta de pedidos e anúncios da QuickStore."""
 
@@ -231,4 +243,5 @@ class GatewayWebhookQuickStore(Protocol):
     def obter_pedido(self, access_token: str, resource_ou_order_id: str) -> dict[str, Any]: ...
 
     def obter_anuncio(self, access_token: str, item_id: str) -> dict[str, Any]: ...
+
 
