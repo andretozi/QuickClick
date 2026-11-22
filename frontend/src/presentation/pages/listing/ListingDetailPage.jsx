@@ -7,6 +7,7 @@ import MarketplaceLogo from '@/presentation/components/MarketplaceLogo/Marketpla
 import Modal from '@/presentation/components/Modal/Modal.jsx';
 import PageHeader from '@/presentation/components/PageHeader/PageHeader.jsx';
 import Panel from '@/presentation/components/Panel/Panel.jsx';
+import QrCodeModal from '@/presentation/components/QrCodeModal/QrCodeModal.jsx';
 import StatusPanel from '@/presentation/components/StatusPanel/StatusPanel.jsx';
 import StatusPill from '@/presentation/components/StatusPill/StatusPill.jsx';
 import useListingDetail from '@/application/listings/useListingDetail.js';
@@ -73,6 +74,7 @@ export default function ListingDetailPage({ params }) {
 
   const [stockDraft, setStockDraft] = useState('');
   const [savingStock, setSavingStock] = useState(false);
+  const [qrChannel, setQrChannel] = useState(null);
 
   useEffect(() => {
     if (listing?.stock !== undefined && listing?.stock !== null) {
@@ -272,41 +274,44 @@ export default function ListingDetailPage({ params }) {
           </strong>
           <form className="listing-detail__stock-form" onSubmit={handleStockSubmit}>
             <div className="listing-detail__stock-controls">
-              <button
-                type="button"
-                className="listing-detail__stock-step"
-                aria-label="Diminuir estoque"
-                disabled={busy || savingStock || (Number(stockDraft) || 0) <= 0}
-                onClick={() => setStockDraft(String(Math.max(0, (Number(stockDraft) || 0) - 1)))}
-              >
-                −
-              </button>
-              <input
-                type="number"
-                min={0}
-                max={LISTING_LIMITS.STOCK_MAX}
-                step={1}
-                aria-label={LISTING_DETAIL.metrics.stockInputLabel}
-                className="listing-detail__stock-input"
-                value={stockDraft}
-                disabled={busy || savingStock}
-                onChange={(e) => setStockDraft(e.target.value)}
-              />
-              <button
-                type="button"
-                className="listing-detail__stock-step"
-                aria-label="Aumentar estoque"
-                disabled={busy || savingStock || (Number(stockDraft) || 0) >= LISTING_LIMITS.STOCK_MAX}
-                onClick={() =>
-                  setStockDraft(String(Math.min(LISTING_LIMITS.STOCK_MAX, (Number(stockDraft) || 0) + 1)))
-                }
-              >
-                +
-              </button>
+              <div className="listing-detail__stock-stepper">
+                <button
+                  type="button"
+                  className="listing-detail__stock-step"
+                  aria-label="Diminuir estoque"
+                  disabled={busy || savingStock || (Number(stockDraft) || 0) <= 0}
+                  onClick={() => setStockDraft(String(Math.max(0, (Number(stockDraft) || 0) - 1)))}
+                >
+                  −
+                </button>
+                <input
+                  type="number"
+                  min={0}
+                  max={LISTING_LIMITS.STOCK_MAX}
+                  step={1}
+                  aria-label={LISTING_DETAIL.metrics.stockInputLabel}
+                  className="listing-detail__stock-input"
+                  value={stockDraft}
+                  disabled={busy || savingStock}
+                  onChange={(e) => setStockDraft(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="listing-detail__stock-step"
+                  aria-label="Aumentar estoque"
+                  disabled={busy || savingStock || (Number(stockDraft) || 0) >= LISTING_LIMITS.STOCK_MAX}
+                  onClick={() =>
+                    setStockDraft(String(Math.min(LISTING_LIMITS.STOCK_MAX, (Number(stockDraft) || 0) + 1)))
+                  }
+                >
+                  +
+                </button>
+              </div>
               <Button
                 type="submit"
                 size="sm"
                 variant={stockChanged ? 'primary' : 'outline'}
+                className="listing-detail__stock-save"
                 loading={savingStock}
                 loadingText={LISTING_DETAIL.metrics.stockSaving}
                 disabled={!stockChanged || busy || savingStock}
@@ -403,10 +408,22 @@ export default function ListingDetailPage({ params }) {
               {channelCards.map((channel) => {
                 const toggleBtn =
                   channel.status === LISTING_STATUS.PUBLISHED
-                    ? { icon: 'pause', label: LISTING_DETAIL.channels.pauseChannel(channel.name) }
+                    ? {
+                        icon: 'pause',
+                        label: LISTING_DETAIL.channels.shortPause,
+                        ariaLabel: LISTING_DETAIL.channels.pauseChannel(channel.name)
+                      }
                     : channel.status === LISTING_STATUS.PAUSED
-                      ? { icon: 'play', label: LISTING_DETAIL.channels.resumeChannel(channel.name) }
-                      : { icon: 'upload', label: LISTING_DETAIL.channels.publishChannel(channel.name) };
+                      ? {
+                          icon: 'play',
+                          label: LISTING_DETAIL.channels.shortResume,
+                          ariaLabel: LISTING_DETAIL.channels.resumeChannel(channel.name)
+                        }
+                      : {
+                          icon: 'upload',
+                          label: LISTING_DETAIL.channels.shortPublish,
+                          ariaLabel: LISTING_DETAIL.channels.publishChannel(channel.name)
+                        };
 
                 return (
                   <section
@@ -468,6 +485,8 @@ export default function ListingDetailPage({ params }) {
                         icon={toggleBtn.icon}
                         iconPosition="start"
                         iconSize={15}
+                        aria-label={toggleBtn.ariaLabel}
+                        className="listing-detail__channel-action-btn"
                         onClick={() => toggleChannelStatus(channel.slug)}
                         disabled={busy}
                       >
@@ -481,24 +500,11 @@ export default function ListingDetailPage({ params }) {
                         icon="edit"
                         iconPosition="start"
                         iconSize={15}
+                        aria-label={LISTING_DETAIL.channels.editChannel(channel.name)}
+                        className="listing-detail__channel-action-btn"
                       >
-                        {LISTING_DETAIL.channels.editChannel(channel.name)}
+                        {LISTING_DETAIL.channels.shortEdit}
                       </Button>
-
-                      {(channel.status !== LISTING_STATUS.UNPUBLISHED || Boolean(channel.itemId)) && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          icon="trash"
-                          iconPosition="start"
-                          iconSize={15}
-                          onClick={() => requestChannelRemoval(channel.slug)}
-                          disabled={busy || removingChannel}
-                          className="listing-detail__channel-delete-btn"
-                        >
-                          {LISTING_DETAIL.channels.deleteChannel(channel.name)}
-                        </Button>
-                      )}
 
                       {channel.permalink && (
                         <Button
@@ -510,8 +516,41 @@ export default function ListingDetailPage({ params }) {
                           icon="external"
                           iconPosition="start"
                           iconSize={15}
+                          aria-label={LISTING_DETAIL.channels.openChannel(channel.name)}
+                          className="listing-detail__channel-action-btn"
                         >
-                          {LISTING_DETAIL.channels.openChannel(channel.name)}
+                          {LISTING_DETAIL.channels.shortOpen}
+                        </Button>
+                      )}
+
+                      {channel.permalink && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          icon="qr-code"
+                          iconPosition="start"
+                          iconSize={15}
+                          aria-label={LISTING_DETAIL.channels.qrCodeChannel(channel.name)}
+                          className="listing-detail__channel-action-btn listing-detail__channel-qr-btn"
+                          onClick={() => setQrChannel(channel)}
+                        >
+                          {LISTING_DETAIL.channels.shortQrCode}
+                        </Button>
+                      )}
+
+                      {(channel.status !== LISTING_STATUS.UNPUBLISHED || Boolean(channel.itemId)) && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          icon="trash"
+                          iconPosition="start"
+                          iconSize={15}
+                          aria-label={LISTING_DETAIL.channels.deleteChannel(channel.name)}
+                          onClick={() => requestChannelRemoval(channel.slug)}
+                          disabled={busy || removingChannel}
+                          className="listing-detail__channel-action-btn listing-detail__channel-delete-btn"
+                        >
+                          {LISTING_DETAIL.channels.shortDelete}
                         </Button>
                       )}
                     </div>
@@ -689,6 +728,15 @@ export default function ListingDetailPage({ params }) {
             </Button>
           </>
         }
+      />
+
+      <QrCodeModal
+        open={Boolean(qrChannel)}
+        onClose={() => setQrChannel(null)}
+        channelSlug={qrChannel?.slug}
+        channelName={qrChannel?.name}
+        listingTitle={listing.title}
+        url={qrChannel?.permalink}
       />
     </div>
   );

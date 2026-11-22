@@ -1,0 +1,71 @@
+/* ==================================================================
+   Bloco: qr-code-modal (modal de QR Code por plataforma)
+   ================================================================== */
+.qr-code-modal {
+  padding: 30px 26px 24px;
+}
+
+.qr-code-modal__brand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 14px;
+  margin-bottom: 14px;
+  border-radius: var(--radius-md);
+  background: var(--color-white);
+  box-shadow: 0 8px 18px -12px rgb(var(--rgb-black) / 0.35);
+}
+
+.qr-code-modal__frame {
+  width: min(260px, 100%);
+  margin: 18px auto 0;
+  padding: 14px;
+  border: 1px solid rgb(var(--rgb-ink) / 0.12);
+  border-radius: var(--radius-lg);
+  background: var(--color-white);
+  box-shadow: 0 18px 36px -22px rgb(var(--rgb-black) / 0.35);
+}
+
+.qr-code-modal__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+}
+
+.qr-code-modal__listing-title {
+  margin: 14px 0 0;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.qr-code-modal__url {
+  margin: 6px 0 0;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: rgb(var(--rgb-ink) / 0.06);
+  color: rgb(var(--rgb-ink) / 0.68);
+  font-size: 12px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.qr-code-modal__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+
+.qr-code-modal__action-btn {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 440px) {
+  .qr-code-modal__actions {
+    grid-template-columns: 1fr;
+  }
+}
