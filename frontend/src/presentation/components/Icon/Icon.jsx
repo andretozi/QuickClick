@@ -200,6 +200,16 @@ const ICONS = {
       </>
     )
   },
+  'qr-code': {
+    body: (
+      <>
+        <rect x="3.5" y="3.5" width="6.5" height="6.5" rx="1.2" />
+        <rect x="14" y="3.5" width="6.5" height="6.5" rx="1.2" />
+        <rect x="3.5" y="14" width="6.5" height="6.5" rx="1.2" />
+        <path d="M14 14h2.5v2.5H14zM18.5 14H20.5M14 19.5h3M19.5 17.5v3" />
+      </>
+    )
+  },
   home: {
     body: (
       <>

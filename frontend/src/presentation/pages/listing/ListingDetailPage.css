@@ -42,34 +42,55 @@
 }
 
 .listing-detail__metric-foot {
+  margin-top: auto;
   color: rgb(var(--rgb-ink) / 0.65);
   font-size: 13.5px;
   font-weight: 600;
 }
 
 .listing-detail__stock-form {
-  margin: 2px 0;
+  margin: 4px 0 2px;
 }
 
 .listing-detail__stock-controls {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.listing-detail__stock-stepper {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) 38px;
+  align-items: stretch;
+  width: 100%;
+  height: 38px;
+  border: 1px solid rgb(var(--rgb-ink) / 0.18);
+  border-radius: var(--radius-md);
+  background: var(--color-white);
+  overflow: hidden;
+  transition:
+    border-color var(--duration-fast),
+    box-shadow var(--duration-fast);
+}
+
+.listing-detail__stock-stepper:focus-within {
+  border-color: var(--color-coral);
+  box-shadow: 0 0 0 2px rgb(var(--rgb-coral) / 0.22);
 }
 
 .listing-detail__stock-step {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 100%;
+  height: 100%;
   padding: 0;
-  border: 1px solid rgb(var(--rgb-ink) / 0.18);
-  border-radius: var(--radius-sm);
-  background: var(--color-white);
+  border: none;
+  border-radius: 0;
+  background: transparent;
   color: var(--color-ink);
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 800;
   line-height: 1;
   cursor: pointer;
@@ -78,9 +99,16 @@
     border-color var(--duration-fast);
 }
 
+.listing-detail__stock-step:first-child {
+  border-right: 1px solid rgb(var(--rgb-ink) / 0.12);
+}
+
+.listing-detail__stock-step:last-child {
+  border-left: 1px solid rgb(var(--rgb-ink) / 0.12);
+}
+
 .listing-detail__stock-step:hover:not(:disabled) {
   background: rgb(var(--rgb-ink) / 0.06);
-  border-color: rgb(var(--rgb-ink) / 0.35);
 }
 
 .listing-detail__stock-step:disabled {
@@ -89,22 +117,38 @@
 }
 
 .listing-detail__stock-input {
-  width: 68px;
-  height: 30px;
-  padding: 2px 8px;
-  border: 1px solid rgb(var(--rgb-ink) / 0.22);
-  border-radius: var(--radius-sm);
-  background: var(--color-white);
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 0 8px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
   color: var(--color-ink);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 800;
+  font-variant-numeric: tabular-nums;
   text-align: center;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.listing-detail__stock-input::-webkit-outer-spin-button,
+.listing-detail__stock-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 .listing-detail__stock-input:focus {
-  outline: 2px solid var(--color-coral);
-  outline-offset: 1px;
-  border-color: var(--color-coral);
+  outline: none;
+}
+
+.listing-detail__stock-save {
+  width: 100%;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: var(--radius-md);
+  font-size: 13.5px;
 }
 
 .listing-detail__grid {
@@ -180,10 +224,9 @@
 
 .listing-detail__channel-head {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px 12px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
 }
 
 .listing-detail__channel-identity {
@@ -194,6 +237,11 @@
 
 .listing-detail__channel-logo {
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 112px;
+  height: 42px;
   padding: 6px 10px;
   border-radius: var(--radius-md);
   background: var(--color-white);
@@ -232,9 +280,21 @@
 }
 
 .listing-detail__channel-actions {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+}
+
+.listing-detail__channel-action-btn {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 12px;
+  font-size: 13.5px;
+}
+
+.listing-detail__channel-qr-btn {
+  --button-bg: rgb(var(--rgb-ink) / 0.04);
+  --button-border: rgb(var(--rgb-ink) / 0.28);
 }
 
 .listing-detail__stage {
@@ -320,6 +380,10 @@
   border-color: rgb(var(--rgb-coral) / 0.35);
 }
 
+.listing-detail__channel-delete-btn {
+  grid-column: 1 / -1;
+}
+
 .listing-detail__delete-btn:hover,
 .listing-detail__channel-delete-btn:hover {
   background: rgb(var(--rgb-coral) / 0.08);
@@ -387,6 +451,12 @@
 
 @media (max-width: 540px) {
   .listing-detail__metrics {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .listing-detail__channel-actions {
     grid-template-columns: 1fr;
   }
 }

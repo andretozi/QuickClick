@@ -404,7 +404,23 @@ export const LISTING_DETAIL = {
     publishChannel: (name) => `Publicar em ${name}`,
     pauseChannel: (name) => `Pausar em ${name}`,
     resumeChannel: (name) => `Reativar em ${name}`,
-    openChannel: (name) => `Abrir em ${name}`
+    openChannel: (name) => `Abrir em ${name}`,
+    qrCodeChannel: (name) => `Gerar QR Code de ${name}`,
+    shortPublish: 'Publicar',
+    shortPause: 'Pausar',
+    shortResume: 'Reativar',
+    shortEdit: 'Editar',
+    shortOpen: 'Abrir anúncio',
+    shortQrCode: 'QR Code',
+    shortDelete: 'Excluir do canal',
+    qrModal: {
+      title: (name) => `Acesse em ${name}`,
+      description: 'Aponte a câmera do celular para abrir a publicação diretamente.',
+      qrAlt: (name) => `QR Code da publicação em ${name}`,
+      copyLink: 'Copiar link',
+      copied: 'Link copiado',
+      openListing: 'Abrir publicação'
+    }
   },
   globalActions: {
     title: 'Ações gerais do anúncio',
@@ -473,7 +489,12 @@ export const LISTING_DETAIL = {
       title: `Você não está conectado em ${name}.`,
       text: `Conecte sua conta de ${name} em Marketplaces para excluir o anúncio ativo dessa plataforma.`
     }),
-    syncError: { title: 'Não deu pra sincronizar agora.', text: 'Mostrando os últimos dados salvos no painel.' }
+    syncError: { title: 'Não deu pra sincronizar agora.', text: 'Mostrando os últimos dados salvos no painel.' },
+    qrCopied: { title: 'Link copiado.', text: 'O endereço da publicação foi copiado para a área de transferência.' },
+    qrCopyError: {
+      title: 'Não deu pra copiar o link.',
+      text: 'Use o botão para abrir a publicação ou copie o endereço exibido.'
+    }
   }
 };
 
